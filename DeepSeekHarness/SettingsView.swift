@@ -44,9 +44,24 @@ struct SettingsView: View {
                 }
 
                 Section("关于") {
-                    LabeledContent("最低系统", value: "iOS 15.0")
-                    LabeledContent("网络", value: "HTTP / HTTPS")
-                    LabeledContent("版本", value: "首版开发中")
+                    HStack {
+                        Text("最低系统")
+                        Spacer()
+                        Text("iOS 15.0")
+                            .foregroundColor(.secondary)
+                    }
+                    HStack {
+                        Text("网络")
+                        Spacer()
+                        Text("HTTP / HTTPS")
+                            .foregroundColor(.secondary)
+                    }
+                    HStack {
+                        Text("版本")
+                        Spacer()
+                        Text("首版开发中")
+                            .foregroundColor(.secondary)
+                    }
                 }
             }
             .navigationTitle("设置")
