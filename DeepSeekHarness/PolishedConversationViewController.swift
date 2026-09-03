@@ -248,8 +248,53 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
 }
 
 final class HarnessMessageCell: UITableViewCell {
-    private let card=UIView(), title=UILabel(), body=UILabel(), meta=UILabel()
-    override init(style:UITableViewCell.CellStyle,reuseIdentifier:String?){super.init(style:style,reuseIdentifier:reuseIdentifier);selectionStyle=.none;backgroundColor=.clear;card.layer.cornerRadius=14;card.translatesAutoresizingMaskIntoConstraints=false;contentView.addSubview(card);[title,body,meta].forEach{$0.translatesAutoresizingMaskIntoConstraints=false;card.addSubview($0)};title.font=DHTheme.font(.caption1,weight:.semibold);body.font=DHTheme.font(.body);body.numberOfLines=0;meta.font=DHTheme.font(.caption2);meta.textColor=DHTheme.tertiaryText;NSLayoutConstraint.activate([card.leadingAnchor.constraint(equalTo:contentView.leadingAnchor,constant:14),card.trailingAnchor.constraint(equalTo:contentView.trailingAnchor,constant:-14),card.topAnchor.constraint(equalTo:contentView.topAnchor,constant:5),card.bottomAnchor.constraint(equalTo:contentView.bottomAnchor,constant:-5),title.leadingAnchor.constraint(equalTo:card.leadingAnchor,constant:13),title.trailingAnchor.constraint(equalTo:card.trailingAnchor,constant:-13),title.topAnchor.constraint(equalTo:card.topAnchor,constant:10),body.leadingAnchor.constraint(equalTo:title.leadingAnchor),body.trailingAnchor.constraint(equalTo:title.trailingAnchor),body.topAnchor.constraint(equalTo:title.bottomAnchor,constant:5),meta.leadingAnchor.constraint(equalTo:title.leadingAnchor),meta.trailingAnchor.constraint(equalTo:title.trailingAnchor),meta.topAnchor.constraint(equalTo:body.bottomAnchor,constant:6),meta.bottomAnchor.constraint(equalTo:card.bottomAnchor,constant:-9)])}
-    @available(*,unavailable) required init?(coder:NSCoder){fatalError()}
-    func configure(_ item:HarnessConversationItem){title.text=item.kind==.user ? "你" : item.kind==.assistant ? "Harness" : item.kind==.tool ? "工具" : "系统";body.text=item.text;meta.text=item.subtitle;card.backgroundColor=item.kind==.user ? DHTheme.accentSoft : item.kind==.tool ? DHTheme.surfaceMuted : DHTheme.surface;title.textColor=item.kind==.user ? DHTheme.accent : DHTheme.secondaryText}
+    private let card = UIView()
+    private let title = UILabel()
+    private let body = UILabel()
+    private let meta = UILabel()
+
+    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+        super.init(style: style, reuseIdentifier: reuseIdentifier)
+        selectionStyle = .none
+        backgroundColor = .clear
+        card.layer.cornerRadius = 14
+        card.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(card)
+        [title, body, meta].forEach {
+            $0.translatesAutoresizingMaskIntoConstraints = false
+            card.addSubview($0)
+        }
+        title.font = DHTheme.font(.caption1, weight: .semibold)
+        body.font = DHTheme.font(.body)
+        body.numberOfLines = 0
+        meta.font = DHTheme.font(.caption2)
+        meta.textColor = DHTheme.tertiaryText
+        NSLayoutConstraint.activate([
+            card.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 14),
+            card.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -14),
+            card.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 5),
+            card.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -5),
+            title.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 13),
+            title.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -13),
+            title.topAnchor.constraint(equalTo: card.topAnchor, constant: 10),
+            body.leadingAnchor.constraint(equalTo: title.leadingAnchor),
+            body.trailingAnchor.constraint(equalTo: title.trailingAnchor),
+            body.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 5),
+            meta.leadingAnchor.constraint(equalTo: title.leadingAnchor),
+            meta.trailingAnchor.constraint(equalTo: title.trailingAnchor),
+            meta.topAnchor.constraint(equalTo: body.bottomAnchor, constant: 6),
+            meta.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -9)
+        ])
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError() }
+
+    func configure(_ item: HarnessConversationItem) {
+        title.text = item.kind == .user ? "你" : item.kind == .assistant ? "Harness" : item.kind == .tool ? "工具" : "系统"
+        body.text = item.text
+        meta.text = item.subtitle
+        card.backgroundColor = item.kind == .user ? DHTheme.accentSoft : item.kind == .tool ? DHTheme.surfaceMuted : DHTheme.surface
+        title.textColor = item.kind == .user ? DHTheme.accent : DHTheme.secondaryText
+    }
 }
