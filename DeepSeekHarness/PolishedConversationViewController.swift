@@ -235,7 +235,22 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
     }
 
     @objc private func removeAttachment(_ sender: UIButton) { guard images.indices.contains(sender.tag) else { return }; images.remove(at: sender.tag); renderAttachments(); updateSend() }
-    private func showApproval(_ value: [String: Any]) { showError("Harness 请求客户端确认：\(value["event"] as? String ?? "操作")。审批面板将在下一阶段按请求类型完整呈现。") }
+    private func showApproval(_ value: [String: Any]) {
+        guard let clientID = value["clientId"] as? String,
+              let eventID = value["eventId"] as? String else { return }
+        let request = value["request"] as? [String: Any]
+        let tool = request?["toolName"] as? String ?? "未知工具"
+        let reason = request?["reason"] as? String
+        let message = ["工具：\(tool)", reason.map { "原因：\($0)" }].compactMap { $0 }.joined(separator: "\n\n")
+        let alert = UIAlertController(title: "允许这次工具调用？", message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "拒绝", style: .destructive) { [weak self] _ in
+            self?.runtime.answerApproval(clientID: clientID, eventID: eventID, decision: "rejected")
+        })
+        alert.addAction(UIAlertAction(title: "仅允许一次", style: .default) { [weak self] _ in
+            self?.runtime.answerApproval(clientID: clientID, eventID: eventID, decision: "allowed-once")
+        })
+        present(alert, animated: true)
+    }
     private func showError(_ message: String) { let a=UIAlertController(title:"提示",message:message,preferredStyle:.alert);a.addAction(UIAlertAction(title:"好",style:.default));present(a,animated:true) }
     private func presentSheet(_ alert: UIAlertController, source: UIView) { alert.popoverPresentationController?.sourceView=source;alert.popoverPresentationController?.sourceRect=source.bounds;present(alert,animated:true) }
     private func scrollBottom() { guard !runtime.items.isEmpty else{return};tableView.scrollToRow(at:IndexPath(row:runtime.items.count-1,section:0),at:.bottom,animated:false) }

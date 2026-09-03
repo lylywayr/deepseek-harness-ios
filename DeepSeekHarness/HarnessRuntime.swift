@@ -102,6 +102,9 @@ final class HarnessRuntime: NSObject, WKNavigationDelegate, WKScriptMessageHandl
     }
     func setPermission(_ value: String) { call("setPermission", arguments: [value]) }
     func rename(_ title: String) { call("rename", arguments: [title]) }
+    func answerApproval(clientID: String, eventID: String, decision: String) {
+        call("answerApproval", arguments: [clientID, eventID, decision])
+    }
 
     private func call(_ method: String, arguments: [Any] = []) {
         guard let data = try? JSONSerialization.data(withJSONObject: arguments),
@@ -227,7 +230,8 @@ final class HarnessRuntime: NSObject, WKNavigationDelegate, WKScriptMessageHandl
       const setPermission=async value=>{try{await rpc('commands/execute',{agentId:state.selectedSessionId,line:`/permission ${value}`,images:[]})}catch(e){fail(e)}};
       const rename=async title=>{try{await rpc('session/rename',{request:{sessionId:state.selectedSessionId,title}});await refresh()}catch(e){fail(e)}};
       const loadOlder=async()=>{if(!state.selectedSessionId||state.cursor==null||state.oldestSeq==null)return;try{const v=await rpc('session/page',{request:{address:{kind:'session',sessionId:state.selectedSessionId},throughSeq:state.cursor,beforeSeq:state.oldestSeq,maxMessages:30}});parseRecords(v.records||[],true);state.hasMore=!!v.hasMore;publish()}catch(e){fail(e)}};
-      window.__harnessNative={refresh,openSession,createSession,prompt,cancel,selectModel,setPermission,rename,loadOlder};
+      const answerApproval=async(clientId,eventId,decision)=>{try{await rpc('$events/result',{clientId,eventId,outcome:{kind:'result',value:decision}})}catch(e){fail(e)}};
+      window.__harnessNative={refresh,openSession,createSession,prompt,cancel,selectModel,setPermission,rename,loadOlder,answerApproval};
       addEventListener('DOMContentLoaded',()=>setTimeout(refresh,0),{once:true});
     })();
     """#
