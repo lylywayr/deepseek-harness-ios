@@ -12,6 +12,7 @@
 		A10000000000000000000003 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000003 /* RootView.swift */; };
 		A10000000000000000000004 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000004 /* SettingsView.swift */; };
 		A10000000000000000000005 /* HarnessWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000005 /* HarnessWebView.swift */; };
+		A10000000000000000000006 /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000007 /* MainViewController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -22,6 +23,7 @@
 		B10000000000000000000004 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		B10000000000000000000005 /* HarnessWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessWebView.swift; sourceTree = "<group>"; };
 		B10000000000000000000006 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		B10000000000000000000007 /* MainViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -52,6 +54,7 @@
 				B10000000000000000000004 /* SettingsView.swift */,
 				B10000000000000000000005 /* HarnessWebView.swift */,
 				B10000000000000000000006 /* Info.plist */,
+				B10000000000000000000007 /* MainViewController.swift */,
 			);
 			path = DeepSeekHarness;
 			sourceTree = "<group>";
@@ -132,6 +135,7 @@
 				A10000000000000000000003 /* RootView.swift in Sources */,
 				A10000000000000000000004 /* SettingsView.swift in Sources */,
 				A10000000000000000000005 /* HarnessWebView.swift in Sources */,
+				A10000000000000000000006 /* MainViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
