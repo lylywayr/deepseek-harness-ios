@@ -1,46 +1,35 @@
 import UIKit
 import WebKit
 
-// Legacy setup and WebView controllers are retained as the compatibility layer.
+/// Compatibility-only setup and Web surface. The native app never uses this
+/// controller for its main screen, but it remains available for unsupported
+/// plugin subtrees.
 final class LegacyMainViewController: UIViewController {
     private let appState = AppState()
     private var currentChild: UIViewController?
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = DHTheme.background
         render()
     }
 
     private func render() {
         removeCurrentChild()
-
         if let endpoint = appState.endpointURL {
             let controller = HarnessViewController(url: endpoint)
             addChildController(controller)
             navigationItem.title = "Harness"
-            navigationItem.leftBarButtonItem = UIBarButtonItem(
-                image: UIImage(systemName: "gearshape"),
-                style: .plain,
-                target: self,
-                action: #selector(openSettings)
-            )
-            navigationItem.rightBarButtonItem = UIBarButtonItem(
-                barButtonSystemItem: .refresh,
-                target: controller,
-                action: #selector(HarnessViewController.reloadPage)
-            )
+            navigationItem.leftBarButtonItem = UIBarButtonItem(image: UIImage(systemName: "gearshape"), style: .plain, target: self, action: #selector(openSettings))
+            navigationItem.rightBarButtonItem = UIBarButtonItem(barButtonSystemItem: .refresh, target: controller, action: #selector(HarnessViewController.reloadPage))
         } else {
             let controller = SetupViewController(initialValue: appState.endpointString)
             controller.onSave = { [weak self] value in
                 guard let self, self.appState.saveEndpoint(value) else { return }
-                self.dismiss(animated: true)
                 self.render()
             }
             addChildController(controller)
             navigationItem.title = "DeepSeek Harness"
-            navigationItem.leftBarButtonItem = nil
-            navigationItem.rightBarButtonItem = nil
         }
     }
 
@@ -74,11 +63,7 @@ final class LegacyMainViewController: UIViewController {
             self.render()
         }
         controller.onClearSession = { [weak self, weak controller] in
-            guard let self else { return }
-            WKWebsiteDataStore.default().removeData(
-                ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(),
-                modifiedSince: Date(timeIntervalSince1970: 0)
-            ) { [weak self, weak controller] in
+            WKWebsiteDataStore.default().removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: Date(timeIntervalSince1970: 0)) { [weak self, weak controller] in
                 DispatchQueue.main.async {
                     self?.appState.clearEndpoint()
                     controller?.dismiss(animated: true)
@@ -86,20 +71,20 @@ final class LegacyMainViewController: UIViewController {
                 }
             }
         }
-        let navigationController = UINavigationController(rootViewController: controller)
-        navigationController.modalPresentationStyle = .formSheet
-        present(navigationController, animated: true)
+        let navigation = UINavigationController(rootViewController: controller)
+        navigation.navigationBar.tintColor = DHTheme.accent
+        navigation.navigationBar.standardAppearance = DHNavigationAppearance.make()
+        navigation.modalPresentationStyle = .formSheet
+        present(navigation, animated: true)
     }
 }
 
 final class SetupViewController: UIViewController {
     var onSave: ((String) -> Void)?
     var onClearSession: (() -> Void)?
-
     private let initialValue: String
     private let endpointField = UITextField()
     private let errorLabel = UILabel()
-    private let saveButton = UIButton(type: .system)
     private let clearButton = UIButton(type: .system)
 
     init(initialValue: String) {
@@ -108,13 +93,13 @@ final class SetupViewController: UIViewController {
     }
 
     @available(*, unavailable)
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = DHTheme.background
+        navigationItem.title = "连接服务"
+        if presentingViewController != nil { navigationItem.leftBarButtonItem = UIBarButtonItem(barButtonSystemItem: .close, target: self, action: #selector(close)) }
         buildView()
     }
 
@@ -122,33 +107,51 @@ final class SetupViewController: UIViewController {
         let scrollView = UIScrollView()
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(scrollView)
-
         let content = UIStackView()
         content.axis = .vertical
-        content.spacing = 16
+        content.spacing = 14
         content.alignment = .fill
         content.translatesAutoresizingMaskIntoConstraints = false
         scrollView.addSubview(content)
 
-        let icon = UIImageView(image: UIImage(systemName: "sparkles.rectangle.stack"))
-        icon.tintColor = .systemBlue
-        icon.contentMode = .scaleAspectFit
-        icon.heightAnchor.constraint(equalToConstant: 56).isActive = true
-
+        let hero = UIView()
+        hero.translatesAutoresizingMaskIntoConstraints = false
+        let icon = dhIconView(systemName: "link", size: 58, symbolSize: 23)
         let title = UILabel()
-        title.text = "连接你的 Harness 服务"
-        title.font = .preferredFont(forTextStyle: .title2)
+        title.text = "连接你的 Harness"
+        title.font = DHTheme.font(.title1, weight: .bold)
         title.textAlignment = .center
+        let subtitle = UILabel()
+        subtitle.text = "把你的工作区带到 iPhone 上"
+        subtitle.font = DHTheme.font(.subheadline)
+        subtitle.textColor = DHTheme.secondaryText
+        subtitle.textAlignment = .center
+        let labels = UIStackView(arrangedSubviews: [title, subtitle])
+        labels.axis = .vertical
+        labels.spacing = 5
+        labels.translatesAutoresizingMaskIntoConstraints = false
+        hero.addSubview(icon)
+        hero.addSubview(labels)
+        NSLayoutConstraint.activate([
+            icon.centerXAnchor.constraint(equalTo: hero.centerXAnchor),
+            icon.topAnchor.constraint(equalTo: hero.topAnchor),
+            labels.leadingAnchor.constraint(equalTo: hero.leadingAnchor),
+            labels.trailingAnchor.constraint(equalTo: hero.trailingAnchor),
+            labels.topAnchor.constraint(equalTo: icon.bottomAnchor, constant: 14),
+            labels.bottomAnchor.constraint(equalTo: hero.bottomAnchor)
+        ])
 
-        let description = UILabel()
-        description.text = "输入已部署的 DeepSeek Harness 地址，即可使用现有会话、模型、Plugins、Skills 和文件能力。"
-        description.font = .preferredFont(forTextStyle: .body)
-        description.textColor = .secondaryLabel
-        description.numberOfLines = 0
-        description.textAlignment = .center
-
-        endpointField.borderStyle = .roundedRect
-        endpointField.placeholder = "http://192.168.31.250:端口"
+        let card = UIView()
+        card.dhApplyCard(backgroundColor: DHTheme.surface, cornerRadius: DHTheme.cornerMedium, shadow: true)
+        let cardContent = UIStackView()
+        cardContent.axis = .vertical
+        cardContent.spacing = 10
+        cardContent.translatesAutoresizingMaskIntoConstraints = false
+        card.addSubview(cardContent)
+        let addressTitle = UILabel()
+        addressTitle.text = "服务地址"
+        addressTitle.font = DHTheme.font(.subheadline, weight: .semibold)
+        endpointField.placeholder = "https://harness.example.com"
         endpointField.text = initialValue
         endpointField.keyboardType = .URL
         endpointField.autocapitalizationType = .none
@@ -156,38 +159,45 @@ final class SetupViewController: UIViewController {
         endpointField.clearButtonMode = .whileEditing
         endpointField.returnKeyType = .done
         endpointField.delegate = self
-        endpointField.heightAnchor.constraint(equalToConstant: 46).isActive = true
-
-        saveButton.setTitle("保存并连接", for: .normal)
-        saveButton.titleLabel?.font = .preferredFont(forTextStyle: .headline)
-        saveButton.backgroundColor = .systemBlue
-        saveButton.tintColor = .white
-        saveButton.layer.cornerRadius = 10
-        saveButton.heightAnchor.constraint(equalToConstant: 46).isActive = true
+        endpointField.font = DHTheme.font(.body)
+        endpointField.backgroundColor = DHTheme.surfaceMuted
+        endpointField.layer.cornerRadius = DHTheme.cornerSmall
+        endpointField.setLeftPadding(13)
+        endpointField.heightAnchor.constraint(equalToConstant: 48).isActive = true
+        var saveConfig = UIButton.Configuration.filled()
+        saveConfig.title = "保存并连接"
+        saveConfig.cornerStyle = .medium
+        saveConfig.baseBackgroundColor = DHTheme.accent
+        saveConfig.baseForegroundColor = .white
+        saveConfig.contentInsets = NSDirectionalEdgeInsets(top: 13, leading: 16, bottom: 13, trailing: 16)
+        let saveButton = UIButton(configuration: saveConfig)
+        saveButton.titleLabel?.font = DHTheme.font(.body, weight: .semibold)
         saveButton.addTarget(self, action: #selector(save), for: .touchUpInside)
-
-        errorLabel.font = .preferredFont(forTextStyle: .footnote)
-        errorLabel.textColor = .systemRed
+        errorLabel.font = DHTheme.font(.footnote)
+        errorLabel.textColor = DHTheme.danger
         errorLabel.numberOfLines = 0
-        errorLabel.textAlignment = .center
         errorLabel.isHidden = true
+        [addressTitle, endpointField, saveButton, errorLabel].forEach(cardContent.addArrangedSubview)
+        NSLayoutConstraint.activate([
+            cardContent.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 18),
+            cardContent.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -18),
+            cardContent.topAnchor.constraint(equalTo: card.topAnchor, constant: 18),
+            cardContent.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -18)
+        ])
 
-        let help = UILabel()
-        help.text = "支持 HTTP 和 HTTPS。公网访问请优先使用 HTTPS 或 VPN/组网。不要把密码或 Token 写入地址。"
-        help.font = .preferredFont(forTextStyle: .footnote)
-        help.textColor = .secondaryLabel
-        help.numberOfLines = 0
-        help.textAlignment = .center
-
-        [icon, title, description, endpointField, saveButton, errorLabel, help].forEach(content.addArrangedSubview)
-
+        let note = UILabel()
+        note.text = "支持 HTTP 和 HTTPS。公网访问请使用 HTTPS 或 VPN。地址中不要填写密码或 Token。"
+        note.font = DHTheme.font(.footnote)
+        note.textColor = DHTheme.secondaryText
+        note.numberOfLines = 0
+        note.textAlignment = .center
+        [hero, card, note].forEach(content.addArrangedSubview)
         if onClearSession != nil {
             clearButton.setTitle("清除本机网页会话", for: .normal)
-            clearButton.setTitleColor(.systemRed, for: .normal)
+            clearButton.setTitleColor(DHTheme.danger, for: .normal)
             clearButton.addTarget(self, action: #selector(clearSession), for: .touchUpInside)
             content.addArrangedSubview(clearButton)
         }
-
         NSLayoutConstraint.activate([
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
@@ -195,7 +205,7 @@ final class SetupViewController: UIViewController {
             scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             content.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor, constant: 24),
             content.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor, constant: -24),
-            content.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor, constant: 32),
+            content.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor, constant: 42),
             content.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor, constant: -32),
             content.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor, constant: -48)
         ])
@@ -205,7 +215,7 @@ final class SetupViewController: UIViewController {
         view.endEditing(true)
         let value = endpointField.text ?? ""
         guard AppState.makeURL(from: value) != nil else {
-            errorLabel.text = "地址无效，请填写完整的 HTTP 或 HTTPS 地址。"
+            errorLabel.text = "请输入完整的 HTTP 或 HTTPS 地址。"
             errorLabel.isHidden = false
             return
         }
@@ -213,15 +223,19 @@ final class SetupViewController: UIViewController {
         onSave?(value)
     }
 
-    @objc private func clearSession() {
-        onClearSession?()
-    }
+    @objc private func clearSession() { onClearSession?() }
+    @objc private func close() { dismiss(animated: true) }
 }
 
 extension SetupViewController: UITextFieldDelegate {
-    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
-        save()
-        return true
+    func textFieldShouldReturn(_ textField: UITextField) -> Bool { save(); return true }
+}
+
+extension UITextField {
+    func setLeftPadding(_ value: CGFloat) {
+        let padding = UIView(frame: CGRect(x: 0, y: 0, width: value, height: 1))
+        leftView = padding
+        leftViewMode = .always
     }
 }
 
@@ -232,20 +246,13 @@ final class HarnessViewController: UIViewController, WKNavigationDelegate, WKUID
     private let errorLabel = UILabel()
     private let retryButton = UIButton(type: .system)
 
-    init(url: URL) {
-        self.url = url
-        super.init(nibName: nil, bundle: nil)
-    }
-
+    init(url: URL) { self.url = url; super.init(nibName: nil, bundle: nil) }
     @available(*, unavailable)
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemBackground
-
+        view.backgroundColor = DHTheme.background
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .default()
         configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
@@ -257,114 +264,46 @@ final class HarnessViewController: UIViewController, WKNavigationDelegate, WKUID
         webView.allowsLinkPreview = false
         view.addSubview(webView)
         NSLayoutConstraint.activate([
-            webView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            webView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            webView.topAnchor.constraint(equalTo: view.topAnchor),
-            webView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+            webView.leadingAnchor.constraint(equalTo: view.leadingAnchor), webView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            webView.topAnchor.constraint(equalTo: view.topAnchor), webView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
-
         buildErrorView()
         webView.load(URLRequest(url: url, cachePolicy: .useProtocolCachePolicy))
     }
 
     private func buildErrorView() {
         errorContainer.translatesAutoresizingMaskIntoConstraints = false
-        errorContainer.backgroundColor = .systemBackground
+        errorContainer.backgroundColor = DHTheme.background
         errorContainer.isHidden = true
         view.addSubview(errorContainer)
-
         let stack = UIStackView()
-        stack.axis = .vertical
-        stack.spacing = 12
-        stack.alignment = .center
-        stack.translatesAutoresizingMaskIntoConstraints = false
+        stack.axis = .vertical; stack.spacing = 12; stack.alignment = .center; stack.translatesAutoresizingMaskIntoConstraints = false
         errorContainer.addSubview(stack)
-
         let icon = UIImageView(image: UIImage(systemName: "wifi.exclamationmark"))
-        icon.tintColor = .systemOrange
-        icon.contentMode = .scaleAspectFit
-        icon.heightAnchor.constraint(equalToConstant: 36).isActive = true
-
-        errorLabel.font = .preferredFont(forTextStyle: .body)
-        errorLabel.textColor = .secondaryLabel
-        errorLabel.numberOfLines = 0
-        errorLabel.textAlignment = .center
-
-        retryButton.setTitle("重新加载", for: .normal)
-        retryButton.titleLabel?.font = .preferredFont(forTextStyle: .headline)
-        retryButton.addTarget(self, action: #selector(reloadPage), for: .touchUpInside)
-
+        icon.tintColor = DHTheme.warning; icon.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 32, weight: .medium)
+        errorLabel.font = DHTheme.font(.body); errorLabel.textColor = DHTheme.secondaryText; errorLabel.numberOfLines = 0; errorLabel.textAlignment = .center
+        retryButton.setTitle("重新加载", for: .normal); retryButton.titleLabel?.font = DHTheme.font(.body, weight: .semibold); retryButton.addTarget(self, action: #selector(reloadPage), for: .touchUpInside)
         [icon, errorLabel, retryButton].forEach(stack.addArrangedSubview)
         NSLayoutConstraint.activate([
-            errorContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            errorContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            errorContainer.topAnchor.constraint(equalTo: view.topAnchor),
-            errorContainer.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            stack.leadingAnchor.constraint(greaterThanOrEqualTo: errorContainer.leadingAnchor, constant: 24),
-            stack.trailingAnchor.constraint(lessThanOrEqualTo: errorContainer.trailingAnchor, constant: -24),
-            stack.centerXAnchor.constraint(equalTo: errorContainer.centerXAnchor),
-            stack.centerYAnchor.constraint(equalTo: errorContainer.centerYAnchor)
+            errorContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor), errorContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor), errorContainer.topAnchor.constraint(equalTo: view.topAnchor), errorContainer.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            stack.leadingAnchor.constraint(greaterThanOrEqualTo: errorContainer.leadingAnchor, constant: 24), stack.trailingAnchor.constraint(lessThanOrEqualTo: errorContainer.trailingAnchor, constant: -24), stack.centerXAnchor.constraint(equalTo: errorContainer.centerXAnchor), stack.centerYAnchor.constraint(equalTo: errorContainer.centerYAnchor)
         ])
     }
 
-    @objc func reloadPage() {
-        errorContainer.isHidden = true
-        webView.reload()
-    }
-
-    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
-        errorContainer.isHidden = true
-    }
-
-    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        errorContainer.isHidden = true
-    }
-
-    func webView(
-        _ webView: WKWebView,
-        didFailProvisionalNavigation navigation: WKNavigation!,
-        withError error: Error
-    ) {
-        guard (error as NSError).code != NSURLErrorCancelled else { return }
-        showError(error)
-    }
-
-    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-        showError(error)
-    }
-
-    private func showError(_ error: Error) {
-        errorLabel.text = "无法加载 Harness 服务。\n\(error.localizedDescription)"
-        errorContainer.isHidden = false
-    }
-
-    func webView(
-        _ webView: WKWebView,
-        decidePolicyFor navigationAction: WKNavigationAction,
-        decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
-    ) {
-        guard let targetURL = navigationAction.request.url else {
-            decisionHandler(.cancel)
-            return
-        }
+    @objc func reloadPage() { errorContainer.isHidden = true; webView.reload() }
+    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) { errorContainer.isHidden = true }
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { errorContainer.isHidden = true }
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) { if (error as NSError).code != NSURLErrorCancelled { showError(error) } }
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { showError(error) }
+    private func showError(_ error: Error) { errorLabel.text = "无法加载 Harness 服务。\n\(error.localizedDescription)"; errorContainer.isHidden = false }
+    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        guard let targetURL = navigationAction.request.url else { decisionHandler(.cancel); return }
         let scheme = targetURL.scheme?.lowercased()
-        guard scheme == "http" || scheme == "https" else {
-            decisionHandler(.cancel)
-            UIApplication.shared.open(targetURL)
-            return
-        }
+        guard scheme == "http" || scheme == "https" else { decisionHandler(.cancel); UIApplication.shared.open(targetURL); return }
         decisionHandler(.allow)
     }
-
-    func webView(
-        _ webView: WKWebView,
-        createWebViewWith configuration: WKWebViewConfiguration,
-        for navigationAction: WKNavigationAction,
-        windowFeatures: WKWindowFeatures
-    ) -> WKWebView? {
-        if let targetURL = navigationAction.request.url {
-            webView.load(URLRequest(url: targetURL))
-        }
+    func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+        if let targetURL = navigationAction.request.url { webView.load(URLRequest(url: targetURL)) }
         return nil
     }
 }
