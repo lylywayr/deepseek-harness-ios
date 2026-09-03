@@ -2,7 +2,7 @@
 
 ## 目标
 
-为自托管 DeepSeek Harness 提供一个轻量 iOS 客户端壳，优先复用现有 Harness Web/API，避免在 iOS 端重复实现服务端能力。
+为自托管 DeepSeek Harness 提供一个 **Native-first** iOS 客户端：可见主界面使用 UIKit/SwiftUI 原生绘制；现有服务端插件无需安装到 iOS；插件 UI 通过自动适配器尽量转换为原生；转换失败时按页面或子树进入兼容层。
 
 ## 已确定约束
 
@@ -13,18 +13,25 @@
 - 支持 HTTP 与 HTTPS；公网部署推荐 HTTPS 或 VPN/组网。
 - 不提交任何账号、Token、证书、私有地址或签名材料。
 - MIT License。
+- 不要求现有 Harness 插件作者逐个适配。
 
-## 首版边界
+## Native-first 架构
 
-- SwiftUI 外壳与 WKWebView。
-- 可编辑服务地址，并进行 scheme 校验。
-- 持久化 WebKit 会话。
-- 原生导航、刷新、网络状态、下载/分享辅助。
-- 后台任务不由客户端承诺；服务端任务可继续，回到前台后刷新状态。
+- `NativeUIProtocol.swift`：版本化 Native UI IR、manifest、action 和 transport。
+- `NativeUIRenderer.swift`：把通用节点转换为 UIKit 控件。
+- `AutoNativeAdapter.swift`：在隐藏兼容运行时读取既有 `dsh.client` 页面，并尝试投影常见 DOM 控件。
+- `NativeMainViewController.swift`：原生窗口、侧边栏、插件中心和聊天壳。
+- `NativeUIViews.swift`：动态插件 surface 与诊断界面。
+- `MainViewController.swift`：Legacy Web 兼容层，仅在必要时打开。
 
-## 暂不包含
+## 动态插件策略
 
-- Harness 服务端实现。
-- 推送通知、多账号、多服务器管理。
-- 原生重写全部 Harness 页面。
-- 第三方分析、广告或模型 SDK。
+插件仍由 Harness 服务端安装和运行。App 通过清单动态发现插件 surface、按钮、页面和设置；点击事件回到服务端。自动投影优先覆盖常见文本、按钮、输入、开关、容器、列表和插槽入口。未知组件生成明确的兼容卡片，不静默白屏。
+
+当前 `NativeUITransport` 预留 `/api/native-ui/manifest` 与 `/api/native-ui/action`，并保留自动适配路径；接下来需要依据官方 Harness 的真实 Session/Remote 契约接入服务端适配器，而不是假设现有部署已经提供这两个路径。
+
+## 分支与验证
+
+- `main`：已验证的 WebView 预览版本。
+- `feature/native-renderer`：Native-first MVP。
+- 构建工作流：`.github/workflows/build-ipa.yml`。
