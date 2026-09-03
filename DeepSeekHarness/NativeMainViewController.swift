@@ -576,7 +576,7 @@ final class NativeConversationViewController: UIViewController, UITableViewDataS
         var configuration = cell.defaultContentConfiguration()
         configuration.text = message.0
         configuration.textProperties.numberOfLines = 0
-        configuration.textProperties.alignment = message.1 ? .right : .left
+        configuration.textProperties.alignment = message.1 ? .natural : .natural
         configuration.textProperties.color = message.1 ? .systemBlue : .label
         cell.contentConfiguration = configuration
         cell.selectionStyle = .none

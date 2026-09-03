@@ -197,17 +197,17 @@ final class NativeUIRenderer {
         ])
         let tap = UITapGestureRecognizer(target: self, action: #selector(openFallback(_:)))
         wrapper.addGestureRecognizer(tap)
-        objc_setAssociatedObject(wrapper, &fallbackURLKey, node.url, .OBJC_ASSOCIATION_COPY_NONATOMIC)
+        objc_setAssociatedObject(wrapper, &NativeUIRenderer.fallbackURLKey, node.url, .OBJC_ASSOCIATION_COPY_NONATOMIC)
         return wrapper
     }
 
     @objc private func openFallback(_ gesture: UITapGestureRecognizer) {
         guard let view = gesture.view,
-              let url = objc_getAssociatedObject(view, &fallbackURLKey) as? String else { return }
+              let url = objc_getAssociatedObject(view, &NativeUIRenderer.fallbackURLKey) as? String else { return }
         fallbackHandler(url)
     }
 
-    private static var fallbackURLKey = "NativeUIFallbackURL"
+    static var fallbackURLKey = "NativeUIFallbackURL"
 }
 
 private final class NativeUIActionTarget: NSObject {
