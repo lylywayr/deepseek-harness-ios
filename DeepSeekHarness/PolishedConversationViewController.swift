@@ -371,4 +371,3 @@ final class DHPolishedMessageCell: UITableViewCell {
         bubble.layer.borderColor = DHTheme.separator.withAlphaComponent(0.3).cgColor
     }
 }
-Use file_read tool to retrieve if needed.
