@@ -248,16 +248,22 @@ final class NativeUITransport {
 }
 
 final class NativeUIStore {
-    private(set) var manifest: NativeUIManifest
+    var manifest: NativeUIManifest
+    let didChange: () -> Void
     private var observers: [UUID: () -> Void] = [:]
 
-    init(manifest: NativeUIManifest = NativeUIManifest()) {
+    init(
+        manifest: NativeUIManifest = NativeUIManifest(),
+        didChange: @escaping () -> Void = {}
+    ) {
         self.manifest = manifest
+        self.didChange = didChange
     }
 
     func replace(_ manifest: NativeUIManifest) {
         self.manifest = manifest
         observers.values.forEach { $0() }
+        didChange()
     }
 
     func observe(_ observer: @escaping () -> Void) -> () -> Void {
