@@ -1,0 +1,26 @@
+# Ignore local and signing material
+.DS_Store
+build/
+derivedData/
+*.xcuserstate
+xcuserdata/
+
+# Signing and provisioning material
+*.p12
+*.cer
+*.mobileprovision
+*.provisionprofile
+*.pem
+*.key
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+Secrets.xcconfig
+Local.xcconfig
+
+# Archives and local exports
+*.xcarchive
+*.ipa
+*.dSYM.zip
