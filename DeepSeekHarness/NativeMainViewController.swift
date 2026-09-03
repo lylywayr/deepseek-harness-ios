@@ -209,6 +209,7 @@ final class NativeHomeViewController: UIViewController {
         adapterHost.alpha = 0.01
         view.addSubview(adapterHost)
         runtime.mount(in: adapterHost)
+        runtime.onNavigationChange = { [weak self] in self?.renderSidebar() }
         runtime.start()
 
         sidebarScrim.backgroundColor = UIColor.black.withAlphaComponent(0.25)

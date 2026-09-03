@@ -59,6 +59,7 @@ final class HarnessRuntime: NSObject, WKNavigationDelegate, WKScriptMessageHandl
     private(set) var lastError: String?
     private(set) var statusText = "正在连接"
     var onChange: (() -> Void)?
+    var onNavigationChange: (() -> Void)?
     var onApproval: (([String: Any]) -> Void)?
 
     init(baseURL: URL) {
@@ -141,6 +142,7 @@ final class HarnessRuntime: NSObject, WKNavigationDelegate, WKScriptMessageHandl
         statusText = "连接异常"
         isLoading = false
         onChange?()
+        onNavigationChange?()
     }
 
     private func parseState(_ body: [String: Any]) {
@@ -156,6 +158,7 @@ final class HarnessRuntime: NSObject, WKNavigationDelegate, WKScriptMessageHandl
         models = (body["models"] as? [[String: Any]] ?? []).compactMap(Self.model)
         items = (body["items"] as? [[String: Any]] ?? []).compactMap(Self.item)
         onChange?()
+        onNavigationChange?()
     }
 
     private static func session(_ value: [String: Any]) -> HarnessSessionSummary? {
