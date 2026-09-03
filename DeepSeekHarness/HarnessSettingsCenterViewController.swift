@@ -85,7 +85,7 @@ final class HarnessSettingsCenterViewController: UIViewController, UICollectionV
 
     private func buildTable() {
         table.backgroundColor = .clear
-        table.separatorColor = DHTheme.border
+        table.separatorColor = DHTheme.separator
         table.rowHeight = UITableView.automaticDimension
         table.estimatedRowHeight = 74
         table.dataSource = self
