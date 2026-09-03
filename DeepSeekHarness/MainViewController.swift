@@ -1,27 +1,8 @@
 import UIKit
 import WebKit
 
-@main
-final class DeepSeekHarnessAppDelegate: UIResponder, UIApplicationDelegate {
-    var window: UIWindow?
-
-    func application(
-        _ application: UIApplication,
-        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
-    ) -> Bool {
-        let window = UIWindow(frame: UIScreen.main.bounds)
-        let rootViewController = MainViewController()
-        let navigationController = UINavigationController(rootViewController: rootViewController)
-        navigationController.navigationBar.prefersLargeTitles = false
-        window.rootViewController = navigationController
-        self.window = window
-        window.backgroundColor = .systemBackground
-        window.makeKeyAndVisible()
-        return true
-    }
-}
-
-final class MainViewController: UIViewController {
+// Legacy setup and WebView controllers are retained as the compatibility layer.
+final class LegacyMainViewController: UIViewController {
     private let appState = AppState()
     private var currentChild: UIViewController?
 
