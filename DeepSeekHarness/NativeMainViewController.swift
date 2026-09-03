@@ -144,6 +144,7 @@ final class NativeHomeViewController: UIViewController {
     private let sidebarContent = UIStackView()
     private let sidebarScrim = UIControl()
     private let adapterHost = UIView()
+    private var runtime: HarnessRuntime!
     private let connectionBadge = DHBadgeLabel(text: "在线", color: DHTheme.success)
     private var sidebarWidthConstraint: NSLayoutConstraint!
     private var isSidebarVisible = false
@@ -191,9 +192,8 @@ final class NativeHomeViewController: UIViewController {
             conversationContainer.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
 
-        let conversation = PolishedConversationViewController { [weak self] text in
-            self?.showNotice("消息已放入原生输入区。真实会话通道将在后续接入 Harness Remote。\n\n\(text)")
-        }
+        runtime = HarnessRuntime(baseURL: appState.endpointURL!)
+        let conversation = PolishedConversationViewController(runtime: runtime)
         addChild(conversation)
         conversation.view.translatesAutoresizingMaskIntoConstraints = false
         conversationContainer.addSubview(conversation.view)
@@ -208,12 +208,8 @@ final class NativeHomeViewController: UIViewController {
         adapterHost.translatesAutoresizingMaskIntoConstraints = false
         adapterHost.alpha = 0.01
         view.addSubview(adapterHost)
-        NSLayoutConstraint.activate([
-            adapterHost.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            adapterHost.topAnchor.constraint(equalTo: view.topAnchor),
-            adapterHost.widthAnchor.constraint(equalToConstant: 2),
-            adapterHost.heightAnchor.constraint(equalToConstant: 2)
-        ])
+        runtime.mount(in: adapterHost)
+        runtime.start()
 
         sidebarScrim.backgroundColor = UIColor.black.withAlphaComponent(0.25)
         sidebarScrim.alpha = 0
@@ -287,14 +283,31 @@ final class NativeHomeViewController: UIViewController {
         sidebarContent.addArrangedSubview(dhSeparator())
 
         sidebarContent.addArrangedSubview(sidebarButton(title: "新建会话", icon: "square.and.pencil", prominent: true) { [weak self] in
-            self?.showNotice("新会话界面已经准备好，等待 Harness Session Remote 接入。")
+            let workspace = self?.runtime.workspaces.first?.id
+            self?.runtime.createSession(workspaceID: workspace)
+            self?.toggleSidebar()
         })
-        sidebarContent.addArrangedSubview(sidebarButton(title: "插件中心", icon: "puzzlepiece.extension") { [weak self] in
+
+        let workspaceTitle = UILabel()
+        workspaceTitle.text = runtime.workspaces.first.map { "工作区 · \($0.title)" } ?? "会话"
+        workspaceTitle.font = DHTheme.font(.caption1, weight: .semibold)
+        workspaceTitle.textColor = DHTheme.tertiaryText
+        sidebarContent.addArrangedSubview(workspaceTitle)
+
+        for session in runtime.sessions.filter({ !$0.blank }).prefix(12) {
+            let title = session.title.isEmpty ? "未命名会话" : session.title
+            sidebarContent.addArrangedSubview(sidebarButton(title: title, icon: session.running ? "circle.dotted" : "message") { [weak self] in
+                self?.runtime.openSession(session.id)
+                self?.toggleSidebar()
+            })
+        }
+
+        sidebarContent.addArrangedSubview(sidebarButton(title: "插件与扩展", icon: "puzzlepiece.extension") { [weak self] in
             self?.openPluginCenter()
         })
 
         let sectionTitle = UILabel()
-        sectionTitle.text = "插件入口"
+        sectionTitle.text = "扩展入口"
         sectionTitle.font = DHTheme.font(.caption1, weight: .semibold)
         sectionTitle.textColor = DHTheme.tertiaryText
         sectionTitle.text = sectionTitle.text?.uppercased()
@@ -328,11 +341,11 @@ final class NativeHomeViewController: UIViewController {
         connection.dhApplyCard(backgroundColor: DHTheme.surfaceMuted, cornerRadius: DHTheme.cornerSmall)
         connection.translatesAutoresizingMaskIntoConstraints = false
         let dot = UIView()
-        dot.backgroundColor = autoAdapter == nil ? DHTheme.warning : DHTheme.success
+        dot.backgroundColor = runtime?.connected == true ? DHTheme.success : DHTheme.warning
         dot.layer.cornerRadius = 4
         dot.translatesAutoresizingMaskIntoConstraints = false
         let status = UILabel()
-        status.text = autoAdapter == nil ? "正在连接服务" : "自动适配已运行"
+        status.text = runtime?.statusText ?? "正在连接服务"
         status.font = DHTheme.font(.caption1, weight: .medium)
         status.textColor = DHTheme.secondaryText
         let endpoint = UILabel()

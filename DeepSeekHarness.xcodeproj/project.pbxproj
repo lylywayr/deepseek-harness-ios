@@ -17,6 +17,7 @@
 		A1000000000000000000000B /* AutoNativeAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000C /* AutoNativeAdapter.swift */; };
 		A1000000000000000000000C /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000D /* DesignSystem.swift */; };
 		A1000000000000000000000D /* PolishedConversationViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000E /* PolishedConversationViewController.swift */; };
+		A1000000000000000000000E /* HarnessRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000F /* HarnessRuntime.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -35,6 +36,7 @@
 		B1000000000000000000000C /* AutoNativeAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoNativeAdapter.swift; sourceTree = "<group>"; };
 		B1000000000000000000000D /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 		B1000000000000000000000E /* PolishedConversationViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PolishedConversationViewController.swift; sourceTree = "<group>"; };
+		B1000000000000000000000F /* HarnessRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessRuntime.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -73,6 +75,7 @@
 				B1000000000000000000000C /* AutoNativeAdapter.swift */,
 				B1000000000000000000000D /* DesignSystem.swift */,
 				B1000000000000000000000E /* PolishedConversationViewController.swift */,
+				B1000000000000000000000F /* HarnessRuntime.swift */,
 			);
 			path = DeepSeekHarness;
 			sourceTree = "<group>";
@@ -158,6 +161,7 @@
 				A1000000000000000000000B /* AutoNativeAdapter.swift in Sources */,
 				A1000000000000000000000C /* DesignSystem.swift in Sources */,
 				A1000000000000000000000D /* PolishedConversationViewController.swift in Sources */,
+				A1000000000000000000000E /* HarnessRuntime.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
