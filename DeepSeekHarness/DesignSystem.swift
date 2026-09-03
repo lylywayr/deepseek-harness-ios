@@ -147,22 +147,12 @@ func dhIconView(
 func dhButton(
     title: String,
     systemName: String? = nil,
-    style: UIButton.Configuration.Style = .plain,
+    filled: Bool = false,
     action: @escaping () -> Void
 ) -> UIButton {
-    var configuration: UIButton.Configuration
-    switch style {
-    case .filled:
-        configuration = .filled()
-        configuration.baseBackgroundColor = DHTheme.accent
-        configuration.baseForegroundColor = .white
-    case .tinted:
-        configuration = .tinted()
-        configuration.baseForegroundColor = DHTheme.accent
-    default:
-        configuration = .plain()
-        configuration.baseForegroundColor = DHTheme.text
-    }
+    var configuration = filled ? UIButton.Configuration.filled() : UIButton.Configuration.plain()
+    configuration.baseBackgroundColor = filled ? DHTheme.accent : nil
+    configuration.baseForegroundColor = filled ? .white : DHTheme.text
     configuration.title = title
     configuration.image = systemName.flatMap { UIImage(systemName: $0) }
     configuration.imagePadding = 9
