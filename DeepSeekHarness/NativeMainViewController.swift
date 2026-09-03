@@ -107,6 +107,26 @@ final class MainViewController: UIViewController {
     }
 
     @objc private func openSettings() {
+        guard let endpoint = appState.endpointURL else {
+            openConnectionSettings()
+            return
+        }
+        let center = HarnessSettingsCenterViewController(appState: appState) { [weak self] in
+            self?.dismiss(animated: true) { self?.openConnectionSettings() }
+        }
+        let navigation = UINavigationController(rootViewController: center)
+        navigation.navigationBar.tintColor = DHTheme.text
+        navigation.navigationBar.standardAppearance = DHNavigationAppearance.make()
+        navigation.modalPresentationStyle = .pageSheet
+        if #available(iOS 15.0, *) {
+            navigation.sheetPresentationController?.detents = [.large()]
+            navigation.sheetPresentationController?.prefersGrabberVisible = true
+        }
+        present(navigation, animated: true)
+        _ = endpoint
+    }
+
+    private func openConnectionSettings() {
         let setup = SetupViewController(initialValue: appState.endpointString)
         setup.onSave = { [weak self, weak setup] value in
             guard let self, self.appState.saveEndpoint(value) else { return }
