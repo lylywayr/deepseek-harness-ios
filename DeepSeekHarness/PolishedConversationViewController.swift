@@ -371,5 +371,4 @@ final class DHPolishedMessageCell: UITableViewCell {
         bubble.layer.borderColor = DHTheme.separator.withAlphaComponent(0.3).cgColor
     }
 }
-Use file_read tool to retrieve if needed.[CONTEXT OFFLOADED] Content (~2811 tokens, 12126 bytes) saved to: /var/minis/offloads/tools/file_write_09a0cc8ee787.txt
 Use file_read tool to retrieve if needed.
