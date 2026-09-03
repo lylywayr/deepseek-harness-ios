@@ -215,5 +215,5 @@ final class AutoNativeAdapter: NSObject, WKNavigationDelegate, WKUIDelegate, WKS
       function boot() { observer.observe(document.documentElement || document, {subtree:true,childList:true,attributes:true,characterData:true}); post({type:'ready'}); post({type:'snapshot',root:window.__dshNativeSnapshot()}); }
       if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
     })();
-    ""#
+    """#
 }
