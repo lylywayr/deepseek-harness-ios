@@ -51,13 +51,11 @@ struct SettingsView: View {
             }
             .navigationTitle("设置")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("关闭") {
-                        dismiss()
-                    }
+            .navigationBarItems(
+                leading: Button("关闭") {
+                    dismiss()
                 }
-            }
+            )
             .onAppear {
                 draft = appState.endpointString
             }

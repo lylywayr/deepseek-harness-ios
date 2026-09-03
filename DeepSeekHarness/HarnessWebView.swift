@@ -1,8 +1,9 @@
 import Foundation
+import Combine
 import Network
 import SwiftUI
 import UIKit
-import WebKit
+@preconcurrency import WebKit
 
 final class WebViewStore: NSObject, ObservableObject {
     @Published private(set) var isLoading = false
