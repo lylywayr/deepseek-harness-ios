@@ -35,8 +35,8 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
         super.viewDidLoad()
         view.backgroundColor = DHTheme.background
         buildMessages()
-        buildEmptyState()
         buildComposer()
+        buildEmptyState()
         updateEmptyState(animated: false)
         NotificationCenter.default.addObserver(
             self,
