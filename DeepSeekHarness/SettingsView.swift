@@ -39,7 +39,7 @@ struct SettingsView: View {
                         }
                     }
                 } footer: {
-                    Text("清除会删除本机 WebKit Cookie 和网页缓存，不会删除服务器上的会话、文件或其他数据。")
+                    Text("清除会删除本机保存的服务地址，不会删除服务器上的会话、文件或其他数据。")
                 }
 
                 Section("关于") {
@@ -99,14 +99,7 @@ struct SettingsView: View {
     }
 
     private func clearWebSession() {
-        WKWebsiteDataStore.default().removeData(
-            ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(),
-            modifiedSince: Date(timeIntervalSince1970: 0)
-        ) {
-            DispatchQueue.main.async {
-                appState.clearEndpoint()
-                dismiss()
-            }
-        }
+        appState.clearEndpoint()
+        dismiss()
     }
 }

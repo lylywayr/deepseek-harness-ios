@@ -9,13 +9,11 @@
 /* Begin PBXBuildFile section */
 		A10000000000000000000010 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000011 /* Assets.xcassets */; };
 		A10000000000000000000002 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000002 /* AppState.swift */; };
-		A10000000000000000000005 /* HarnessWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000005 /* HarnessWebView.swift */; };
 		A10000000000000000000006 /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000007 /* MainViewController.swift */; };
 		A10000000000000000000007 /* NativeMainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000008 /* NativeMainViewController.swift */; };
 		A10000000000000000000008 /* NativeUIProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000009 /* NativeUIProtocol.swift */; };
 		A10000000000000000000009 /* NativeUIRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000A /* NativeUIRenderer.swift */; };
 		A1000000000000000000000A /* NativeUIViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000B /* NativeUIViews.swift */; };
-		A1000000000000000000000B /* AutoNativeAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000C /* AutoNativeAdapter.swift */; };
 		A1000000000000000000000C /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000D /* DesignSystem.swift */; };
 		A1000000000000000000000D /* PolishedConversationViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000E /* PolishedConversationViewController.swift */; };
 		A1000000000000000000000E /* HarnessRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000F /* HarnessRuntime.swift */; };
@@ -29,14 +27,12 @@
 		B10000000000000000000002 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		B10000000000000000000003 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		B10000000000000000000004 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
-		B10000000000000000000005 /* HarnessWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessWebView.swift; sourceTree = "<group>"; };
 		B10000000000000000000006 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B10000000000000000000007 /* MainViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>"; };
 		B10000000000000000000008 /* NativeMainViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeMainViewController.swift; sourceTree = "<group>"; };
 		B10000000000000000000009 /* NativeUIProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeUIProtocol.swift; sourceTree = "<group>"; };
 		B1000000000000000000000A /* NativeUIRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeUIRenderer.swift; sourceTree = "<group>"; };
 		B1000000000000000000000B /* NativeUIViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeUIViews.swift; sourceTree = "<group>"; };
-		B1000000000000000000000C /* AutoNativeAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoNativeAdapter.swift; sourceTree = "<group>"; };
 		B1000000000000000000000D /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 		B1000000000000000000000E /* PolishedConversationViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PolishedConversationViewController.swift; sourceTree = "<group>"; };
 		B1000000000000000000000F /* HarnessRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessRuntime.swift; sourceTree = "<group>"; };
@@ -69,14 +65,12 @@
 				B10000000000000000000002 /* AppState.swift */,
 				B10000000000000000000003 /* RootView.swift */,
 				B10000000000000000000004 /* SettingsView.swift */,
-				B10000000000000000000005 /* HarnessWebView.swift */,
 				B10000000000000000000006 /* Info.plist */,
 				B10000000000000000000007 /* MainViewController.swift */,
 				B10000000000000000000008 /* NativeMainViewController.swift */,
 				B10000000000000000000009 /* NativeUIProtocol.swift */,
 				B1000000000000000000000A /* NativeUIRenderer.swift */,
 				B1000000000000000000000B /* NativeUIViews.swift */,
-				B1000000000000000000000C /* AutoNativeAdapter.swift */,
 				B1000000000000000000000D /* DesignSystem.swift */,
 				B1000000000000000000000E /* PolishedConversationViewController.swift */,
 				B1000000000000000000000F /* HarnessRuntime.swift */,
@@ -159,13 +153,11 @@
 			buildActionMask = 2147483647;
 			files = (
 				A10000000000000000000002 /* AppState.swift in Sources */,
-				A10000000000000000000005 /* HarnessWebView.swift in Sources */,
 				A10000000000000000000006 /* MainViewController.swift in Sources */,
 				A10000000000000000000007 /* NativeMainViewController.swift in Sources */,
 				A10000000000000000000008 /* NativeUIProtocol.swift in Sources */,
 				A10000000000000000000009 /* NativeUIRenderer.swift in Sources */,
 				A1000000000000000000000A /* NativeUIViews.swift in Sources */,
-				A1000000000000000000000B /* AutoNativeAdapter.swift in Sources */,
 				A1000000000000000000000C /* DesignSystem.swift in Sources */,
 				A1000000000000000000000D /* PolishedConversationViewController.swift in Sources */,
 				A1000000000000000000000E /* HarnessRuntime.swift in Sources */,

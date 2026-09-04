@@ -1,7 +1,7 @@
 import UIKit
 
 /// Connection screen for the native client. The active application never loads a web surface.
-final class LegacyMainViewController: UIViewController {
+final class ConnectionRootViewController: UIViewController {
     private let appState = AppState()
     private var currentChild: UIViewController?
 
