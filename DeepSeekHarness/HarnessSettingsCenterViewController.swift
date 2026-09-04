@@ -3,7 +3,7 @@ import UIKit
 /// Native settings shell. Only locally-owned settings and explicitly declared
 /// server surfaces are shown; unsupported server domains are not fabricated.
 final class HarnessSettingsCenterViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
-    private struct Row {
+    struct Row {
         let title: String
         let subtitle: String
         let value: String?

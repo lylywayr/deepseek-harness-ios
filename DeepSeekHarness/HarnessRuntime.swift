@@ -726,6 +726,7 @@ final class HarnessRuntime: NSObject {
         guard type == "waterfall",
               let clientID = eventClientID,
               let eventID = object["eventId"] as? String,
+              !eventID.isEmpty,
               let request = object["request"] as? [String: Any] else { return }
         var approval = object
         approval["clientId"] = clientID
