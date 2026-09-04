@@ -1,15 +1,12 @@
-# 本地自签说明
+# 自签名与安装
 
-## 直接用 Xcode
+GitHub Actions 生成的是面向 iOS 设备的未签名 IPA。它不包含证书、provisioning profile 或用户凭据，不能直接安装。
 
-1. 在 macOS 上用 Xcode 打开 `DeepSeekHarness.xcodeproj`。
-2. 在 Target → Signing & Capabilities 中填写自己的 Bundle Identifier，并选择自己的 Team。
-3. 连接设备，选择真实 iPhone/iPad 作为运行目标，执行 Build/Archive。
+1. 下载 `DeepSeekHarness-unsigned.ipa`。
+2. 使用自己的 Apple Team、Bundle ID、设备 UDID 和 provisioning setup 重新签名。
+3. 让签名工具同时重新签署 App 及嵌入内容，然后再安装到设备。
+4. 首次启动后，在原生连接页填写 Harness 的 HTTP/HTTPS 地址；访问令牌可选并仅保存到本机 Keychain。
 
-## 对 Actions 产物重签
+HTTP 只适用于可信私有 LAN；公网或跨网络部署请使用 HTTPS 或 VPN。项目不会默认跳过 TLS 校验，也不会把 token 写入 URL、UserDefaults、日志或 IPA。
 
-Actions 产物名为 `DeepSeekHarness-unsigned.ipa`，不含证书和 provisioning profile，不能直接安装。使用自己的签名工具重签时，请让工具按自己的 Bundle ID、Team ID、设备和 entitlements 重新签署应用及其嵌入内容。
-
-不要把 `.p12`、`.mobileprovision`、Apple 私钥、设备 UDID 清单或服务端凭据提交到仓库。
-
-不同签名方式的有效期、设备限制和安装流程由 Apple 账号及所用工具决定，本项目不承诺特定签名工具的行为。
+真实 Harness endpoint、服务端 capability、Native manifest、签名安装和真机行为需要使用者在自己的环境中复核；本仓库的完成报告不会把这些未知项写成已验证。

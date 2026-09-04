@@ -4,74 +4,41 @@ Open-source, native-first iOS client for a self-hosted DeepSeek Harness instance
 
 > 中文说明在下方。This is an independent community client, not an official DeepSeek product.
 
-## Product direction
+## Current scope
 
-The app is **native-first**: the visible shell, navigation, sidebar, chat surface, settings and plugin surfaces are rendered with UIKit/SwiftUI controls. It does not require installing any iOS UI plugin.
+The visible app shell is UIKit-native: connection setup, session rail, sidebar, workspace/session lists, conversation, trajectory, logs, directory selection, settings, model/permission controls, attachments, approvals, and declared Native UI plugin surfaces. Networking is also native (`URLSession` JSON-RPC plus `URLSessionWebSocketTask` Remote Mux); no WebView is used for communication or presentation.
 
-Existing Harness plugins remain server-side. The client uses a three-step compatibility strategy:
+The client does not install plugins on iOS. A server may expose versioned `dsh-native-ui` manifests. Declared surfaces are rendered from a constrained native component tree and actions are sent back through the native transport. Unsupported or legacy-only surfaces show a native “not available” explanation; this branch does not open plugin webpages or project arbitrary DOM into native UI.
 
-1. **Native UI manifest** — if a server adapter provides a versioned `dsh-native-ui` tree, the app renders it natively and dynamically.
-2. **Automatic projection** — the adapter can inspect existing `dsh.client` Web UI and project common DOM controls into the same native intermediate representation, without requiring every plugin author to change code.
-3. **Per-surface fallback** — unsupported or browser-specific parts remain available through the legacy Web compatibility surface instead of blanking the whole app.
+## What is implemented
 
-This is deliberately incremental. The conversion engine improves from reproducible unsupported-component fixtures. It does not claim that arbitrary Canvas, Monaco, custom CSS engines, Web Workers or browser-only behavior is already equivalent to native UI.
+- iOS 15+, arm64 device target and unsigned IPA workflow.
+- Configurable HTTP/HTTPS Harness endpoint; optional access token is stored in Keychain and never displayed.
+- Native JSON-RPC envelope/response correlation and structured remote errors.
+- Native Remote Mux subscriptions for workspace, session control, event approvals, and the selected session; bounded reconnect and old-session cancellation.
+- Session creation, selection, rename, fork, archive, history paging, live messages, stop, model catalog/model selection, permission command, image attachments, tool approvals, workspace management, and directory browsing.
+- Native plugin manifest refresh, constrained renderer, action dispatch, and explicit unsupported-surface state.
+- Dependency-free protocol regression fixtures under `Tests/`.
 
-## What users get
+## What is deliberately not claimed
 
-- iOS 15.0 or later; arm64 iPhone/iPad.
-- Configurable `http://` and `https://` Harness endpoint.
-- Native app frame, sidebar, plugin center, settings entry and initial chat surface.
-- Dynamic native plugin surfaces, buttons, forms and actions when a manifest is available.
-- Automatic best-effort projection of legacy `dsh.client` surfaces.
-- A compatibility path for unsupported legacy plugin UI.
-- No plugin installation, model bundle, analytics SDK or third-party account service on the device.
-- GitHub Actions workflow for a device-oriented unsigned IPA; users sign with their own account and tools.
+The current repository is not a substitute for a signed-device acceptance run. The real Harness endpoint was not contacted during this close-out, per the task boundary. Endpoint-specific authentication, server capability availability, native manifest availability, user-question variants, and behavior on a signed physical device remain acceptance items. The app only exposes capabilities actually returned by the service; it does not fabricate plugin, expert, market, service-control, or settings pages.
 
-## Current MVP status
+## Build
 
-The `feature/native-renderer` branch contains the Native-first MVP and has a successful GitHub macOS/Xcode build. It currently proves the native surface protocol, renderer, hidden legacy adapter, per-surface fallback and dynamic manifest refresh. The official Harness Session/Remote contract still needs to be wired into the native chat and action transport before this should be called feature-complete.
+Open `DeepSeekHarness.xcodeproj` in Xcode, or run **Actions → Build unsigned IPA → Run workflow**. The artifact is intentionally unsigned and must be re-signed with the user's own Apple account and provisioning setup before installation. See [self-signing notes](docs/self-signing.md).
 
-The `main` branch remains the earlier WebView preview until the Native-first branch is reviewed and promoted.
+## Security
 
-## Requirements
-
-- iOS 15.0 or later.
-- A reachable self-hosted/private DeepSeek Harness instance.
-- Xcode on macOS for local builds, or the included GitHub Actions workflow.
-- A valid signing method of your choice for installation. The repository never includes signing material.
-
-## Quick start
-
-1. Open `DeepSeekHarness.xcodeproj` in Xcode, or run the manual GitHub Actions workflow.
-2. Sign the resulting app/IPA with your own Apple account and provisioning setup.
-3. Configure your Harness endpoint in the app.
-4. Prefer HTTPS or a private encrypted network for remote access.
-
-## Build an unsigned IPA
-
-Open **Actions → Build unsigned IPA → Run workflow**. The workflow uses a GitHub-hosted macOS runner and uploads `DeepSeekHarness-unsigned.ipa`. The artifact is intentionally unsigned and cannot be installed until it is re-signed.
-
-## Security and privacy
-
-HTTP is enabled for private LAN deployments but sends credentials, cookies, messages and files in plaintext. Do not expose it to the public Internet. Prefer HTTPS or a VPN/Tailscale-style private network. Do not submit private URLs, cookies, tokens, certificates, provisioning profiles or personal logs in issues and pull requests.
-
-See [Security](SECURITY.md), [contributing](CONTRIBUTING.md), [self-signing notes](docs/self-signing.md), and the [Native-first MVP notes](docs/native-first-mvp.md).
+HTTP is retained only for private LAN deployments and sends credentials, messages, and files without transport encryption. Prefer HTTPS or a private encrypted network. Do not publish private URLs, tokens, cookies, certificates, provisioning profiles, or personal logs. See [SECURITY.md](SECURITY.md).
 
 ## 中文说明
 
-这是一个面向自托管 DeepSeek Harness 的 **原生优先 iOS 客户端**，不是官方 DeepSeek 产品。
+这是面向自托管 DeepSeek Harness 的原生优先 iOS 客户端，不是官方 DeepSeek 产品。所有用户可见界面和通信均由原生 UIKit/URLSession 实现，不使用 WKWebView、DOM 投影或网页兼容路径。服务端插件仍安装在 Harness 服务端；iOS 只消费明确声明的 Native UI 清单，无法原生表达的插件界面会显示诚实的原生不可用说明，不会打开插件网页。
 
-可见的 App 主界面使用 UIKit/SwiftUI 原生控件绘制，包括：
+插件市场、专家、Agent 预设、服务控制等仅由已停用插件提供的入口不会被伪装为基础版能力。模型、权限、会话、工作区和运行状态只有在真实 Remote 返回后才显示；未联调能力会明确写出“未声明/未验证”，不会用演示数据填充。
 
-- 原生导航和侧边栏；
-- 原生聊天页面；
-- 原生设置、模型、附件和插件入口；
-- 插件动态新增的按钮、页面、表单和侧边栏入口；
-- 对暂时无法转换的插件界面按页面或子树降级到兼容层。
-
-插件仍然安装在 Harness 服务端，iPhone 不安装任何 UI 插件。对于已有数十万插件，自动适配器会尝试加载现有 `dsh.client` Web UI，将常见 DOM 控件投影成原生中间表示，再由 iOS 原生渲染器绘制。发现一个失败案例后，可以补充适配规则和回归样例，逐步提高覆盖率。
-
-兼容层会继续保留一段时间，用于 Canvas、复杂富文本编辑器、浏览器专用 API、自定义复杂 CSS 等暂时无法可靠原生化的内容。目标是让原生成为默认路径，而不是承诺任意网页行为立即百分百等价于 SwiftUI。
+详见 [原生完成报告](docs/native-completion-report.md)、[基础版 UI 盘点](docs/mobile-ui-inventory.md) 和 [项目方向](docs/PROJECT.md)。
 
 ## License
 

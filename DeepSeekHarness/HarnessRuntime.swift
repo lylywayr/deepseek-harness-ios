@@ -45,6 +45,20 @@ struct HarnessConversationItem {
     let time: Double
 }
 
+struct HarnessDirectoryEntry {
+    let name: String
+    let path: String
+    let hidden: Bool
+}
+
+struct HarnessDirectoryListing {
+    let path: String
+    let home: String
+    let crumbs: [HarnessDirectoryEntry]
+    let entries: [HarnessDirectoryEntry]
+    let truncated: Bool
+}
+
 private enum HarnessClientError: LocalizedError {
     case invalidURL
     case unauthorized
@@ -67,7 +81,7 @@ private enum HarnessClientError: LocalizedError {
     }
 }
 
-private final class HarnessCredentialStore {
+final class HarnessCredentialStore {
     private let service = "com.example.DeepSeekHarness"
     private let account: String
 
@@ -87,6 +101,10 @@ private final class HarnessCredentialStore {
         guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
               let data = result as? Data else { return nil }
         return String(data: data, encoding: .utf8)
+    }
+
+    func hasValue() -> Bool {
+        read() != nil
     }
 
     func write(_ token: String) {
@@ -272,6 +290,7 @@ final class HarnessRuntime: NSObject {
     private var workspaceStreamID: String?
     private var controlStreamID: String?
     private var eventsStreamID: String?
+    private var eventClientID: String?
 
     private(set) var sessions: [HarnessSessionSummary] = []
     private(set) var workspaces: [HarnessWorkspace] = []
@@ -438,22 +457,36 @@ final class HarnessRuntime: NSObject {
         call("workspace/create", args: ["request": ["path": path]]) { [weak self] _ in self?.refresh() }
     }
 
-    func listDirectories(path: String?, completion: @escaping ([[String: Any]]) -> Void) {
-        var request: [String: Any] = [:]
-        if let path { request["path"] = path }
-        call("directoryPicker/list", args: ["request": request]) { value in
-            let object = value as? [String: Any]
-            completion((object?["entries"] as? [[String: Any]]) ?? (object?["items"] as? [[String: Any]]) ?? [])
-        } failure: { _ in completion([]) }
+    func listDirectories(path: String?, completion: @escaping (HarnessDirectoryListing) -> Void, failure: ((Error) -> Void)? = nil) {
+        var args: [String: Any] = [:]
+        if let path { args["path"] = path }
+        call("directoryPicker/list", args: args) { value in
+            guard let object = value as? [String: Any],
+                  let listedPath = object["path"] as? String,
+                  let home = object["home"] as? String else {
+                failure?(HarnessClientError.invalidResponse)
+                return
+            }
+            func entries(_ value: Any?) -> [HarnessDirectoryEntry] {
+                (value as? [[String: Any]] ?? []).compactMap { row in
+                    guard let name = row["name"] as? String, let path = row["path"] as? String else { return nil }
+                    return HarnessDirectoryEntry(name: name, path: path, hidden: row["hidden"] as? Bool ?? name.hasPrefix("."))
+                }
+            }
+            completion(HarnessDirectoryListing(path: listedPath, home: home, crumbs: entries(object["crumbs"]), entries: entries(object["entries"]), truncated: object["truncated"] as? Bool ?? false))
+        } failure: { error in
+            failure?(error)
+        }
     }
 
     func createDirectory(path: String, name: String, completion: @escaping (String?) -> Void) {
-        call("directoryPicker/createDirectory", args: ["request": ["path": path, "name": name]]) { value in
+        call("directoryPicker/createDirectory", args: ["path": path, "name": name]) { value in
             completion(value as? String ?? (value as? [String: Any])?["path"] as? String)
         } failure: { _ in completion(nil) }
     }
 
-    func answerApproval(clientID: String, eventID: String, decision: String) {
+    func answerApproval(clientID _: String, eventID: String, decision: String) {
+        guard let clientID = eventClientID, !clientID.isEmpty else { return }
         call("$events/result", args: [
             "clientId": clientID,
             "eventId": eventID,
@@ -530,6 +563,7 @@ final class HarnessRuntime: NSObject {
         workspaceStreamID = "workspace-\(UUID().uuidString)"
         controlStreamID = "control-\(UUID().uuidString)"
         eventsStreamID = "events-\(UUID().uuidString)"
+        eventClientID = nil
         guard let request = client.webSocketRequest() else {
             acceptError("无法建立 Harness 实时连接。")
             return
@@ -582,13 +616,13 @@ final class HarnessRuntime: NSObject {
         if let oldID = followStreamID { sendMuxCancel(socket, streamID: oldID) }
         let streamID = "follow-\(UUID().uuidString)"
         followStreamID = streamID
-        let object: [String: Any] = [
+        let request: [String: Any] = [
             "type": "open",
             "streamId": streamID,
             "endpoint": "session/follow",
             "payload": ["args": ["request": followRequest(id)]]
         ]
-        guard let data = try? JSONSerialization.data(withJSONObject: object), let text = String(data: data, encoding: .utf8) else { return }
+        guard let data = try? JSONSerialization.data(withJSONObject: request), let text = String(data: data, encoding: .utf8) else { return }
         socket.send(.string(text), completionHandler: { _ in })
     }
 
@@ -684,8 +718,19 @@ final class HarnessRuntime: NSObject {
     }
 
     private func acceptRemoteEvent(_ value: Any?) {
-        guard let object = value as? [String: Any], object["type"] as? String == "waterfall" else { return }
-        onApproval?(object)
+        guard let object = value as? [String: Any], let type = object["type"] as? String else { return }
+        if type == "ready" {
+            eventClientID = object["clientId"] as? String
+            return
+        }
+        guard type == "waterfall",
+              let clientID = eventClientID,
+              let eventID = object["eventId"] as? String,
+              let request = object["request"] as? [String: Any] else { return }
+        var approval = object
+        approval["clientId"] = clientID
+        approval["request"] = request
+        onApproval?(approval)
     }
 
     private func parseRecords(_ records: [Any], prepend: Bool) {

@@ -13,9 +13,12 @@ final class ConnectionRootViewController: UIViewController {
 
     private func render() {
         removeCurrentChild()
-        let controller = SetupViewController(initialValue: appState.endpointString)
-        controller.onSave = { [weak self] value in
-            guard let self, self.appState.saveEndpoint(value) else { return }
+        let controller = SetupViewController(
+            initialValue: appState.endpointString,
+            credentialConfigured: appState.hasStoredCredential
+        )
+        controller.onSaveWithToken = { [weak self] value, token in
+            guard let self, self.appState.saveEndpoint(value, token: token) else { return }
             self.render()
         }
         addChildController(controller)
@@ -47,14 +50,18 @@ final class ConnectionRootViewController: UIViewController {
 
 final class SetupViewController: UIViewController {
     var onSave: ((String) -> Void)?
+    var onSaveWithToken: ((String, String?) -> Void)?
     var onClearSession: (() -> Void)?
     private let initialValue: String
+    private let credentialConfigured: Bool
     private let endpointField = UITextField()
+    private let tokenField = UITextField()
     private let errorLabel = UILabel()
     private let clearButton = UIButton(type: .system)
 
-    init(initialValue: String) {
+    init(initialValue: String, credentialConfigured: Bool = false) {
         self.initialValue = initialValue
+        self.credentialConfigured = credentialConfigured
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -125,13 +132,29 @@ final class SetupViewController: UIViewController {
         endpointField.autocapitalizationType = .none
         endpointField.autocorrectionType = .no
         endpointField.clearButtonMode = .whileEditing
-        endpointField.returnKeyType = .done
+        endpointField.returnKeyType = .next
         endpointField.delegate = self
         endpointField.font = DHTheme.font(.body)
         endpointField.backgroundColor = DHTheme.surfaceMuted
         endpointField.layer.cornerRadius = DHTheme.cornerSmall
         endpointField.setLeftPadding(13)
         endpointField.heightAnchor.constraint(equalToConstant: 48).isActive = true
+
+        let tokenTitle = UILabel()
+        tokenTitle.text = credentialConfigured ? "访问令牌（已保存，留空则保留）" : "访问令牌（可选）"
+        tokenTitle.font = DHTheme.font(.subheadline, weight: .semibold)
+        tokenField.placeholder = "仅保存在本机钥匙串"
+        tokenField.isSecureTextEntry = true
+        tokenField.autocapitalizationType = .none
+        tokenField.autocorrectionType = .no
+        tokenField.returnKeyType = .done
+        tokenField.delegate = self
+        tokenField.font = DHTheme.font(.body)
+        tokenField.backgroundColor = DHTheme.surfaceMuted
+        tokenField.layer.cornerRadius = DHTheme.cornerSmall
+        tokenField.setLeftPadding(13)
+        tokenField.heightAnchor.constraint(equalToConstant: 48).isActive = true
+
         var saveConfig = UIButton.Configuration.filled()
         saveConfig.title = "保存并连接"
         saveConfig.cornerStyle = .medium
@@ -145,7 +168,7 @@ final class SetupViewController: UIViewController {
         errorLabel.textColor = DHTheme.danger
         errorLabel.numberOfLines = 0
         errorLabel.isHidden = true
-        [addressTitle, endpointField, saveButton, errorLabel].forEach(cardContent.addArrangedSubview)
+        [addressTitle, endpointField, tokenTitle, tokenField, saveButton, errorLabel].forEach(cardContent.addArrangedSubview)
         NSLayoutConstraint.activate([
             cardContent.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 18),
             cardContent.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -18),
@@ -154,7 +177,7 @@ final class SetupViewController: UIViewController {
         ])
 
         let note = UILabel()
-        note.text = "支持 HTTP 和 HTTPS。公网访问请使用 HTTPS 或 VPN。地址中不要填写密码或 Token。"
+        note.text = "支持 HTTP 和 HTTPS。令牌仅保存在本机钥匙串；公网访问请使用 HTTPS 或 VPN。"
         note.font = DHTheme.font(.footnote)
         note.textColor = DHTheme.secondaryText
         note.numberOfLines = 0
@@ -188,7 +211,12 @@ final class SetupViewController: UIViewController {
             return
         }
         errorLabel.isHidden = true
-        onSave?(value)
+        if let onSaveWithToken {
+            let token = tokenField.text?.trimmingCharacters(in: .whitespacesAndNewlines)
+            onSaveWithToken(value, token?.isEmpty == true ? nil : token)
+        } else {
+            onSave?(value)
+        }
     }
 
     @objc private func clearSession() { onClearSession?() }
@@ -196,7 +224,14 @@ final class SetupViewController: UIViewController {
 }
 
 extension SetupViewController: UITextFieldDelegate {
-    func textFieldShouldReturn(_ textField: UITextField) -> Bool { save(); return true }
+    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        if textField === endpointField {
+            tokenField.becomeFirstResponder()
+        } else {
+            save()
+        }
+        return true
+    }
 }
 
 extension UITextField {

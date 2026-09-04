@@ -1,43 +1,33 @@
-# Harness 手机 UI 视觉盘点
+# 移动端基础版 UI 盘点
 
-基准：真实部署、390×844 手机视口。页面必须同时记录入口、布局、可见状态、子页面、弹窗、返回路径和对应服务能力。
+范围：已停用全部服务端插件后的 Harness 基础版。旧版插件提供的专家、Agent 预设、插件市场、服务控制等不列入基础版主导航。
 
-## 已确认页面
+| 入口 | 基础版是否存在 | 默认/空/加载/错误态 | 官方 Remote / endpoint | iOS 实现 | 状态 |
+|---|---|---|---|---|---|
+| 首次连接 | 是 | 未配置、连接中、401/403、网络失败 | 根地址；后续 `/api/*` | `SetupViewController`, `AppState` | 原生实现；真实地址未联调 |
+| 新建会话 | 是 | 默认工作区或空工作区 | `session/create` | `NativeHomeViewController`, `HarnessRuntime` | 原生实现；真实 endpoint 未联调 |
+| 搜索会话 | 是 | 侧栏搜索、无结果、取消 | 基于已加载 `session/list` 数据 | 侧栏 | 原生筛选；官方内容搜索边界未验证 |
+| 视图选项 | 是 | 当前侧栏排序/过滤入口 | 本机偏好/已加载列表 | 侧栏 | 基础排序与状态显示；完整官方选项未验证 |
+| 添加工作区 | 是 | 目录列表、空目录、失败 | `directoryPicker/list`, `createDirectory`; `workspace/create` | `HarnessDirectoryPickerViewController` | 按官方 listing 字段实现；真实 capability 未联调 |
+| 工作区菜单 | 是 | 重命名、移除确认 | `workspace/rename`, `workspace/delete` | 侧栏 + Runtime | 原生实现；真实 endpoint 未联调 |
+| 会话菜单 | 是 | 重命名、分叉、归档确认 | `session/rename`, `session/fork`, `workspace/archiveSession` | 侧栏 + Runtime | 原生实现；真实 endpoint 未联调 |
+| 会话顶栏 | 是 | 会话标题、模型、权限、运行状态 | `session/control` projections | 对话控制器 | 原生实现；事件变体未完整联调 |
+| 对话/轨迹 | 是 | 空态、加载、流式、错误 | `session/follow`, `session/page` | `PolishedConversationViewController` | 原生实现；真实 endpoint 未联调 |
+| 文本发送/停止 | 是 | 空输入禁用、生成中停止 | `session/prompt`, `session/cancel` | 对话编辑器 | 原生实现；真实 endpoint 未联调 |
+| 模型选择 | 是 | provider/model 列表、失败 | `session/modelCatalog`, `session/selectModel` | 对话菜单 | 原生实现；真实 catalog 未联调 |
+| 权限选择 | 是 | 当前值、失败 | `commands/execute` | 对话菜单 | 原生命令实现；权限选项边界未验证 |
+| 图片附件 | 是（若服务接受） | 预览、移除、发送失败 | `session/attachment` / prompt images | 对话编辑器 | 原生实现；上限和服务能力未联调 |
+| 普通文件附件 | 未确认 | 不在基础菜单中虚构 | 需真实基础协议声明 | 无 | 未验证，不暴露入口 |
+| 工具调用/结果 | 是 | 运行中、结果、错误 | `session/follow` 事件 | 对话/轨迹详情 | 已解析常见事件；完整变体未联调 |
+| 工具审批 | 是（事件触发时） | ready、审批、允许/拒绝 | `$events`, `$events/result` | 原生 alert | clientId 关联已实现；真实事件未联调 |
+| Session 日志 | 是 | 空/有内容/可复制 | 已加载真实事件 | 日志页 | 原生实现；真实事件未联调 |
+| 设置 | 是 | endpoint、Keychain 状态、本机显示说明 | 本地偏好；服务端 settings 未声明 | `HarnessSettingsCenterViewController` | 不显示演示值；服务端设置未联调 |
+| 插件中心 | 动态 | 无 Native manifest 时诚实空态 | `api/native-ui/manifest` | `NativePluginCenterViewController` | 仅声明 Native UI；插件停用基线无入口 |
 
-### 会话工作台
-- 折叠侧栏：品牌、新会话、工作区、搜索、视图选项、添加工作区、文件浏览、导出会话日志、设置。
-- 展开侧栏：工作区树、会话列表、选中态、更新时间。
-- 会话顶栏：会话标题、Agent 预设、文件入口、Session 日志。
-- 主标签：对话、轨迹。
-- 编辑器：文本输入、添加、附件、语音、静音、专家、权限、模型、运行/发送、统计信息。
+## 不属于基础版的旧入口
 
-### 轨迹
-- 时长开关、轮次折叠、调用折叠、搜索、加载更早历史。
-- 输入/模型/工具时间轴、用户消息、助手消息、工具调用、工具结果、轮次边界。
-- 工具详情侧栏及关闭入口。
+专家、Agent 预设、插件市场、服务控制、通用文件浏览器和任意插件 DOM/网页兼容页面来自旧插件或未验证扩展。本分支不把它们放入基础版导航，不创建假数据，也不打开插件网页。
 
-### 设置中心
-横向标签：通用设置、模型、插件、专家、Agent 预设、插件市场、服务控制。
+## 证据与限制
 
-- 通用设置：默认权限、语言、浅色/深色/跟随系统、字号、对话显示、繁忙时 Enter 行为。
-- 模型：Provider 卡片、状态、编辑、删除、添加提供方、添加自定义提供方。
-- 插件：插件配置/插件列表；插件市场、终端、Agent 循环、Subagent、网页搜索、服务控制等折叠配置卡。
-- 专家：刷新、总数/启用数、分类、搜索、分类分组、启用/停用。
-- Agent 预设：说明、内置预设卡、当前使用、标识、查看详情、复制。
-- 插件市场：待继续采集加载完成、搜索、详情和安装状态。
-- 服务控制：待继续采集完整页面、开关状态和配置文件入口。
-
-## 已采集视觉样本
-- `minis://browser/screenshot_1788477691.jpg`：轨迹工作台
-- `minis://browser/screenshot_1788477706.jpg`：展开侧栏
-- `minis://browser/screenshot_1788477726.jpg`：通用设置
-- `minis://browser/screenshot_1788477815.jpg`：模型
-- `minis://browser/screenshot_1788477842.jpg`：插件
-- `minis://browser/screenshot_1788477870.jpg`：专家
-- `minis://browser/screenshot_1788477882.jpg`：Agent 预设
-
-## 实现纪律
-1. 先按真实页面建立原生信息架构和状态，不凭名称臆造页面。
-2. 未接真实协议的操作明确标记“待接入”，不伪装成功。
-3. 每个页面依次完成：默认态 → 列表/空态 → 编辑/详情 → 确认/错误态 → 真实 API/Remote → 真机验证。
-4. 后续继续逐项采集：插件市场、服务控制、文件浏览、Session 日志、工作区菜单、会话菜单、模型编辑、插件折叠详情、专家筛选及启停、预设详情及复制、编辑器各弹窗。
+本清单依据当前分支已有真实采集记录、官方源码类型和插件停用后的信息架构整理。按本轮任务边界，没有重新访问 NAS、插件或真实 endpoint；所有“未联调/未验证”均保持明确标注。

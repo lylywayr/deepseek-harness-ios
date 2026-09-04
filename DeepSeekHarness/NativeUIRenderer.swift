@@ -6,23 +6,20 @@ struct NativeUIRenderResult {
 }
 
 /// Converts the intermediate Native UI tree into UIKit controls.
-/// Unsupported nodes are isolated as explicit fallback cards rather than
+/// Unsupported nodes are isolated as explicit native diagnostic cards rather than
 /// blanking the entire plugin surface.
 final class NativeUIRenderer {
     private let surfaceID: String
     private let actionHandler: NativeUIActionHandler?
-    private let fallbackHandler: (String?) -> Void
     private var diagnostics: [String] = []
 
     init(
         surfaceID: String,
         transport: NativeUITransport?,
-        actionHandler: NativeUIActionHandler? = nil,
-        fallbackHandler: @escaping (String?) -> Void = { _ in }
+        actionHandler: NativeUIActionHandler? = nil
     ) {
         self.surfaceID = surfaceID
         self.actionHandler = actionHandler
-        self.fallbackHandler = fallbackHandler
         _ = transport
     }
 
@@ -184,9 +181,10 @@ final class NativeUIRenderer {
         wrapper.layer.cornerRadius = 10
         wrapper.layer.borderWidth = 1
         wrapper.layer.borderColor = UIColor.systemOrange.cgColor
-        let label = makeLabel("兼容模式\n\(node.displayTitle)\n\(reason)\n点击打开原始插件页面")
+        let label = makeLabel("原生界面不可用\n\(node.displayTitle)\n\(reason)\n此版本不会打开插件网页")
         label.textColor = .secondaryLabel
-        label.isUserInteractionEnabled = true
+        label.numberOfLines = 0
+        label.accessibilityLabel = "\(node.displayTitle)：原生界面不可用"
         wrapper.addSubview(label)
         label.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
@@ -195,19 +193,9 @@ final class NativeUIRenderer {
             label.topAnchor.constraint(equalTo: wrapper.topAnchor, constant: 12),
             label.bottomAnchor.constraint(equalTo: wrapper.bottomAnchor, constant: -12)
         ])
-        let tap = UITapGestureRecognizer(target: self, action: #selector(openFallback(_:)))
-        wrapper.addGestureRecognizer(tap)
-        objc_setAssociatedObject(wrapper, &NativeUIRenderer.fallbackURLKey, node.url, .OBJC_ASSOCIATION_COPY_NONATOMIC)
         return wrapper
     }
 
-    @objc private func openFallback(_ gesture: UITapGestureRecognizer) {
-        guard let view = gesture.view,
-              let url = objc_getAssociatedObject(view, &NativeUIRenderer.fallbackURLKey) as? String else { return }
-        fallbackHandler(url)
-    }
-
-    static var fallbackURLKey = "NativeUIFallbackURL"
 }
 
 private final class NativeUIActionTarget: NSObject {

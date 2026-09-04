@@ -366,10 +366,9 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
     }
 
     private func showPresetNotice() {
-        let alert = UIAlertController(title: "Agent 预设", message: "当前使用标准模式。其他预设将在对应 Remote 接入后开放切换。", preferredStyle: .actionSheet)
-        alert.addAction(UIAlertAction(title: "标准模式 ✓", style: .default))
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-        presentSheet(alert, source: presetButton)
+        let alert = UIAlertController(title: "Agent 预设", message: "当前会话使用的预设来自 session/list；客户端未实现 preset 列表 Remote，因此不显示或伪造其他预设。", preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "知道了", style: .default))
+        present(alert, animated: true)
     }
 
     private func configureIcon(_ button: UIButton, _ name: String, label: String) {

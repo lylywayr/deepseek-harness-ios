@@ -49,9 +49,12 @@ final class MainViewController: UIViewController {
         removeCurrentChild()
         guard let endpoint = appState.endpointURL else {
             navigationController?.setNavigationBarHidden(false, animated: false)
-            let setup = SetupViewController(initialValue: appState.endpointString)
-            setup.onSave = { [weak self] value in
-                guard let self, self.appState.saveEndpoint(value) else { return }
+            let setup = SetupViewController(
+                initialValue: appState.endpointString,
+                credentialConfigured: appState.hasStoredCredential
+            )
+            setup.onSaveWithToken = { [weak self] value, token in
+                guard let self, self.appState.saveEndpoint(value, token: token) else { return }
                 self.render()
             }
             addChildController(setup)
@@ -118,9 +121,12 @@ final class MainViewController: UIViewController {
     }
 
     private func openConnectionSettings() {
-        let setup = SetupViewController(initialValue: appState.endpointString)
-        setup.onSave = { [weak self, weak setup] value in
-            guard let self, self.appState.saveEndpoint(value) else { return }
+        let setup = SetupViewController(
+            initialValue: appState.endpointString,
+            credentialConfigured: appState.hasStoredCredential
+        )
+        setup.onSaveWithToken = { [weak self, weak setup] value, token in
+            guard let self, self.appState.saveEndpoint(value, token: token) else { return }
             setup?.dismiss(animated: true)
             self.render()
         }
@@ -488,7 +494,7 @@ final class NativeHomeViewController: UIViewController {
     }
 
     private func openPluginCenter() {
-        let controller = NativePluginCenterViewController(store: store, transport: transport, actionHandler: makeActionHandler(), fallbackHandler: { [weak self] _ in self?.showNotice("此页面没有可用的原生声明。") })
+        let controller = NativePluginCenterViewController(store: store, transport: transport, actionHandler: makeActionHandler())
         navigationController?.pushViewController(controller, animated: true)
     }
 
@@ -497,7 +503,7 @@ final class NativeHomeViewController: UIViewController {
             showNotice("此页面没有可用的原生声明。")
             return
         }
-        let controller = NativeUISurfaceViewController(surface: surface, store: store, transport: transport, actionHandler: makeActionHandler(), fallbackHandler: { [weak self] _ in self?.showNotice("此页面没有可用的原生声明。") })
+        let controller = NativeUISurfaceViewController(surface: surface, store: store, transport: transport, actionHandler: makeActionHandler())
         navigationController?.pushViewController(controller, animated: true)
     }
 
@@ -826,9 +832,12 @@ final class DHNavigationAppearance {
 final class HarnessDirectoryPickerViewController: UITableViewController {
     private let runtime: HarnessRuntime
     private let onOpen: (String) -> Void
-    private var path: String?
+    private var currentPath: String?
+    private var homePath: String?
+    private var crumbs: [(name: String, path: String)] = []
     private var rows: [(name: String, path: String, hidden: Bool)] = []
     private var showHidden = false
+    private var selectedPath: String?
 
     init(runtime: HarnessRuntime, onOpen: @escaping (String) -> Void) {
         self.runtime = runtime
@@ -845,7 +854,10 @@ final class HarnessDirectoryPickerViewController: UITableViewController {
         view.backgroundColor = DHTheme.surface
         navigationItem.leftBarButtonItem = UIBarButtonItem(title: "取消", style: .plain, target: self, action: #selector(close))
         navigationItem.rightBarButtonItem = UIBarButtonItem(title: "打开", style: .done, target: self, action: #selector(open))
+        navigationItem.rightBarButtonItem?.isEnabled = false
         tableView.register(UITableViewCell.self, forCellReuseIdentifier: "dir")
+        tableView.register(UITableViewCell.self, forCellReuseIdentifier: "crumb")
+        tableView.tableHeaderView = makeBreadcrumbHeader()
         toolbarItems = [
             UIBarButtonItem(title: "＋ 新建文件夹", style: .plain, target: self, action: #selector(newFolder)),
             UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil),
@@ -856,16 +868,57 @@ final class HarnessDirectoryPickerViewController: UITableViewController {
     }
 
     private func load() {
-        runtime.listDirectories(path: path) { [weak self] values in
+        runtime.listDirectories(path: currentPath) { [weak self] listing in
             guard let self else { return }
-            self.rows = values.compactMap { value in
-                guard let name = value["name"] as? String,
-                      let path = value["path"] as? String,
-                      (value["isDirectory"] as? Bool) != false else { return nil }
-                return (name, path, (value["hidden"] as? Bool) ?? name.hasPrefix("."))
-            }
+            self.currentPath = listing.path
+            self.homePath = listing.home
+            self.crumbs = listing.crumbs.map { ($0.name, $0.path) }
+            self.rows = listing.entries.map { ($0.name, $0.path, $0.hidden) }
+            self.selectedPath = nil
+            self.navigationItem.rightBarButtonItem?.isEnabled = false
+            self.title = listing.path
+            self.tableView.tableHeaderView = self.makeBreadcrumbHeader()
             self.tableView.reloadData()
+        } failure: { [weak self] error in
+            self?.showError(error.localizedDescription)
         }
+    }
+
+    private func makeBreadcrumbHeader() -> UIView {
+        let scroll = UIScrollView(frame: CGRect(x: 0, y: 0, width: tableView.bounds.width, height: 44))
+        scroll.showsHorizontalScrollIndicator = false
+        let stack = UIStackView()
+        stack.axis = .horizontal
+        stack.spacing = 4
+        stack.alignment = .center
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        scroll.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: scroll.contentLayoutGuide.leadingAnchor, constant: 16),
+            stack.trailingAnchor.constraint(equalTo: scroll.contentLayoutGuide.trailingAnchor, constant: -16),
+            stack.topAnchor.constraint(equalTo: scroll.contentLayoutGuide.topAnchor, constant: 6),
+            stack.bottomAnchor.constraint(equalTo: scroll.contentLayoutGuide.bottomAnchor, constant: -6),
+            stack.heightAnchor.constraint(equalTo: scroll.frameLayoutGuide.heightAnchor, constant: -12)
+        ])
+        for (index, crumb) in crumbs.enumerated() {
+            if index > 0 { stack.addArrangedSubview(makeChevron()) }
+            let button = UIButton(type: .system)
+            button.setTitle(crumb.name.isEmpty ? crumb.path : crumb.name, for: .normal)
+            button.titleLabel?.font = DHTheme.font(.caption1, weight: index == crumbs.count - 1 ? .semibold : .regular)
+            button.accessibilityLabel = "打开路径 \(crumb.path)"
+            button.tag = index
+            button.addTarget(self, action: #selector(selectBreadcrumb(_:)), for: .touchUpInside)
+            stack.addArrangedSubview(button)
+        }
+        return scroll
+    }
+
+    private func makeChevron() -> UIImageView {
+        let image = UIImageView(image: UIImage(systemName: "chevron.right"))
+        image.tintColor = DHTheme.tertiaryText
+        image.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 10, weight: .medium)
+        image.widthAnchor.constraint(equalToConstant: 12).isActive = true
+        return image
     }
 
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
@@ -877,25 +930,39 @@ final class HarnessDirectoryPickerViewController: UITableViewController {
         let cell = tableView.dequeueReusableCell(withIdentifier: "dir", for: indexPath)
         var configuration = cell.defaultContentConfiguration()
         configuration.text = row.name
+        configuration.secondaryText = row.path
         configuration.image = UIImage(systemName: "folder")
         cell.contentConfiguration = configuration
-        cell.accessoryType = .disclosureIndicator
+        cell.accessoryType = row.path == selectedPath ? .checkmark : .disclosureIndicator
         return cell
     }
 
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         let row = rows.filter { showHidden || !$0.hidden }[indexPath.row]
-        path = row.path
-        title = row.name
+        selectedPath = row.path
+        navigationItem.rightBarButtonItem?.isEnabled = true
+        tableView.reloadData()
+    }
+
+    @objc private func selectBreadcrumb(_ sender: UIButton) {
+        guard crumbs.indices.contains(sender.tag) else { return }
+        currentPath = crumbs[sender.tag].path
         load()
+    }
+
+    private func showError(_ message: String) {
+        let alert = UIAlertController(title: "目录", message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "知道了", style: .default))
+        present(alert, animated: true)
     }
 
     @objc private func close() { dismiss(animated: true) }
     @objc private func open() {
-        guard let path else { return }
+        guard let path = selectedPath else { return }
         onOpen(path)
         dismiss(animated: true)
     }
+
     @objc private func toggleHidden() {
         showHidden.toggle()
         toolbarItems?.last?.title = showHidden ? "隐藏隐藏文件" : "显示隐藏文件"
@@ -907,7 +974,14 @@ final class HarnessDirectoryPickerViewController: UITableViewController {
         alert.addAction(UIAlertAction(title: "取消", style: .cancel))
         alert.addAction(UIAlertAction(title: "创建", style: .default) { [weak self, weak alert] _ in
             guard let self, let name = alert?.textFields?.first?.text, !name.isEmpty else { return }
-            self.runtime.createDirectory(path: self.path ?? "", name: name) { _ in self.load() }
+            self.runtime.createDirectory(path: self.currentPath ?? self.homePath ?? "", name: name) { [weak self] result in
+                guard let self else { return }
+                if result == nil {
+                    self.showError("文件夹创建失败，请检查当前目录权限或名称。")
+                } else {
+                    self.load()
+                }
+            }
         })
         present(alert, animated: true)
     }

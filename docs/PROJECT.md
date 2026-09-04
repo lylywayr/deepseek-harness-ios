@@ -1,37 +1,51 @@
-# DeepSeek Harness iOS — 项目方向
+# 项目方向
 
 ## 目标
 
-为自托管 DeepSeek Harness 提供一个 **Native-first** iOS 客户端：可见主界面使用 UIKit/SwiftUI 原生绘制；现有服务端插件无需安装到 iOS；插件 UI 通过自动适配器尽量转换为原生；转换失败时按页面或子树进入兼容层。
+为自托管 DeepSeek Harness 提供一个原生优先 iOS 客户端。可见界面使用 UIKit/SwiftUI，通信使用 `URLSession` 的 JSON-RPC 与 `URLSessionWebSocketTask` 的 Remote Mux。当前分支不使用 WKWebView、DOM 投影或网页兼容路径。
 
-## 已确定约束
+## 基础版范围
 
-- 面向个人自用，也欢迎其他用户自行部署和构建。
-- 不上架 App Store，不依赖 TestFlight。
-- GitHub Actions 使用 macOS Runner 构建设备版未签名 IPA。
-- 最低支持 iOS 15.0，目标架构 arm64。
-- 支持 HTTP 与 HTTPS；公网部署推荐 HTTPS 或 VPN/组网。
-- 不提交任何账号、Token、证书、私有地址或签名材料。
-- MIT License。
-- 不要求现有 Harness 插件作者逐个适配。
+插件停用后的基础 Harness 只应显示真实返回的会话、工作区、模型、权限、对话、轨迹、日志和目录选择能力。插件市场、专家、Agent 预设、服务控制等此前由停用插件提供的页面不属于基础版主导航；只有服务端返回明确的 Native UI manifest 时，才动态出现对应原生 surface。
 
-## Native-first 架构
+## 运行结构
 
-- `NativeUIProtocol.swift`：版本化 Native UI IR、manifest、action 和 transport。
-- `NativeUIRenderer.swift`：把通用节点转换为 UIKit 控件。
-- `AutoNativeAdapter.swift`：在隐藏兼容运行时读取既有 `dsh.client` 页面，并尝试投影常见 DOM 控件。
-- `NativeMainViewController.swift`：原生窗口、侧边栏、插件中心和聊天壳。
-- `NativeUIViews.swift`：动态插件 surface 与诊断界面。
-- `MainViewController.swift`：Legacy Web 兼容层，仅在必要时打开。
+```text
+UIKit App
+  ├─ MainViewController / SetupViewController
+  ├─ NativeHomeViewController
+  │   ├─ rail + sidebar
+  │   ├─ PolishedConversationViewController
+  │   └─ HarnessDirectoryPickerViewController
+  ├─ HarnessRuntime (@MainActor state coordinator)
+  │   └─ HarnessClient (URLSession + JSON-RPC)
+  │       └─ URLSessionWebSocketTask (/api/remote.mux)
+  └─ NativeUITransport / NativeUIRenderer (declared manifest only)
+```
 
-## 动态插件策略
+## 真实协议对照
 
-插件仍由 Harness 服务端安装和运行。App 通过清单动态发现插件 surface、按钮、页面和设置；点击事件回到服务端。自动投影优先覆盖常见文本、按钮、输入、开关、容器、列表和插槽入口。未知组件生成明确的兼容卡片，不静默白屏。
+| 能力 | Remote / endpoint | 原生实现 | 状态 |
+|---|---|---|---|
+| 会话列表 | `session/list` | `HarnessRuntime.refresh` | 已实现，未在本轮访问真实 endpoint |
+| 会话历史 | `session/follow`, `session/page` | follow + cursor 合并 | 已实现，未在本轮访问真实 endpoint |
+| 会话操作 | `session/create`, `rename`, `fork`, `prompt`, `cancel`, `selectModel` | Runtime actions | 已实现，未在本轮访问真实 endpoint |
+| 工作区 | `workspace/follow`, `create`, `rename`, `delete`, `archiveSession` | Runtime/sidebar | 已实现，未在本轮访问真实 endpoint |
+| 目录 | `directoryPicker/list`, `createDirectory` | `HarnessDirectoryPickerViewController` | 按官方 `path/home/crumbs/entries` 建模；未在本轮访问真实 endpoint |
+| 实时控制 | `session/control` | jobs/queues/projections | 已实现，未在本轮访问真实 endpoint |
+| 工具审批 | `$events` + `$events/result` | ready clientId 关联 | 已实现，未在本轮访问真实 endpoint |
+| Native UI | `api/native-ui/manifest`, `api/native-ui/action` | constrained renderer | 已实现；服务端是否提供该清单未验证 |
 
-当前 `NativeUITransport` 预留 `/api/native-ui/manifest` 与 `/api/native-ui/action`，并保留自动适配路径；接下来需要依据官方 Harness 的真实 Session/Remote 契约接入服务端适配器，而不是假设现有部署已经提供这两个路径。
+## 安全边界
 
-## 分支与验证
+服务地址只接受 HTTP/HTTPS，访问令牌使用 Keychain 保存，用户界面只显示是否已配置。HTTP 仅适用于私有 LAN；不要将其暴露到公网。未提供真实 endpoint、session、workspace、token、Cookie 或演示 provider 数据。
 
-- `main`：已验证的 WebView 预览版本。
-- `feature/native-renderer`：Native-first MVP。
-- 构建工作流：`.github/workflows/build-ipa.yml`。
+## 验证
+
+协议回归测试：
+
+```sh
+python3 -m unittest discover -s Tests -p 'test_*.py' -v
+```
+
+Xcode device archive 由 `.github/workflows/build-ipa.yml` 执行。签名、真机安装、真实 endpoint 交互和 Native manifest 可用性需要验收者另行复核。

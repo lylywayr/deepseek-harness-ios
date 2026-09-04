@@ -1,27 +1,19 @@
-# DeepSeek Harness iOS — Native-first MVP
+# Native-first MVP
 
-这一条主线已经从“网页客户端壳”切换为 **原生主界面 + 自动原生适配 + 兼容层兜底**。
+本分支是一个纯原生 UIKit/URLSession 实现：用户可见界面不依赖网页，网络层也不通过隐藏 WebView 获取鉴权或调用服务。
 
-## 当前已实现
+## Native UI manifest
 
-- 可见主界面使用 UIKit 原生窗口、导航栏、侧边栏、插件中心和聊天壳。
-- iOS 不安装 Harness UI 插件，也不执行插件原生代码。
-- `NativeUIManifest` / `NativeUINode` / `NativeUIActionRequest` 定义版本化的原生中间表示。
-- `NativeUIRenderer` 将文本、按钮、输入框、开关、容器、列表、分组等节点绘制为 UIKit 控件。
-- `NativeUITransport` 预留 `/api/native-ui/manifest` 和 `/api/native-ui/action` 服务端协议。
-- `AutoNativeAdapter` 在隐藏兼容运行时中加载现有 Harness Web 客户端，读取 DOM/可访问标签并投影为 Native UI 树。
-- 未支持节点按子树生成兼容模式卡片，不会让整页无提示白屏；点击后进入旧 Web 插件页面。
-- 清单更新会刷新原生侧边栏和插件中心，不需要重新打包 IPA。
-- GitHub Actions 已验证可构建 iOS 15+ arm64 未签名 IPA。
+服务器可选地返回版本化 `dsh-native-ui` manifest。客户端只渲染协议允许的原生组件树（文本、按钮、输入、开关、列表、容器和明确的 action），并将 action 通过原生 `api/native-ui/action` 发送回服务端。清单为空、协议不支持或 surface 使用 legacy/web 类型时，客户端显示原生不可用说明，不会打开网页。
 
-## 重要边界
+## Harness Remote
 
-目前 Harness 官方插件客户端是 React/TSX Web UI。自动 DOM 投影是渐进式兼容机制，不等于任意 CSS、Canvas、富文本编辑器、Web Worker 或浏览器专用 API 都能立即变成原生控件。失败样本应转化为适配器规则和回归 fixture，逐步扩大原生覆盖率。
+`HarnessRuntime` 使用 URLSession JSON-RPC envelope，并通过 `/api/remote.mux` 的 `URLSessionWebSocketTask` 订阅 workspace、session control、selected session 和 `$events`。RPC response 会校验 HTTP、`server-response`、`rpcId`、`result.ok` 和结构化错误；会话切换取消旧 follow，断线采用有界延迟重连。访问令牌在 Keychain 中保存。
 
-兼容层仍然保留，但只负责 Legacy Web Surface，不负责 App 主界面。后续应先把官方 Harness 的真实 Session/Remote 契约接入 Native Transport，再逐步替换当前聊天壳和自动投影中的占位行为。
+## 已实现边界
 
-## 分支与验证
+已实现基础会话、工作区、目录选择、对话、轨迹、日志、模型、权限、图片附件、审批和清单声明的 Native UI surface。插件不会安装到 iOS；插件市场、专家、服务控制、任意 DOM/Canvas/Web Worker 等不属于当前基础版原生能力。未由真实服务返回的能力不会用演示数据填充。
 
-- `main`：此前已验证的 WebView 预览版本。
-- `feature/native-renderer`：Native-first MVP。
-- 构建工作流：`.github/workflows/build-ipa.yml`。
+## 当前限制
+
+本次收尾按任务要求没有访问真实 Harness endpoint、NAS 或插件，因此真实部署上的鉴权方式、服务端目录 capability、Native manifest 和事件变体没有在本轮联调。Xcode/Actions 构建和脱敏协议 fixtures 是可复现证据；签名后真机交互仍需验收者执行。

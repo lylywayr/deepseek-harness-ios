@@ -4,7 +4,6 @@ final class NativePluginCenterViewController: UIViewController, UITableViewDataS
     private let store: NativeUIStore
     private let transport: NativeUITransport?
     private let actionHandler: NativeUIActionHandler?
-    private let fallbackHandler: (String?) -> Void
     private let tableView = UITableView(frame: .zero, style: .insetGrouped)
     private let refreshControl = UIRefreshControl()
     private var stopObserving: (() -> Void)?
@@ -13,13 +12,11 @@ final class NativePluginCenterViewController: UIViewController, UITableViewDataS
     init(
         store: NativeUIStore,
         transport: NativeUITransport?,
-        actionHandler: NativeUIActionHandler? = nil,
-        fallbackHandler: @escaping (String?) -> Void = { _ in }
+        actionHandler: NativeUIActionHandler? = nil
     ) {
         self.store = store
         self.transport = transport
         self.actionHandler = actionHandler
-        self.fallbackHandler = fallbackHandler
         super.init(nibName: nil, bundle: nil)
         title = "插件"
     }
@@ -122,10 +119,10 @@ final class NativePluginCenterViewController: UIViewController, UITableViewDataS
             return
         }
         if surface.isLegacyOnly {
-            fallbackHandler(surface.root.url)
+            showNotice("该插件页面未声明 Native UI；当前 iOS 客户端不会打开网页兼容页面。")
         } else {
             navigationController?.pushViewController(
-                NativeUISurfaceViewController(surface: surface, store: store, transport: transport, actionHandler: actionHandler, fallbackHandler: fallbackHandler),
+                NativeUISurfaceViewController(surface: surface, store: store, transport: transport, actionHandler: actionHandler),
                 animated: true
             )
         }
@@ -243,7 +240,10 @@ final class DHPluginEmptyCell: UITableViewCell {
     }
 
     @available(*, unavailable) required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-    func configure() { titleLabel.text = "还没有原生插件"; detailLabel.text = "服务端插件安装后，会自动出现在这里。\n下拉刷新以重新发现插件入口。" }
+    func configure() {
+        titleLabel.text = "没有可用的原生插件入口"
+        detailLabel.text = "当前服务没有返回 Native UI 清单，或插件均已停用。此版本不会安装、投影或打开插件网页。"
+    }
 }
 
 final class NativeUISurfaceViewController: UIViewController {
@@ -251,13 +251,12 @@ final class NativeUISurfaceViewController: UIViewController {
     private let store: NativeUIStore
     private let transport: NativeUITransport?
     private let actionHandler: NativeUIActionHandler?
-    private let fallbackHandler: (String?) -> Void
     private let scrollView = UIScrollView()
     private let content = UIStackView()
     private var stopObserving: (() -> Void)?
 
-    init(surface: NativeUISurface, store: NativeUIStore, transport: NativeUITransport?, actionHandler: NativeUIActionHandler? = nil, fallbackHandler: @escaping (String?) -> Void = { _ in }) {
-        self.surface = surface; self.store = store; self.transport = transport; self.actionHandler = actionHandler; self.fallbackHandler = fallbackHandler
+    init(surface: NativeUISurface, store: NativeUIStore, transport: NativeUITransport?, actionHandler: NativeUIActionHandler? = nil) {
+        self.surface = surface; self.store = store; self.transport = transport; self.actionHandler = actionHandler
         super.init(nibName: nil, bundle: nil)
         title = surface.title
     }
@@ -288,7 +287,7 @@ final class NativeUISurfaceViewController: UIViewController {
         intro.addSubview(icon); intro.addSubview(labels)
         NSLayoutConstraint.activate([icon.leadingAnchor.constraint(equalTo: intro.leadingAnchor, constant: 16), icon.topAnchor.constraint(equalTo: intro.topAnchor, constant: 16), icon.bottomAnchor.constraint(equalTo: intro.bottomAnchor, constant: -16), labels.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 12), labels.trailingAnchor.constraint(equalTo: intro.trailingAnchor, constant: -16), labels.centerYAnchor.constraint(equalTo: icon.centerYAnchor)])
         content.addArrangedSubview(intro)
-        let renderer = NativeUIRenderer(surfaceID: surface.id, transport: transport, actionHandler: actionHandler, fallbackHandler: fallbackHandler)
+        let renderer = NativeUIRenderer(surfaceID: surface.id, transport: transport, actionHandler: actionHandler)
         let result = renderer.render(surface.root); result.views.forEach(content.addArrangedSubview)
         result.diagnostics.forEach { diagnostic in
             let label = UILabel(); label.text = "⚠︎  \(diagnostic)"; label.textColor = DHTheme.warning; label.font = DHTheme.font(.caption1); label.numberOfLines = 0; content.addArrangedSubview(label)
