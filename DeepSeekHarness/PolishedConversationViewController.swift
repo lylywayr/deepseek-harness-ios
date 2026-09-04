@@ -703,11 +703,26 @@ final class TrajectoryDetailViewController: UIViewController {
     private let item: HarnessConversationItem
     init(item: HarnessConversationItem){self.item=item;super.init(nibName:nil,bundle:nil)}
     @available(*, unavailable) required init?(coder:NSCoder){fatalError()}
-    override func viewDidLoad(){
-        super.viewDidLoad(); title="调用详情"; view.backgroundColor=DHTheme.background
-        navigationItem.rightBarButtonItem=UIBarButtonItem(barButtonSystemItem:.done,target:self,action:#selector(close))
-        let text=UITextView(); text.isEditable=false; text.backgroundColor=.clear; text.textColor=DHTheme.text; text.font=.monospacedSystemFont(ofSize:13,weight:.regular); text.textContainerInset=UIEdgeInsets(top:20,left:16,bottom:20,right:16); text.text="类型：\(item.kind)\n\n\(item.text)\n\n\(item.subtitle ?? "")"; text.translatesAutoresizingMaskIntoConstraints=false; view.addSubview(text)
-        NSLayoutConstraint.activate([text.leadingAnchor.constraint(equalTo:view.leadingAnchor),text.trailingAnchor.constraint(equalTo:view.trailingAnchor),text.topAnchor.constraint(equalTo:view.safeAreaLayoutGuide.topAnchor),text.bottomAnchor.constraint(equalTo:view.bottomAnchor)])
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        title = "调用详情"
+        view.backgroundColor = DHTheme.background
+        navigationItem.rightBarButtonItem = UIBarButtonItem(barButtonSystemItem: .done, target: self, action: #selector(close))
+        let text = UITextView()
+        text.isEditable = false
+        text.backgroundColor = .clear
+        text.textColor = DHTheme.text
+        text.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
+        text.textContainerInset = UIEdgeInsets(top: 20, left: 16, bottom: 20, right: 16)
+        text.text = "类型：\(item.kind)\n\n\(item.text)\n\n\(item.subtitle ?? "")"
+        text.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(text)
+        NSLayoutConstraint.activate([
+            text.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            text.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            text.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            text.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
     }
-    @objc private func close(){dismiss(animated:true)}
+    @objc private func close() { dismiss(animated: true) }
 }
