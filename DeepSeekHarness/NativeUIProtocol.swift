@@ -1,7 +1,7 @@
 import Foundation
 
-/// Actions are resolved by the Harness host. The iOS client never executes
-/// plugin JavaScript or loads plugin native code.
+/// Server-declared native UI actions are sent through the same authenticated
+/// JSON-RPC transport as the built-in client. No plugin code is executed on iOS.
 typealias NativeUIActionHandler = (
     _ surfaceID: String,
     _ nodeID: String,
@@ -17,13 +17,7 @@ struct NativeUIManifest: Codable {
     let surfaces: [NativeUISurface]
     let diagnostics: [NativeUIDiagnostic]
 
-    init(
-        protocolVersion: String = "dsh-native-ui/1",
-        generatedAt: String? = nil,
-        plugins: [NativeUIPlugin] = [],
-        surfaces: [NativeUISurface] = [],
-        diagnostics: [NativeUIDiagnostic] = []
-    ) {
+    init(protocolVersion: String = "dsh-native-ui/1", generatedAt: String? = nil, plugins: [NativeUIPlugin] = [], surfaces: [NativeUISurface] = [], diagnostics: [NativeUIDiagnostic] = []) {
         self.protocolVersion = protocolVersion
         self.generatedAt = generatedAt
         self.plugins = plugins
@@ -50,9 +44,7 @@ struct NativeUISurface: Codable {
     let root: NativeUINode
     let order: Int?
 
-    var isLegacyOnly: Bool {
-        ["legacy", "web"].contains(root.type.lowercased())
-    }
+    var isLegacyOnly: Bool { ["legacy", "web"].contains(root.type.lowercased()) }
 }
 
 struct NativeUIDiagnostic: Codable {
@@ -90,50 +82,12 @@ struct NativeUINode: Codable {
     let options: [NativeUIOption]?
     let accessibilityLabel: String?
 
-    init(
-        type: String,
-        id: String? = nil,
-        title: String? = nil,
-        text: String? = nil,
-        subtitle: String? = nil,
-        icon: String? = nil,
-        action: String? = nil,
-        state: String? = nil,
-        value: String? = nil,
-        placeholder: String? = nil,
-        url: String? = nil,
-        isEnabled: Bool? = nil,
-        axis: String? = nil,
-        children: [NativeUINode]? = nil,
-        items: [NativeUINode]? = nil,
-        options: [NativeUIOption]? = nil,
-        accessibilityLabel: String? = nil
-    ) {
-        self.type = type
-        self.id = id
-        self.title = title
-        self.text = text
-        self.subtitle = subtitle
-        self.icon = icon
-        self.action = action
-        self.state = state
-        self.value = value
-        self.placeholder = placeholder
-        self.url = url
-        self.isEnabled = isEnabled
-        self.axis = axis
-        self.children = children
-        self.items = items
-        self.options = options
-        self.accessibilityLabel = accessibilityLabel
+    init(type: String, id: String? = nil, title: String? = nil, text: String? = nil, subtitle: String? = nil, icon: String? = nil, action: String? = nil, state: String? = nil, value: String? = nil, placeholder: String? = nil, url: String? = nil, isEnabled: Bool? = nil, axis: String? = nil, children: [NativeUINode]? = nil, items: [NativeUINode]? = nil, options: [NativeUIOption]? = nil, accessibilityLabel: String? = nil) {
+        self.type = type; self.id = id; self.title = title; self.text = text; self.subtitle = subtitle; self.icon = icon; self.action = action; self.state = state; self.value = value; self.placeholder = placeholder; self.url = url; self.isEnabled = isEnabled; self.axis = axis; self.children = children; self.items = items; self.options = options; self.accessibilityLabel = accessibilityLabel
     }
 
     var resolvedChildren: [NativeUINode] { children ?? items ?? [] }
-
-    var displayTitle: String {
-        let candidate = title ?? text ?? subtitle ?? type
-        return candidate.isEmpty ? type : candidate
-    }
+    var displayTitle: String { let candidate = title ?? text ?? subtitle ?? type; return candidate.isEmpty ? type : candidate }
 }
 
 struct NativeUIActionRequest: Codable {
@@ -169,78 +123,34 @@ enum NativeUITransportError: LocalizedError {
 }
 
 /// Optional server-side protocol for declarative native surfaces.
-/// Actions are dispatched through the native JSON-RPC transport.
 final class NativeUITransport {
     let baseURL: URL
     private let session: URLSession
 
-    init(baseURL: URL, session: URLSession = .shared) {
-        self.baseURL = baseURL
-        self.session = session
-    }
+    init(baseURL: URL, session: URLSession = .shared) { self.baseURL = baseURL; self.session = session }
 
     func loadManifest(completion: @escaping (Result<NativeUIManifest, Error>) -> Void) {
         var request = URLRequest(url: baseURL.appendingPathComponent("api/native-ui/manifest"))
-        request.httpMethod = "GET"
-        request.timeoutInterval = 15
+        request.httpMethod = "GET"; request.timeoutInterval = 15
         session.dataTask(with: request) { data, response, error in
             if let error { completion(.failure(error)); return }
-            guard let http = response as? HTTPURLResponse else {
-                completion(.failure(NativeUITransportError.invalidResponse)); return
-            }
-            guard (200..<300).contains(http.statusCode) else {
-                completion(.failure(http.statusCode == 404
-                    ? NativeUITransportError.protocolUnavailable
-                    : NativeUITransportError.http(http.statusCode)))
-                return
-            }
-            guard let data else {
-                completion(.failure(NativeUITransportError.invalidManifest)); return
-            }
-            do {
-                completion(.success(try JSONDecoder().decode(NativeUIManifest.self, from: data)))
-            } catch {
-                completion(.failure(error))
-            }
+            guard let http = response as? HTTPURLResponse else { completion(.failure(NativeUITransportError.invalidResponse)); return }
+            guard (200..<300).contains(http.statusCode) else { completion(.failure(http.statusCode == 404 ? NativeUITransportError.protocolUnavailable : NativeUITransportError.http(http.statusCode))); return }
+            guard let data else { completion(.failure(NativeUITransportError.invalidManifest)); return }
+            do { completion(.success(try JSONDecoder().decode(NativeUIManifest.self, from: data))) } catch { completion(.failure(error)) }
         }.resume()
     }
 
-    func perform(
-        surfaceID: String,
-        nodeID: String,
-        action: String,
-        payload: [String: String],
-        completion: @escaping (Result<NativeUIActionResponse, Error>) -> Void
-    ) {
-        let body = NativeUIActionRequest(
-            protocolVersion: "dsh-native-ui/1",
-            surfaceID: surfaceID,
-            nodeID: nodeID,
-            action: action,
-            payload: payload
-        )
+    func perform(surfaceID: String, nodeID: String, action: String, payload: [String: String], completion: @escaping (Result<NativeUIActionResponse, Error>) -> Void) {
+        let body = NativeUIActionRequest(protocolVersion: "dsh-native-ui/1", surfaceID: surfaceID, nodeID: nodeID, action: action, payload: payload)
         var request = URLRequest(url: baseURL.appendingPathComponent("api/native-ui/action"))
-        request.httpMethod = "POST"
-        request.timeoutInterval = 20
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        do {
-            request.httpBody = try JSONEncoder().encode(body)
-        } catch {
-            completion(.failure(error)); return
-        }
+        request.httpMethod = "POST"; request.timeoutInterval = 20; request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        do { request.httpBody = try JSONEncoder().encode(body) } catch { completion(.failure(error)); return }
         session.dataTask(with: request) { data, response, error in
             if let error { completion(.failure(error)); return }
-            guard let http = response as? HTTPURLResponse else {
-                completion(.failure(NativeUITransportError.invalidResponse)); return
-            }
-            guard (200..<300).contains(http.statusCode), let data else {
-                completion(.failure(NativeUITransportError.http(http.statusCode))); return
-            }
-            do {
-                completion(.success(try JSONDecoder().decode(NativeUIActionResponse.self, from: data)))
-            } catch {
-                completion(.failure(error))
-            }
+            guard let http = response as? HTTPURLResponse else { completion(.failure(NativeUITransportError.invalidResponse)); return }
+            guard (200..<300).contains(http.statusCode), let data else { completion(.failure(NativeUITransportError.http(http.statusCode))); return }
+            do { completion(.success(try JSONDecoder().decode(NativeUIActionResponse.self, from: data))) } catch { completion(.failure(error)) }
         }.resume()
     }
 }
@@ -250,29 +160,8 @@ final class NativeUIStore {
     let didChange: () -> Void
     private var observers: [UUID: () -> Void] = [:]
 
-    init(
-        manifest: NativeUIManifest = NativeUIManifest(),
-        didChange: @escaping () -> Void = {}
-    ) {
-        self.manifest = manifest
-        self.didChange = didChange
-    }
-
-    func replace(_ manifest: NativeUIManifest) {
-        self.manifest = manifest
-        observers.values.forEach { $0() }
-        didChange()
-    }
-
-    func observe(_ observer: @escaping () -> Void) -> () -> Void {
-        let id = UUID()
-        observers[id] = observer
-        return { [weak self] in self?.observers.removeValue(forKey: id) }
-    }
-
-    func surfaces(at placement: String) -> [NativeUISurface] {
-        manifest.surfaces
-            .filter { $0.placement == placement }
-            .sorted { ($0.order ?? 0) < ($1.order ?? 0) }
-    }
+    init(manifest: NativeUIManifest = NativeUIManifest(), didChange: @escaping () -> Void = {}) { self.manifest = manifest; self.didChange = didChange }
+    func replace(_ manifest: NativeUIManifest) { self.manifest = manifest; observers.values.forEach { $0() }; didChange() }
+    func observe(_ observer: @escaping () -> Void) -> () -> Void { let id = UUID(); observers[id] = observer; return { [weak self] in self?.observers.removeValue(forKey: id) } }
+    func surfaces(at placement: String) -> [NativeUISurface] { manifest.surfaces.filter { $0.placement == placement }.sorted { ($0.order ?? 0) < ($1.order ?? 0) } }
 }

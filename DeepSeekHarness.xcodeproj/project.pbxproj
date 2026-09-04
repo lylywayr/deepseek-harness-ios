@@ -25,8 +25,6 @@
 		B10000000000000000000000 /* DeepSeekHarness.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DeepSeekHarness.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B10000000000000000000001 /* DeepSeekHarnessApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeepSeekHarnessApp.swift; sourceTree = "<group>"; };
 		B10000000000000000000002 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
-		B10000000000000000000003 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
-		B10000000000000000000004 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		B10000000000000000000006 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B10000000000000000000007 /* MainViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>"; };
 		B10000000000000000000008 /* NativeMainViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeMainViewController.swift; sourceTree = "<group>"; };
@@ -63,8 +61,6 @@
 			children = (
 				B10000000000000000000001 /* DeepSeekHarnessApp.swift */,
 				B10000000000000000000002 /* AppState.swift */,
-				B10000000000000000000003 /* RootView.swift */,
-				B10000000000000000000004 /* SettingsView.swift */,
 				B10000000000000000000006 /* Info.plist */,
 				B10000000000000000000007 /* MainViewController.swift */,
 				B10000000000000000000008 /* NativeMainViewController.swift */,
