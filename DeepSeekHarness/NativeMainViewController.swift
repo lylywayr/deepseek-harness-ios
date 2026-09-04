@@ -125,16 +125,9 @@ final class MainViewController: UIViewController {
             self.render()
         }
         setup.onClearSession = { [weak self, weak setup] in
-            WKWebsiteDataStore.default().removeData(
-                ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(),
-                modifiedSince: Date(timeIntervalSince1970: 0)
-            ) { [weak self, weak setup] in
-                DispatchQueue.main.async {
-                    self?.appState.clearEndpoint()
-                    setup?.dismiss(animated: true)
-                    self?.render()
-                }
-            }
+            self?.appState.clearEndpoint()
+            setup?.dismiss(animated: true)
+            self?.render()
         }
         let navigation = UINavigationController(rootViewController: setup)
         navigation.navigationBar.tintColor = DHTheme.accent
@@ -156,14 +149,11 @@ final class NativeHomeViewController: UIViewController {
     private let sidebar = UIView()
     private let sidebarContent = UIStackView()
     private let sidebarScrim = UIControl()
-    private let adapterHost = UIView()
     private var runtime: HarnessRuntime!
     private let connectionBadge = DHBadgeLabel(text: "在线", color: DHTheme.success)
     private var sidebarWidthConstraint: NSLayoutConstraint!
     private var isSidebarVisible = false
     private var stopObserving: (() -> Void)?
-    private var autoAdapter: AutoNativeAdapter?
-    private var didStartAdapter = false
 
     init(
         appState: AppState,
@@ -190,7 +180,6 @@ final class NativeHomeViewController: UIViewController {
             DispatchQueue.main.async { self?.renderSidebar() }
         }
         loadNativeManifest()
-        startAutoAdapterIfNeeded()
     }
 
     deinit { stopObserving?() }
@@ -275,10 +264,6 @@ final class NativeHomeViewController: UIViewController {
         ])
         conversation.didMove(toParent: self)
 
-        adapterHost.translatesAutoresizingMaskIntoConstraints = false
-        adapterHost.alpha = 0.01
-        view.addSubview(adapterHost)
-        runtime.mount(in: adapterHost)
         runtime.onNavigationChange = { [weak self] in self?.renderSidebar() }
         runtime.start()
 
@@ -495,68 +480,25 @@ final class NativeHomeViewController: UIViewController {
         }
     }
 
-    private func startAutoAdapterIfNeeded() {
-        guard !didStartAdapter, let endpoint = appState.endpointURL else { return }
-        didStartAdapter = true
-        let adapter = AutoNativeAdapter(baseURL: endpoint)
-        autoAdapter = adapter
-        adapter.mount(in: adapterHost)
-        adapter.onStatus = { [weak self] status in
-            DispatchQueue.main.async { self?.renderSidebar(); self?.navigationItem.prompt = status }
-        }
-        adapter.onSnapshot = { [weak self] result in
-            DispatchQueue.main.async { self?.applyAutoSnapshot(result, endpoint: endpoint) }
-        }
-        adapter.start()
-        renderSidebar()
-    }
-
-    private func applyAutoSnapshot(_ result: Result<NativeUINode, Error>, endpoint: URL) {
-        let pluginID = "auto.projected.harness"
-        let surfaceID = "auto.projected.harness.main"
-        let plugin = NativeUIPlugin(id: pluginID, name: "自动适配界面", version: "runtime", enabled: true, nativeMode: "dom-projection", legacyURL: endpoint.absoluteString)
-        let root: NativeUINode
-        switch result {
-        case let .success(node): root = node
-        case let .failure(error):
-            root = NativeUINode(type: "legacy", id: "auto-fallback", title: "Harness 兼容页面", subtitle: error.localizedDescription, url: endpoint.absoluteString)
-        }
-        let surface = NativeUISurface(id: surfaceID, pluginID: pluginID, title: "自动转换界面", subtitle: "现有 dsh.client 页面", icon: "wand.and.stars", placement: "sidebar", root: root, legacyURL: endpoint.absoluteString, order: -1000)
-        let current = store.manifest
-        var plugins = current.plugins.filter { $0.id != pluginID }
-        plugins.append(plugin)
-        var surfaces = current.surfaces.filter { $0.id != surfaceID }
-        surfaces.append(surface)
-        store.replace(NativeUIManifest(protocolVersion: current.protocolVersion, generatedAt: current.generatedAt, plugins: plugins, surfaces: surfaces, diagnostics: current.diagnostics))
-    }
-
     private func makeActionHandler() -> NativeUIActionHandler {
         { [weak self] surfaceID, nodeID, action, payload, completion in
             guard let self else { completion(.failure(NativeUITransportError.message("Native UI 页面已退出。"))); return }
-            if action.hasPrefix("dom.") {
-                let event = action == "dom.input" ? "dom.input" : (action == "dom.toggle" ? "dom.toggle" : "dom.click")
-                self.autoAdapter?.dispatch(nodeID: nodeID, event: event, value: payload["value"])
-                completion(.success(NativeUIActionResponse(ok: true, message: nil, manifest: nil)))
-                return
-            }
             self.transport.perform(surfaceID: surfaceID, nodeID: nodeID, action: action, payload: payload, completion: completion)
         }
     }
 
     private func openPluginCenter() {
-        let controller = NativePluginCenterViewController(store: store, transport: transport, actionHandler: makeActionHandler(), fallbackHandler: { [weak self] url in self?.openLegacy(url: url) })
+        let controller = NativePluginCenterViewController(store: store, transport: transport, actionHandler: makeActionHandler(), fallbackHandler: { [weak self] _ in self?.showNotice("此页面没有可用的原生声明。") })
         navigationController?.pushViewController(controller, animated: true)
     }
 
     private func open(surface: NativeUISurface) {
-        if surface.isLegacyOnly { openLegacy(url: surface.legacyURL ?? surface.root.url); return }
-        let controller = NativeUISurfaceViewController(surface: surface, store: store, transport: transport, actionHandler: makeActionHandler(), fallbackHandler: { [weak self] url in self?.openLegacy(url: url) })
+        if surface.isLegacyOnly {
+            showNotice("此页面没有可用的原生声明。")
+            return
+        }
+        let controller = NativeUISurfaceViewController(surface: surface, store: store, transport: transport, actionHandler: makeActionHandler(), fallbackHandler: { [weak self] _ in self?.showNotice("此页面没有可用的原生声明。") })
         navigationController?.pushViewController(controller, animated: true)
-    }
-
-    private func openLegacy(url rawURL: String?) {
-        guard let rawURL, let url = URL(string: rawURL) else { showNotice("此区域需要兼容层，但没有可用的页面地址。"); return }
-        navigationController?.pushViewController(HarnessViewController(url: url), animated: true)
     }
 
     @objc func toggleSidebar() {

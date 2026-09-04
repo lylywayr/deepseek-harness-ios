@@ -496,10 +496,10 @@ final class HarnessRuntime: NSObject {
 
     private func applyModels(_ value: Any?) {
         guard let object = value as? [String: Any], let groups = object["groups"] as? [[String: Any]] else { return }
-        models = groups.flatMap { group in
+        models = groups.flatMap { (group: [String: Any]) -> [HarnessModelOption] in
             let provider = group["id"] as? String ?? ""
             let providerName = group["name"] as? String ?? provider
-            return (group["models"] as? [[String: Any]] ?? []).compactMap { model -> HarnessModelOption? in
+            return (group["models"] as? [[String: Any]] ?? []).compactMap { (model: [String: Any]) -> HarnessModelOption? in
                 guard let id = model["id"] as? String else { return nil }
                 let efforts = ((model["reasoning"] as? [String: Any])?["efforts"] as? [[String: Any]] ?? []).compactMap {
                     guard let effortID = $0["id"] as? String else { return nil }
@@ -588,7 +588,7 @@ final class HarnessRuntime: NSObject {
             "payload": ["args": ["request": followRequest(id)]]
         ]
         guard let data = try? JSONSerialization.data(withJSONObject: object), let text = String(data: data, encoding: .utf8) else { return }
-        socket.send(.string(text), completionHandler: nil)
+        socket.send(.string(text), completionHandler: { _ in })
     }
 
     private func cancelFollowStream() {
@@ -600,7 +600,7 @@ final class HarnessRuntime: NSObject {
     private func sendMuxCancel(_ socket: URLSessionWebSocketTask, streamID: String) {
         let object: [String: Any] = ["type": "cancel", "streamId": streamID]
         guard let data = try? JSONSerialization.data(withJSONObject: object), let text = String(data: data, encoding: .utf8) else { return }
-        socket.send(.string(text), completionHandler: nil)
+        socket.send(.string(text), completionHandler: { _ in })
     }
 
     private func acceptSocketMessage(_ text: String, generation: Int) {

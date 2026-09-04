@@ -122,7 +122,7 @@ final class NativePluginCenterViewController: UIViewController, UITableViewDataS
             return
         }
         if surface.isLegacyOnly {
-            fallbackHandler(surface.legacyURL ?? surface.root.url)
+            fallbackHandler(surface.root.url)
         } else {
             navigationController?.pushViewController(
                 NativeUISurfaceViewController(surface: surface, store: store, transport: transport, actionHandler: actionHandler, fallbackHandler: fallbackHandler),

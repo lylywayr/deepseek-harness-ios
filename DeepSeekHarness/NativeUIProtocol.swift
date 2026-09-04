@@ -38,7 +38,6 @@ struct NativeUIPlugin: Codable {
     let version: String?
     let enabled: Bool
     let nativeMode: String?
-    let legacyURL: String?
 }
 
 struct NativeUISurface: Codable {
@@ -49,7 +48,6 @@ struct NativeUISurface: Codable {
     let icon: String?
     let placement: String
     let root: NativeUINode
-    let legacyURL: String?
     let order: Int?
 
     var isLegacyOnly: Bool {
@@ -170,8 +168,8 @@ enum NativeUITransportError: LocalizedError {
     }
 }
 
-/// Optional server-side protocol. A regular Harness deployment can still be
-/// used: AutoNativeAdapter provides a best-effort projection of its Web UI.
+/// Optional server-side protocol for declarative native surfaces.
+/// Actions are dispatched through the native JSON-RPC transport.
 final class NativeUITransport {
     let baseURL: URL
     private let session: URLSession

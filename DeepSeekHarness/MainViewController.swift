@@ -1,8 +1,6 @@
 import UIKit
 
-/// Compatibility-only setup and Web surface. The native app never uses this
-/// controller for its main screen, but it remains available for unsupported
-/// plugin subtrees.
+/// Connection screen for the native client. The active application never loads a web surface.
 final class LegacyMainViewController: UIViewController {
     private let appState = AppState()
     private var currentChild: UIViewController?
@@ -15,21 +13,13 @@ final class LegacyMainViewController: UIViewController {
 
     private func render() {
         removeCurrentChild()
-        if let endpoint = appState.endpointURL {
-            let controller = HarnessViewController(url: endpoint)
-            addChildController(controller)
-            navigationItem.title = "Harness"
-            navigationItem.leftBarButtonItem = UIBarButtonItem(image: UIImage(systemName: "gearshape"), style: .plain, target: self, action: #selector(openSettings))
-            navigationItem.rightBarButtonItem = UIBarButtonItem(barButtonSystemItem: .refresh, target: controller, action: #selector(HarnessViewController.reloadPage))
-        } else {
-            let controller = SetupViewController(initialValue: appState.endpointString)
-            controller.onSave = { [weak self] value in
-                guard let self, self.appState.saveEndpoint(value) else { return }
-                self.render()
-            }
-            addChildController(controller)
-            navigationItem.title = "DeepSeek Harness"
+        let controller = SetupViewController(initialValue: appState.endpointString)
+        controller.onSave = { [weak self] value in
+            guard let self, self.appState.saveEndpoint(value) else { return }
+            self.render()
         }
+        addChildController(controller)
+        navigationItem.title = "DeepSeek Harness"
     }
 
     private func addChildController(_ controller: UIViewController) {
@@ -53,29 +43,6 @@ final class LegacyMainViewController: UIViewController {
         child.removeFromParent()
         currentChild = nil
     }
-
-    @objc private func openSettings() {
-        let controller = SetupViewController(initialValue: appState.endpointString)
-        controller.onSave = { [weak self, weak controller] value in
-            guard let self, self.appState.saveEndpoint(value) else { return }
-            controller?.dismiss(animated: true)
-            self.render()
-        }
-        controller.onClearSession = { [weak self, weak controller] in
-            WKWebsiteDataStore.default().removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: Date(timeIntervalSince1970: 0)) { [weak self, weak controller] in
-                DispatchQueue.main.async {
-                    self?.appState.clearEndpoint()
-                    controller?.dismiss(animated: true)
-                    self?.render()
-                }
-            }
-        }
-        let navigation = UINavigationController(rootViewController: controller)
-        navigation.navigationBar.tintColor = DHTheme.accent
-        navigation.navigationBar.standardAppearance = DHNavigationAppearance.make()
-        navigation.modalPresentationStyle = .formSheet
-        present(navigation, animated: true)
-    }
 }
 
 final class SetupViewController: UIViewController {
@@ -98,7 +65,9 @@ final class SetupViewController: UIViewController {
         super.viewDidLoad()
         view.backgroundColor = DHTheme.background
         navigationItem.title = "连接服务"
-        if presentingViewController != nil { navigationItem.leftBarButtonItem = UIBarButtonItem(barButtonSystemItem: .close, target: self, action: #selector(close)) }
+        if presentingViewController != nil {
+            navigationItem.leftBarButtonItem = UIBarButtonItem(barButtonSystemItem: .close, target: self, action: #selector(close))
+        }
         buildView()
     }
 
@@ -192,7 +161,7 @@ final class SetupViewController: UIViewController {
         note.textAlignment = .center
         [hero, card, note].forEach(content.addArrangedSubview)
         if onClearSession != nil {
-            clearButton.setTitle("清除本机网页会话", for: .normal)
+            clearButton.setTitle("清除本机连接凭据", for: .normal)
             clearButton.setTitleColor(DHTheme.danger, for: .normal)
             clearButton.addTarget(self, action: #selector(clearSession), for: .touchUpInside)
             content.addArrangedSubview(clearButton)
@@ -235,74 +204,5 @@ extension UITextField {
         let padding = UIView(frame: CGRect(x: 0, y: 0, width: value, height: 1))
         leftView = padding
         leftViewMode = .always
-    }
-}
-
-final class HarnessViewController: UIViewController, WKNavigationDelegate, WKUIDelegate {
-    private let url: URL
-    private var webView: WKWebView!
-    private let errorContainer = UIView()
-    private let errorLabel = UILabel()
-    private let retryButton = UIButton(type: .system)
-
-    init(url: URL) { self.url = url; super.init(nibName: nil, bundle: nil) }
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        view.backgroundColor = DHTheme.background
-        let configuration = WKWebViewConfiguration()
-        configuration.websiteDataStore = .default()
-        configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
-        webView = WKWebView(frame: .zero, configuration: configuration)
-        webView.translatesAutoresizingMaskIntoConstraints = false
-        webView.navigationDelegate = self
-        webView.uiDelegate = self
-        webView.allowsBackForwardNavigationGestures = true
-        webView.allowsLinkPreview = false
-        view.addSubview(webView)
-        NSLayoutConstraint.activate([
-            webView.leadingAnchor.constraint(equalTo: view.leadingAnchor), webView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            webView.topAnchor.constraint(equalTo: view.topAnchor), webView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
-        ])
-        buildErrorView()
-        webView.load(URLRequest(url: url, cachePolicy: .useProtocolCachePolicy))
-    }
-
-    private func buildErrorView() {
-        errorContainer.translatesAutoresizingMaskIntoConstraints = false
-        errorContainer.backgroundColor = DHTheme.background
-        errorContainer.isHidden = true
-        view.addSubview(errorContainer)
-        let stack = UIStackView()
-        stack.axis = .vertical; stack.spacing = 12; stack.alignment = .center; stack.translatesAutoresizingMaskIntoConstraints = false
-        errorContainer.addSubview(stack)
-        let icon = UIImageView(image: UIImage(systemName: "wifi.exclamationmark"))
-        icon.tintColor = DHTheme.warning; icon.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 32, weight: .medium)
-        errorLabel.font = DHTheme.font(.body); errorLabel.textColor = DHTheme.secondaryText; errorLabel.numberOfLines = 0; errorLabel.textAlignment = .center
-        retryButton.setTitle("重新加载", for: .normal); retryButton.titleLabel?.font = DHTheme.font(.body, weight: .semibold); retryButton.addTarget(self, action: #selector(reloadPage), for: .touchUpInside)
-        [icon, errorLabel, retryButton].forEach(stack.addArrangedSubview)
-        NSLayoutConstraint.activate([
-            errorContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor), errorContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor), errorContainer.topAnchor.constraint(equalTo: view.topAnchor), errorContainer.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            stack.leadingAnchor.constraint(greaterThanOrEqualTo: errorContainer.leadingAnchor, constant: 24), stack.trailingAnchor.constraint(lessThanOrEqualTo: errorContainer.trailingAnchor, constant: -24), stack.centerXAnchor.constraint(equalTo: errorContainer.centerXAnchor), stack.centerYAnchor.constraint(equalTo: errorContainer.centerYAnchor)
-        ])
-    }
-
-    @objc func reloadPage() { errorContainer.isHidden = true; webView.reload() }
-    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) { errorContainer.isHidden = true }
-    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { errorContainer.isHidden = true }
-    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) { if (error as NSError).code != NSURLErrorCancelled { showError(error) } }
-    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { showError(error) }
-    private func showError(_ error: Error) { errorLabel.text = "无法加载 Harness 服务。\n\(error.localizedDescription)"; errorContainer.isHidden = false }
-    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-        guard let targetURL = navigationAction.request.url else { decisionHandler(.cancel); return }
-        let scheme = targetURL.scheme?.lowercased()
-        guard scheme == "http" || scheme == "https" else { decisionHandler(.cancel); UIApplication.shared.open(targetURL); return }
-        decisionHandler(.allow)
-    }
-    func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
-        if let targetURL = navigationAction.request.url { webView.load(URLRequest(url: targetURL)) }
-        return nil
     }
 }
