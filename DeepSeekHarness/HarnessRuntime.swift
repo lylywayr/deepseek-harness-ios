@@ -1,5 +1,7 @@
 import Foundation
-import WebKit
+import Network
+import Security
+import UIKit
 
 struct HarnessSessionSummary {
     let id: String
@@ -43,10 +45,233 @@ struct HarnessConversationItem {
     let time: Double
 }
 
-@MainActor
-final class HarnessRuntime: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
+private enum HarnessClientError: LocalizedError {
+    case invalidURL
+    case unauthorized
+    case http(Int)
+    case invalidResponse
+    case correlation
+    case remote(code: String, message: String)
+    case network(Error)
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidURL: return "Harness 服务地址无效。"
+        case .unauthorized: return "Harness 鉴权失败，请检查服务地址或令牌。"
+        case let .http(status): return "Harness 请求失败（HTTP \(status)）。"
+        case .invalidResponse: return "Harness 返回了无效响应。"
+        case .correlation: return "Harness 响应关联失败。"
+        case let .remote(code, message): return message.isEmpty ? "Harness 服务错误（\(code)）。" : message
+        case let .network(error): return error.localizedDescription
+        }
+    }
+}
+
+private final class HarnessCredentialStore {
+    private let service = "com.example.DeepSeekHarness"
+    private let account: String
+
+    init(baseURL: URL) {
+        account = "launch-token-\(baseURL.host ?? "unknown")-\(baseURL.port ?? 80)"
+    }
+
+    func read() -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var result: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
+              let data = result as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    func write(_ token: String) {
+        guard let data = token.data(using: .utf8), !token.isEmpty else { return }
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account
+        ]
+        let values: [String: Any] = [
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
+        ]
+        if SecItemUpdate(query as CFDictionary, values as CFDictionary) == errSecItemNotFound {
+            _ = SecItemAdd(query.merging(values) { _, new in new } as CFDictionary, nil)
+        }
+    }
+
+    func remove() {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account
+        ]
+        SecItemDelete(query as CFDictionary)
+    }
+}
+
+private final class HarnessClient {
     let baseURL: URL
-    private(set) var webView: WKWebView!
+    private let tokenFromURL: String?
+    private let credentials: HarnessCredentialStore
+    private let session: URLSession
+
+    init(baseURL: URL) {
+        var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)
+        tokenFromURL = components?.queryItems?.first(where: { $0.name == "token" })?.value
+        components?.queryItems = components?.queryItems?.filter { $0.name != "token" }
+        self.baseURL = components?.url ?? baseURL
+        credentials = HarnessCredentialStore(baseURL: self.baseURL)
+        let configuration = URLSessionConfiguration.default
+        configuration.httpCookieStorage = HTTPCookieStorage.shared
+        configuration.httpShouldSetCookies = true
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        session = URLSession(configuration: configuration)
+        if let tokenFromURL, !tokenFromURL.isEmpty { credentials.write(tokenFromURL) }
+    }
+
+    func bootstrap(completion: @escaping (Result<Void, Error>) -> Void) {
+        var url = baseURL
+        if let token = tokenFromURL ?? credentials.read(), !token.isEmpty {
+            var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)
+            var items = components?.queryItems ?? []
+            items.removeAll { $0.name == "token" }
+            items.append(URLQueryItem(name: "token", value: token))
+            components?.queryItems = items
+            url = components?.url ?? baseURL
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 20
+        session.dataTask(with: request) { _, response, error in
+            if let error { completion(.failure(HarnessClientError.network(error))); return }
+            guard let http = response as? HTTPURLResponse else {
+                completion(.failure(HarnessClientError.invalidResponse)); return
+            }
+            if http.statusCode == 401 || http.statusCode == 403 {
+                completion(.failure(HarnessClientError.unauthorized)); return
+            }
+            guard (200..<400).contains(http.statusCode) else {
+                completion(.failure(HarnessClientError.http(http.statusCode))); return
+            }
+            completion(.success(()))
+        }.resume()
+    }
+
+    func call(endpoint: String, args: [String: Any], completion: @escaping (Result<Any, Error>) -> Void) {
+        guard Self.validEndpoint(endpoint), let url = apiURL(endpoint) else {
+            completion(.failure(HarnessClientError.invalidURL)); return
+        }
+        let rpcID = UUID().uuidString
+        let envelope: [String: Any] = [
+            "type": "client-request",
+            "rpcId": rpcID,
+            "method": endpoint,
+            "payload": ["args": args]
+        ]
+        guard JSONSerialization.isValidJSONObject(envelope),
+              let body = try? JSONSerialization.data(withJSONObject: envelope) else {
+            completion(.failure(HarnessClientError.invalidResponse)); return
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 30
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = body
+        session.dataTask(with: request) { data, response, error in
+            if let error { completion(.failure(HarnessClientError.network(error))); return }
+            guard let http = response as? HTTPURLResponse else {
+                completion(.failure(HarnessClientError.invalidResponse)); return
+            }
+            if http.statusCode == 401 || http.statusCode == 403 {
+                completion(.failure(HarnessClientError.unauthorized)); return
+            }
+            guard (200..<300).contains(http.statusCode), let data,
+                  let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  object["type"] as? String == "server-response",
+                  let receivedID = object["rpcId"] as? String,
+                  let result = object["result"] as? [String: Any] else {
+                completion(.failure(HarnessClientError.invalidResponse)); return
+            }
+            guard receivedID == rpcID else {
+                completion(.failure(HarnessClientError.correlation)); return
+            }
+            if result["ok"] as? Bool == true {
+                completion(.success(result["value"] ?? NSNull()))
+            } else {
+                let errorValue = result["error"] as? [String: Any]
+                completion(.failure(HarnessClientError.remote(
+                    code: errorValue?["code"] as? String ?? "gateway/internal",
+                    message: errorValue?["message"] as? String ?? "Harness 服务请求失败。"
+                )))
+            }
+        }.resume()
+    }
+
+    func webSocketRequest() -> URLRequest? {
+        guard var components = URLComponents(url: baseURL.appendingPathComponent("api/remote.mux"), resolvingAgainstBaseURL: false) else { return nil }
+        components.scheme = components.scheme == "https" ? "wss" : "ws"
+        guard let url = components.url else { return nil }
+        var request = URLRequest(url: url)
+        if let cookies = HTTPCookieStorage.shared.cookies(for: baseURL), !cookies.isEmpty {
+            let fields = HTTPCookie.requestHeaderFields(with: cookies)
+            if let value = fields["Cookie"] { request.setValue(value, forHTTPHeaderField: "Cookie") }
+        }
+        return request
+    }
+
+    func webSocketTask(with request: URLRequest) -> URLSessionWebSocketTask {
+        session.webSocketTask(with: request)
+    }
+
+    func invalidate() { session.invalidateAndCancel() }
+
+    private func apiURL(_ endpoint: String) -> URL? {
+        var url = baseURL.appendingPathComponent("api")
+        endpoint.split(separator: "/").forEach { url.appendPathComponent(String($0)) }
+        return url
+    }
+
+    private static func validEndpoint(_ endpoint: String) -> Bool {
+        guard !endpoint.isEmpty else { return false }
+        return endpoint.split(separator: "/").allSatisfy { part in
+            let value = String(part)
+            return !value.isEmpty && value != "." && value != ".."
+                && value.allSatisfy { $0.isLetter || $0.isNumber || "_$.-".contains($0) }
+        }
+    }
+}
+
+@MainActor
+final class HarnessRuntime: NSObject {
+    let baseURL: URL
+    private let client: HarnessClient
+    private var socket: URLSessionWebSocketTask?
+    private var receiveTask: Task<Void, Never>?
+    private var reconnectTask: Task<Void, Never>?
+    private var streamGeneration = 0
+    private var selectedCursor = -1
+    private var oldestSeq = -1
+    private var seenEventIDs = Set<String>()
+    private var liveItems: [String: HarnessConversationItem] = [:]
+    private var liveOrder: [String] = []
+    private var sessionCursors: [String: (cursor: Int, oldest: Int)] = [:]
+    private var workspacesByID: [String: HarnessWorkspace] = [:]
+    private var workspaceOrder: [String] = []
+    private var archivedSessionIDs = Set<String>()
+    private var controlProjection: [String: [String: Any]] = [:]
+    private var isStarted = false
+    private var isRefreshing = false
+    private var followStreamID: String?
+    private var workspaceStreamID: String?
+    private var controlStreamID: String?
+    private var eventsStreamID: String?
+
     private(set) var sessions: [HarnessSessionSummary] = []
     private(set) var workspaces: [HarnessWorkspace] = []
     private(set) var models: [HarnessModelOption] = []
@@ -64,201 +289,596 @@ final class HarnessRuntime: NSObject, WKNavigationDelegate, WKScriptMessageHandl
 
     init(baseURL: URL) {
         self.baseURL = baseURL
+        client = HarnessClient(baseURL: baseURL)
         super.init()
-        let controller = WKUserContentController()
-        controller.add(self, name: "harnessRuntime")
-        controller.addUserScript(WKUserScript(source: Self.runtimeScript, injectionTime: .atDocumentStart, forMainFrameOnly: true))
-        let config = WKWebViewConfiguration()
-        config.websiteDataStore = .default()
-        config.userContentController = controller
-        webView = WKWebView(frame: .zero, configuration: config)
-        webView.navigationDelegate = self
-        webView.isHidden = true
-        webView.alpha = 0.01
-        webView.accessibilityElementsHidden = true
     }
 
-    deinit { webView?.configuration.userContentController.removeScriptMessageHandler(forName: "harnessRuntime") }
+    deinit {
+        receiveTask?.cancel()
+        reconnectTask?.cancel()
+        socket?.cancel(with: .goingAway, reason: nil)
+        client.invalidate()
+    }
 
-    func mount(in host: UIView) {
-        webView.translatesAutoresizingMaskIntoConstraints = false
-        host.addSubview(webView)
-        NSLayoutConstraint.activate([
-            webView.leadingAnchor.constraint(equalTo: host.leadingAnchor),
-            webView.trailingAnchor.constraint(equalTo: host.trailingAnchor),
-            webView.topAnchor.constraint(equalTo: host.topAnchor),
-            webView.bottomAnchor.constraint(equalTo: host.bottomAnchor)
+    func mount(in host: UIView) { }
+
+    func start() {
+        guard !isStarted else { return }
+        isStarted = true
+        refresh()
+    }
+
+    func refresh() {
+        guard !isRefreshing else { return }
+        isRefreshing = true
+        isLoading = true
+        publish()
+        client.bootstrap { [weak self] result in
+            Task { @MainActor in
+                guard let self else { return }
+                self.isRefreshing = false
+                switch result {
+                case .success:
+                    self.clearError()
+                    self.loadInitialState()
+                case let .failure(error):
+                    self.acceptError(error.localizedDescription)
+                }
+            }
+        }
+    }
+
+    func openSession(_ id: String) {
+        guard sessions.contains(where: { $0.id == id }) else { return }
+        cancelFollowStream()
+        selectedSessionID = id
+        resetConversation()
+        publish()
+        openSessionStream(id)
+    }
+
+    func createSession(workspaceID: String?) {
+        var request: [String: Any] = [:]
+        if let workspaceID { request["workspaceId"] = workspaceID }
+        call("session/create", args: ["request": request]) { [weak self] value in
+            guard let self, let dict = value as? [String: Any], let id = dict["sessionId"] as? String else { return }
+            self.refresh()
+            self.selectedSessionID = id
+            self.resetConversation()
+            self.openSessionStream(id)
+        }
+    }
+
+    func send(_ text: String, mode: String = "queue", images: [[String: Any]] = []) {
+        guard let sessionID = selectedSessionID else { return }
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !images.isEmpty else { return }
+        var content: [[String: Any]] = []
+        if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            content.append(["type": "text", "text": text])
+        }
+        content.append(contentsOf: images)
+        let request: [String: Any] = [
+            "sessionId": sessionID,
+            "content": content,
+            "mode": mode,
+            "clientTimeZone": TimeZone.current.identifier,
+            "requestId": UUID().uuidString
+        ]
+        isGenerating = true
+        publish()
+        call("session/prompt", args: ["request": request]) { [weak self] _ in self?.publish() }
+    }
+
+    func cancel() {
+        guard let id = selectedSessionID else { return }
+        call("session/cancel", args: ["request": ["sessionId": id]]) { [weak self] _ in
+            self?.isGenerating = false
+            self?.publish()
+        }
+    }
+
+    func loadOlder() {
+        guard let id = selectedSessionID, let cursor = sessionCursors[id], cursor.oldest >= 0, hasMore else { return }
+        let request: [String: Any] = [
+            "address": ["kind": "session", "sessionId": id],
+            "throughSeq": cursor.cursor,
+            "beforeSeq": cursor.oldest,
+            "maxMessages": 30
+        ]
+        call("session/page", args: ["request": request]) { [weak self] value in
+            guard let self, let page = value as? [String: Any] else { return }
+            self.parseRecords(page["records"] as? [Any] ?? [], prepend: true)
+            self.hasMore = page["hasMore"] as? Bool ?? false
+            self.sessionCursors[id] = (cursor.cursor, self.oldestSeq)
+            self.publish()
+        }
+    }
+
+    func selectModel(_ option: HarnessModelOption, reasoning: String? = nil) {
+        guard let id = selectedSessionID else { return }
+        var request: [String: Any] = ["sessionId": id, "provider": option.provider, "model": option.model]
+        if let reasoning { request["reasoningEffort"] = reasoning }
+        call("session/selectModel", args: ["request": request]) { [weak self] _ in self?.refresh() }
+    }
+
+    func setPermission(_ value: String) {
+        guard let id = selectedSessionID else { return }
+        call("commands/execute", args: ["agentId": id, "line": "/permission \(value)", "images": []]) { [weak self] _ in self?.refresh() }
+    }
+
+    func rename(_ title: String) {
+        guard let id = selectedSessionID else { return }
+        call("session/rename", args: ["request": ["sessionId": id, "title": title]]) { [weak self] _ in self?.refresh() }
+    }
+
+    func renameWorkspace(_ id: String, title: String) {
+        call("workspace/rename", args: ["request": ["workspaceId": id, "title": title]]) { [weak self] _ in self?.refresh() }
+    }
+
+    func deleteWorkspace(_ id: String) {
+        call("workspace/delete", args: ["request": ["workspaceId": id]]) { [weak self] _ in self?.refresh() }
+    }
+
+    func archiveSession(_ id: String) {
+        call("workspace/archiveSession", args: ["request": ["sessionId": id]]) { [weak self] _ in self?.refresh() }
+    }
+
+    func forkSession(_ id: String) {
+        call("session/fork", args: ["request": ["sessionId": id]]) { [weak self] value in
+            guard let self, let result = value as? [String: Any], let newID = result["sessionId"] as? String else { return }
+            self.refresh()
+            self.selectedSessionID = newID
+            self.resetConversation()
+            self.openSessionStream(newID)
+        }
+    }
+
+    func addWorkspace(path: String) {
+        call("workspace/create", args: ["request": ["path": path]]) { [weak self] _ in self?.refresh() }
+    }
+
+    func listDirectories(path: String?, completion: @escaping ([[String: Any]]) -> Void) {
+        var request: [String: Any] = [:]
+        if let path { request["path"] = path }
+        call("directoryPicker/list", args: ["request": request]) { value in
+            let object = value as? [String: Any]
+            completion((object?["entries"] as? [[String: Any]]) ?? (object?["items"] as? [[String: Any]]) ?? [])
+        } failure: { _ in completion([]) }
+    }
+
+    func createDirectory(path: String, name: String, completion: @escaping (String?) -> Void) {
+        call("directoryPicker/createDirectory", args: ["request": ["path": path, "name": name]]) { value in
+            completion(value as? String ?? (value as? [String: Any])?["path"] as? String)
+        } failure: { _ in completion(nil) }
+    }
+
+    func answerApproval(clientID: String, eventID: String, decision: String) {
+        call("$events/result", args: [
+            "clientId": clientID,
+            "eventId": eventID,
+            "outcome": ["kind": "result", "value": decision]
         ])
     }
 
-    func start() { webView.load(URLRequest(url: baseURL, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 30)) }
-    func refresh() { call("refresh") }
-    func openSession(_ id: String) { call("openSession", arguments: [id]) }
-    func createSession(workspaceID: String?) { call("createSession", arguments: [workspaceID as Any]) }
-    func send(_ text: String, mode: String = "queue", images: [[String: Any]] = []) { call("prompt", arguments: [text, mode, images]) }
-    func cancel() { call("cancel") }
-    func loadOlder() { call("loadOlder") }
-    func selectModel(_ option: HarnessModelOption, reasoning: String? = nil) {
-        call("selectModel", arguments: [option.provider, option.model, reasoning as Any])
-    }
-    func setPermission(_ value: String) { call("setPermission", arguments: [value]) }
-    func rename(_ title: String) { call("rename", arguments: [title]) }
-    func renameWorkspace(_ id: String, title: String) { call("renameWorkspace", arguments: [id, title]) }
-    func deleteWorkspace(_ id: String) { call("deleteWorkspace", arguments: [id]) }
-    func archiveSession(_ id: String) { call("archiveSession", arguments: [id]) }
-    func forkSession(_ id: String) { call("forkSession", arguments: [id]) }
-    func addWorkspace(path: String) { call("addWorkspace", arguments: [path]) }
-    func listDirectories(path: String?, completion: @escaping ([[String: Any]]) -> Void) {
-        guard let data = try? JSONSerialization.data(withJSONObject: [path as Any]), let json = String(data: data, encoding: .utf8) else { completion([]); return }
-        webView.evaluateJavaScript("window.__harnessNative?.listDirectories.apply(window.__harnessNative, \(json))") { value, _ in
-            let rows = value as? [[String: Any]] ?? []
-            Task { @MainActor in completion(rows) }
-        }
-    }
-    func createDirectory(path: String, name: String, completion: @escaping (String?) -> Void) {
-        guard let data = try? JSONSerialization.data(withJSONObject: [path, name]), let json = String(data: data, encoding: .utf8) else { completion(nil); return }
-        webView.evaluateJavaScript("window.__harnessNative?.createDirectory.apply(window.__harnessNative, \(json))") { value, _ in Task { @MainActor in completion(value as? String) } }
-    }
-    func answerApproval(clientID: String, eventID: String, decision: String) {
-        call("answerApproval", arguments: [clientID, eventID, decision])
-    }
-
-    private func call(_ method: String, arguments: [Any] = []) {
-        guard let data = try? JSONSerialization.data(withJSONObject: arguments),
-              let json = String(data: data, encoding: .utf8) else { return }
-        webView.evaluateJavaScript("window.__harnessNative?.\(method).apply(window.__harnessNative, \(json))") { [weak self] _, error in
-            if let error { Task { @MainActor in self?.acceptError(error.localizedDescription) } }
+    private func loadInitialState() {
+        let group = DispatchGroup()
+        var sessionsValue: Any?
+        var modelsValue: Any?
+        var failed: Error?
+        group.enter()
+        call("session/list", args: [:]) { value in sessionsValue = value; group.leave() } failure: { error in failed = error; group.leave() }
+        group.enter()
+        call("session/modelCatalog", args: [:]) { value in modelsValue = value; group.leave() } failure: { error in failed = error; group.leave() }
+        group.notify(queue: .main) { [weak self] in
+            guard let self else { return }
+            if let failed { self.acceptError(failed.localizedDescription); return }
+            self.applySessions(sessionsValue)
+            self.applyModels(modelsValue)
+            self.connected = true
+            self.isLoading = false
+            self.statusText = "已连接"
+            self.openMuxStreams()
+            self.publish()
         }
     }
 
-    nonisolated func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-        guard let body = message.body as? [String: Any] else { return }
-        Task { @MainActor in self.accept(body) }
+    private func applySessions(_ value: Any?) {
+        guard let object = value as? [String: Any], let rows = object["items"] as? [[String: Any]] else { return }
+        let previousSelection = selectedSessionID
+        sessions = rows.compactMap(Self.session)
+        if let previousSelection, sessions.contains(where: { $0.id == previousSelection }) {
+            selectedSessionID = previousSelection
+        } else {
+            selectedSessionID = sessions.first(where: { !$0.blank })?.id ?? sessions.first?.id
+        }
+        if let id = selectedSessionID, id != previousSelection { resetConversation(); openSessionStream(id) }
     }
 
-    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        call("refresh")
+    private func applyModels(_ value: Any?) {
+        guard let object = value as? [String: Any], let groups = object["groups"] as? [[String: Any]] else { return }
+        models = groups.flatMap { group in
+            let provider = group["id"] as? String ?? ""
+            let providerName = group["name"] as? String ?? provider
+            return (group["models"] as? [[String: Any]] ?? []).compactMap { model -> HarnessModelOption? in
+                guard let id = model["id"] as? String else { return nil }
+                let efforts = ((model["reasoning"] as? [String: Any])?["efforts"] as? [[String: Any]] ?? []).compactMap {
+                    guard let effortID = $0["id"] as? String else { return nil }
+                    return ["id": effortID, "name": $0["name"] as? String ?? effortID]
+                }
+                return HarnessModelOption(provider: provider, providerName: providerName, model: id, modelName: model["name"] as? String ?? id, reasoning: efforts)
+            }
+        }
     }
 
-    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-        acceptError(error.localizedDescription)
+    private func refreshWorkspace(_ value: Any?) {
+        guard let frame = value as? [String: Any], frame["type"] as? String == "baseline",
+              let body = frame["value"] as? [String: Any] else { return }
+        let rows = (body["items"] as? [[String: Any]] ?? []).compactMap(Self.workspace)
+        workspacesByID = Dictionary(uniqueKeysWithValues: rows.map { ($0.id, $0) })
+        workspaceOrder = rows.map(\.id)
+        archivedSessionIDs = Set(body["archivedSessionIds"] as? [String] ?? [])
+        rebuildWorkspaces()
     }
 
-    private func accept(_ body: [String: Any]) {
-        switch body["type"] as? String {
-        case "state": parseState(body)
-        case "error": acceptError(body["message"] as? String ?? "Harness 请求失败")
-        case "approval": onApproval?(body)
+    private func openMuxStreams() {
+        streamGeneration += 1
+        let generation = streamGeneration
+        receiveTask?.cancel()
+        socket?.cancel(with: .goingAway, reason: nil)
+        followStreamID = nil
+        workspaceStreamID = "workspace-\(UUID().uuidString)"
+        controlStreamID = "control-\(UUID().uuidString)"
+        eventsStreamID = "events-\(UUID().uuidString)"
+        guard let request = client.webSocketRequest() else {
+            acceptError("无法建立 Harness 实时连接。")
+            return
+        }
+        let task = client.webSocketTask(with: request)
+        socket = task
+        task.resume()
+        let workspaceID = workspaceStreamID!
+        let controlID = controlStreamID!
+        let eventsID = eventsStreamID!
+        receiveTask = Task.detached { [weak self, weak task] in
+            guard let self, let task else { return }
+            do {
+                try await self.subscribe(task, streamID: workspaceID, endpoint: "workspace/follow", payload: ["args": [:]])
+                try await self.subscribe(task, streamID: controlID, endpoint: "session/control", payload: ["args": [:]])
+                try await self.subscribe(task, streamID: eventsID, endpoint: "$events", payload: ["args": [:]])
+                let selectedID = await MainActor.run { self.selectedSessionID }
+                if let id = selectedID {
+                    let followID = "follow-\(UUID().uuidString)"
+                    await MainActor.run { self.followStreamID = followID }
+                    let request = await MainActor.run { self.followRequest(id) }
+                    try await self.subscribe(task, streamID: followID, endpoint: "session/follow", payload: ["args": ["request": request]])
+                }
+                while !Task.isCancelled {
+                    let message = try await task.receive()
+                    guard case let .string(text) = message else { continue }
+                    await MainActor.run { self.acceptSocketMessage(text, generation: generation) }
+                }
+            } catch {
+                if !Task.isCancelled {
+                    await MainActor.run { self.socketLost(generation: generation, message: error.localizedDescription) }
+                }
+            }
+        }
+    }
+
+    private func followRequest(_ id: String) -> [String: Any] {
+        ["address": ["kind": "session", "sessionId": id], "maxMessages": 50]
+    }
+
+    private func subscribe(_ socket: URLSessionWebSocketTask, streamID: String, endpoint: String, payload: [String: Any]) async throws {
+        let object: [String: Any] = ["type": "open", "streamId": streamID, "endpoint": endpoint, "payload": payload]
+        let data = try JSONSerialization.data(withJSONObject: object)
+        guard let text = String(data: data, encoding: .utf8) else { throw HarnessClientError.invalidResponse }
+        try await socket.send(.string(text))
+    }
+
+    private func openSessionStream(_ id: String) {
+        guard let socket, socket.state == .running else { return }
+        if let oldID = followStreamID { sendMuxCancel(socket, streamID: oldID) }
+        let streamID = "follow-\(UUID().uuidString)"
+        followStreamID = streamID
+        let object: [String: Any] = [
+            "type": "open",
+            "streamId": streamID,
+            "endpoint": "session/follow",
+            "payload": ["args": ["request": followRequest(id)]]
+        ]
+        guard let data = try? JSONSerialization.data(withJSONObject: object), let text = String(data: data, encoding: .utf8) else { return }
+        socket.send(.string(text), completionHandler: nil)
+    }
+
+    private func cancelFollowStream() {
+        guard let socket, let streamID = followStreamID else { return }
+        sendMuxCancel(socket, streamID: streamID)
+        followStreamID = nil
+    }
+
+    private func sendMuxCancel(_ socket: URLSessionWebSocketTask, streamID: String) {
+        let object: [String: Any] = ["type": "cancel", "streamId": streamID]
+        guard let data = try? JSONSerialization.data(withJSONObject: object), let text = String(data: data, encoding: .utf8) else { return }
+        socket.send(.string(text), completionHandler: nil)
+    }
+
+    private func acceptSocketMessage(_ text: String, generation: Int) {
+        guard generation == streamGeneration,
+              let object = try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any] else { return }
+        if object["type"] as? String == "error" {
+            let error = object["error"] as? [String: Any]
+            acceptError(error?["message"] as? String ?? "Harness 实时连接失败")
+            return
+        }
+        guard object["type"] as? String == "item", let streamID = object["streamId"] as? String else { return }
+        switch streamID {
+        case followStreamID: acceptFollow(object["value"])
+        case workspaceStreamID: acceptWorkspace(object["value"])
+        case controlStreamID: acceptControl(object["value"])
+        case eventsStreamID: acceptRemoteEvent(object["value"])
         default: break
         }
     }
 
+    private func acceptWorkspace(_ value: Any?) {
+        guard let object = value as? [String: Any] else { return }
+        if object["type"] as? String == "baseline" { refreshWorkspace(object); publish(); return }
+        switch object["type"] as? String {
+        case "upsert":
+            if let workspace = Self.workspace(object["workspace"] as? [String: Any] ?? [:]) { workspacesByID[workspace.id] = workspace; rebuildWorkspaces() }
+        case "remove":
+            if let id = object["workspaceId"] as? String { workspacesByID.removeValue(forKey: id); workspaceOrder.removeAll { $0 == id }; rebuildWorkspaces() }
+        case "order": workspaceOrder = object["workspaceIds"] as? [String] ?? workspaceOrder; rebuildWorkspaces()
+        case "archived": archivedSessionIDs = Set(object["archivedSessionIds"] as? [String] ?? []); rebuildWorkspaces()
+        default: break
+        }
+        publish()
+    }
+
+    private func acceptControl(_ value: Any?) {
+        guard let object = value as? [String: Any] else { return }
+        if object["type"] as? String == "baseline", let body = object["value"] as? [String: Any] {
+            if let projections = body["projections"] as? [String: Any] {
+                for (id, block) in projections { controlProjection[id] = (block as? [String: Any])?["values"] as? [String: Any] ?? [:] }
+            }
+            updateGeneration(body["jobs"] as? [String: Any], queues: body["queues"] as? [String: Any])
+        } else if object["type"] as? String == "projection", let id = object["sessionId"] as? String, let key = object["key"] as? String {
+            var values = controlProjection[id] ?? [:]
+            values[key] = object["value"]
+            controlProjection[id] = values
+            applyProjection(id, key: key, value: object["value"])
+        } else if object["type"] as? String == "jobs", let id = object["sessionId"] as? String {
+            let jobs = object["jobs"] as? [[String: Any]] ?? []
+            isGenerating = id == selectedSessionID && jobs.contains { $0["status"] as? String == "running" }
+        }
+        publish()
+    }
+
+    private func updateGeneration(_ jobs: [String: Any]?, queues: [String: Any]?) {
+        guard let id = selectedSessionID else { return }
+        let rows = jobs?[id] as? [[String: Any]] ?? []
+        let queue = queues?[id] as? [[String: Any]] ?? []
+        isGenerating = rows.contains { $0["status"] as? String == "running" } || !queue.isEmpty
+    }
+
+    private func acceptFollow(_ value: Any?) {
+        guard let object = value as? [String: Any] else { return }
+        if object["type"] as? String == "snapshot" {
+            resetConversation()
+            selectedCursor = (object["cursor"] as? NSNumber)?.intValue ?? -1
+            hasMore = object["hasMore"] as? Bool ?? false
+            if let id = selectedSessionID { sessionCursors[id] = (selectedCursor, -1) }
+            if let projections = object["projections"] as? [String: Any], let id = selectedSessionID {
+                controlProjection[id] = projections["values"] as? [String: Any] ?? [:]
+                applyAllProjections(id)
+            }
+            parseRecords(object["records"] as? [Any] ?? [], prepend: false)
+            if let id = selectedSessionID { sessionCursors[id] = (selectedCursor, oldestSeq) }
+        } else {
+            parseRecords([value as Any], prepend: false)
+        }
+        isGenerating = items.last?.kind == .assistant && items.last?.subtitle == "生成中"
+        publish()
+    }
+
+    private func acceptRemoteEvent(_ value: Any?) {
+        guard let object = value as? [String: Any], object["type"] as? String == "waterfall" else { return }
+        onApproval?(object)
+    }
+
+    private func parseRecords(_ records: [Any], prepend: Bool) {
+        let sequence: [Any] = prepend ? records : records.reversed()
+        for raw in sequence { parseRecord(raw) }
+        items = liveOrder.compactMap { liveItems[$0] }.sorted { $0.seq < $1.seq }
+        oldestSeq = items.map(\.seq).filter { $0 >= 0 }.min() ?? oldestSeq
+    }
+
+    private func parseRecord(_ raw: Any) {
+        guard let row = raw as? [String: Any] else { return }
+        if row["type"] as? String == "chunks", let event = row["event"] as? [String: Any] { parseEvent(event); return }
+        if let event = row["event"] as? [String: Any] { parseEvent(event) }
+    }
+
+    private func parseEvent(_ event: [String: Any]) {
+        guard let type = event["type"] as? String else { return }
+        let seq = (event["seq"] as? NSNumber)?.intValue ?? -1
+        let eventID = event["eventId"] as? String ?? "\(seq):\(type)"
+        guard seenEventIDs.insert(eventID).inserted else { return }
+        if seq >= 0 { oldestSeq = oldestSeq < 0 ? seq : min(oldestSeq, seq) }
+        let data = event["data"] as? [String: Any] ?? [:]
+        let time = (event["time"] as? NSNumber)?.doubleValue ?? 0
+        switch type {
+        case "user/message":
+            if let text = contentText(data["content"] ?? data["message"]), !text.isEmpty { upsert(HarnessConversationItem(id: eventID, kind: .user, text: text, subtitle: nil, seq: seq, time: time)) }
+        case "assistant/message":
+            let message = data["message"] as? [String: Any] ?? data
+            if let text = contentText(message["content"]), !text.isEmpty { upsert(HarnessConversationItem(id: eventID, kind: .assistant, text: text, subtitle: nil, seq: seq, time: time)) }
+        case "tool/call":
+            upsert(HarnessConversationItem(id: eventID, kind: .tool, text: data["name"] as? String ?? "工具调用", subtitle: data["arguments"] as? String, seq: seq, time: time))
+        case "tool/result":
+            let message = data["message"] as? [String: Any]
+            upsert(HarnessConversationItem(id: eventID, kind: .tool, text: contentText(message?["content"]) ?? "工具结果", subtitle: "结果", seq: seq, time: time))
+        case "command/done":
+            if let result = data["result"] as? [String: Any], let text = result["text"] as? String { upsert(HarnessConversationItem(id: eventID, kind: .system, text: text, subtitle: result["kind"] as? String ?? "指令结果", seq: seq, time: time)) }
+        case "turn/start":
+            upsert(HarnessConversationItem(id: eventID, kind: .system, text: "第\((data["turn"] as? NSNumber)?.intValue ?? 0) 轮开始", subtitle: "轮次", seq: seq, time: time))
+        case "turn/end":
+            if let reason = data["reason"] as? [String: Any] { upsert(HarnessConversationItem(id: eventID, kind: .system, text: "本轮结束", subtitle: reason["kind"] as? String ?? "完成", seq: seq, time: time)) }
+        case "chunkrow/text-chunks", "chunkrow/reasoning-chunks", "assistant/chunk": parseChunk(data, seq: seq, time: time, key: eventID)
+        default:
+            if type.contains("error") { upsert(HarnessConversationItem(id: eventID, kind: .system, text: data["message"] as? String ?? type, subtitle: "错误", seq: seq, time: time)) }
+        }
+    }
+
+    private func parseChunk(_ data: [String: Any], seq: Int, time: Double, key: String) {
+        let chunk = data["chunk"] as? [String: Any] ?? data
+        let text = chunk["text"] as? String ?? chunk["content"] as? String ?? ""
+        guard !text.isEmpty else { return }
+        let reasoning = (chunk["type"] as? String)?.contains("reasoning") == true || key.contains("reasoning")
+        let id = "live:\(reasoning ? "reasoning" : "assistant")"
+        let existing = liveItems[id]?.text ?? ""
+        upsert(HarnessConversationItem(id: id, kind: reasoning ? .system : .assistant, text: existing + text, subtitle: reasoning ? "思考中" : "生成中", seq: seq, time: time))
+    }
+
+    private func contentText(_ value: Any?) -> String? {
+        if let string = value as? String { return string }
+        if let blocks = value as? [[String: Any]] {
+            return blocks.compactMap { block in
+                switch block["type"] as? String {
+                case "text": return block["text"] as? String
+                case "image": return "[图片] \(block["name"] as? String ?? "")"
+                case "tool-result": return contentText(block["content"])
+                case "reasoning": return "思考：\(block["text"] as? String ?? "")"
+                default: return nil
+                }
+            }.filter { !$0.isEmpty }.joined(separator: "\n")
+        }
+        return nil
+    }
+
+    private func upsert(_ item: HarnessConversationItem) {
+        if liveItems[item.id] == nil { liveOrder.append(item.id) }
+        liveItems[item.id] = item
+    }
+
+    private func resetConversation() {
+        items = []
+        liveItems.removeAll()
+        liveOrder.removeAll()
+        seenEventIDs.removeAll()
+        selectedCursor = -1
+        oldestSeq = -1
+        hasMore = false
+        isGenerating = false
+    }
+
+    private func applyAllProjections(_ id: String) {
+        for (key, value) in controlProjection[id] ?? [:] { applyProjection(id, key: key, value: value) }
+    }
+
+    private func applyProjection(_ id: String, key: String, value: Any?) {
+        guard let index = sessions.firstIndex(where: { $0.id == id }) else { return }
+        var session = sessions[index]
+        switch key {
+        case "title": session.title = value as? String ?? session.title
+        case "agentPreset": session.preset = value as? String ?? session.preset
+        case "permissions": session.permission = (value as? [String: Any])?["currentValue"] as? String ?? session.permission
+        case "sessionStats":
+            if let v = value as? [String: Any] { session.turns = (v["turns"] as? NSNumber)?.intValue ?? session.turns; session.steps = (v["steps"] as? NSNumber)?.intValue ?? session.steps }
+        case "contextPressure":
+            if let v = value as? [String: Any], let window = (v["contextWindow"] as? NSNumber)?.doubleValue, window > 0 { session.contextUsed = ((v["pressureTokens"] as? NSNumber)?.doubleValue ?? 0) / window }
+        case "modelSelection":
+            let selected = (value as? [String: Any])?["next"] as? [String: Any] ?? (value as? [String: Any])?["lastUsed"] as? [String: Any] ?? [:]
+            session.provider = selected["provider"] as? String ?? session.provider
+            session.model = selected["model"] as? String ?? session.model
+        default: break
+        }
+        sessions[index] = session
+    }
+
+    private func rebuildWorkspaces() {
+        let ordered = workspaceOrder.compactMap { workspacesByID[$0] }
+        workspaces = ordered.filter { workspace in !workspace.sessionIDs.allSatisfy { archivedSessionIDs.contains($0) } }
+    }
+
+    private func call(_ endpoint: String, args: [String: Any], completion: ((Any?) -> Void)? = nil, failure: ((Error) -> Void)? = nil) {
+        client.call(endpoint: endpoint, args: args) { [weak self] result in
+            Task { @MainActor in
+                guard let self else { return }
+                switch result {
+                case let .success(value): completion?(value)
+                case let .failure(error):
+                    self.acceptError(error.localizedDescription)
+                    failure?(error)
+                }
+            }
+        }
+    }
+
+    private func clearError() {
+        lastError = nil
+        connected = false
+        statusText = "正在读取"
+    }
+
     private func acceptError(_ text: String) {
         lastError = text
-        statusText = "连接异常"
         isLoading = false
+        connected = false
+        statusText = "连接异常"
+        publish()
+    }
+
+    private func publish() {
         onChange?()
         onNavigationChange?()
     }
 
-    private func parseState(_ body: [String: Any]) {
-        connected = body["connected"] as? Bool ?? connected
-        isLoading = body["loading"] as? Bool ?? false
-        isGenerating = body["generating"] as? Bool ?? false
-        hasMore = body["hasMore"] as? Bool ?? false
-        selectedSessionID = body["selectedSessionId"] as? String
-        statusText = connected ? (isGenerating ? "正在运行" : "已连接") : "正在连接"
-        lastError = body["error"] as? String
-        sessions = (body["sessions"] as? [[String: Any]] ?? []).compactMap(Self.session)
-        workspaces = (body["workspaces"] as? [[String: Any]] ?? []).compactMap(Self.workspace)
-        models = (body["models"] as? [[String: Any]] ?? []).compactMap(Self.model)
-        items = (body["items"] as? [[String: Any]] ?? []).compactMap(Self.item)
-        onChange?()
-        onNavigationChange?()
+    private func socketLost(generation: Int, message: String) {
+        guard generation == streamGeneration else { return }
+        connected = false
+        statusText = "实时连接已断开：\(message)"
+        publish()
+        reconnectTask?.cancel()
+        reconnectTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            guard !Task.isCancelled else { return }
+            self?.reconnect()
+        }
     }
 
-    private static func session(_ value: [String: Any]) -> HarnessSessionSummary? {
-        guard let id = value["id"] as? String else { return nil }
-        return HarnessSessionSummary(id: id, title: value["title"] as? String ?? "新会话", cwd: value["cwd"] as? String ?? "", updatedAt: (value["updatedAt"] as? NSNumber)?.doubleValue ?? 0, running: value["running"] as? Bool ?? false, blank: value["blank"] as? Bool ?? false, preset: value["preset"] as? String ?? "standard", permission: value["permission"] as? String ?? "", provider: value["provider"] as? String ?? "", model: value["model"] as? String ?? "", turns: (value["turns"] as? NSNumber)?.intValue ?? 0, steps: (value["steps"] as? NSNumber)?.intValue ?? 0, contextUsed: (value["contextUsed"] as? NSNumber)?.doubleValue)
+    private func reconnect() {
+        guard isStarted else { return }
+        openMuxStreams()
+    }
+}
+
+private extension HarnessRuntime {
+    static func session(_ value: [String: Any]) -> HarnessSessionSummary? {
+        guard let id = value["sessionId"] as? String else { return nil }
+        let projections = value["projections"] as? [String: Any]
+        let values = projections?["values"] as? [String: Any] ?? [:]
+        let metadata = values["sessionListMetadata"] as? [String: Any]
+        return HarnessSessionSummary(
+            id: id,
+            title: metadata?["title"] as? String ?? "新会话",
+            cwd: value["cwd"] as? String ?? "",
+            updatedAt: (value["updatedAt"] as? NSNumber)?.doubleValue ?? 0,
+            running: value["running"] as? Bool ?? false,
+            blank: metadata?["blank"] as? Bool ?? value["blank"] as? Bool ?? false,
+            preset: value["agentPreset"] as? String ?? "standard",
+            permission: "",
+            provider: "",
+            model: "",
+            turns: 0,
+            steps: 0,
+            contextUsed: nil
+        )
     }
 
-    private static func workspace(_ value: [String: Any]) -> HarnessWorkspace? {
-        guard let id = value["id"] as? String else { return nil }
+    static func workspace(_ value: [String: Any]) -> HarnessWorkspace? {
+        guard let id = value["workspaceId"] as? String else { return nil }
         return HarnessWorkspace(id: id, title: value["title"] as? String ?? "工作区", path: value["path"] as? String ?? "", sessionIDs: value["sessionIds"] as? [String] ?? [])
     }
-
-    private static func model(_ value: [String: Any]) -> HarnessModelOption? {
-        guard let provider = value["provider"] as? String, let model = value["model"] as? String else { return nil }
-        return HarnessModelOption(provider: provider, providerName: value["providerName"] as? String ?? provider, model: model, modelName: value["modelName"] as? String ?? model, reasoning: value["reasoning"] as? [[String: String]] ?? [])
-    }
-
-    private static func item(_ value: [String: Any]) -> HarnessConversationItem? {
-        guard let id = value["id"] as? String, let raw = value["kind"] as? String,
-              let kind = HarnessConversationItem.Kind(rawValue: raw) else { return nil }
-        return HarnessConversationItem(id: id, kind: kind, text: value["text"] as? String ?? "", subtitle: value["subtitle"] as? String, seq: (value["seq"] as? NSNumber)?.intValue ?? -1, time: (value["time"] as? NSNumber)?.doubleValue ?? 0)
-    }
-
-    private static let runtimeScript = #"""
-    (() => {
-      if (window.__harnessNative) return;
-      const state = {connected:false,loading:true,generating:false,hasMore:false,error:null,sessions:[],workspaces:[],models:[],items:[],selectedSessionId:null,cursor:null,oldestSeq:null};
-      let socket, stopped = false, reconnectTimer, liveText = new Map(), seen = new Set();
-      const post = x => window.webkit.messageHandlers.harnessRuntime.postMessage(x);
-      const publish = () => post({type:'state', ...state});
-      const fail = e => { state.error = e?.message || String(e); state.loading=false; post({type:'error',message:state.error}); publish(); };
-      const rpc = async (endpoint,args={}) => {
-        const rpcId = crypto.randomUUID();
-        const response = await fetch('/api/'+endpoint,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({type:'client-request',rpcId,method:endpoint,payload:{args}})});
-        if(!response.ok) throw new Error(`HTTP ${response.status}: ${endpoint}`);
-        const envelope=await response.json(); if(envelope.rpcId!==rpcId) throw new Error('RPC correlation mismatch');
-        if(!envelope.result?.ok) throw new Error(envelope.result?.error?.message || `${endpoint} failed`);
-        return envelope.result.value;
-      };
-      const projection = s => s?.projections?.values || {};
-      const route = p => p?.modelSelection?.next || p?.modelSelection?.lastUsed || {};
-      const sessionOf = s => { const p=projection(s), r=route(p), cp=p.contextPressure||{}; return {id:s.sessionId,title:p.title||'新会话',cwd:s.cwd||'',updatedAt:s.updatedAt||0,running:!!s.running,blank:!!s.blank,preset:p.agentPreset||'standard',permission:p.permissions?.currentValue||'',provider:r.provider||'',model:r.model||'',turns:p.sessionStats?.turns||0,steps:p.sessionStats?.steps||0,contextUsed:cp.contextWindow?((cp.pressureTokens||0)/cp.contextWindow):null}; };
-      const refresh = async () => { try { state.loading=true; publish(); const [sl,mc]=await Promise.all([rpc('session/list',{_request:{}}),rpc('session/modelCatalog',{})]); state.sessions=(sl.items||[]).map(sessionOf); state.models=[]; for(const g of mc.groups||[]) for(const m of g.models||[]) state.models.push({provider:g.id,providerName:g.name,model:m.id,modelName:m.name,reasoning:m.reasoning?.efforts||[]}); if(!state.selectedSessionId && state.sessions.length) state.selectedSessionId=state.sessions.find(s=>!s.blank)?.id||state.sessions[0].id; state.connected=true;state.loading=false;state.error=null; publish(); openGlobalStreams(); if(state.selectedSessionId) openFollow(state.selectedSessionId); } catch(e){fail(e)} };
-      const textBlocks = content => { if(!Array.isArray(content)) return ''; return content.map(b=>{ if(b?.type==='text')return b.text||''; if(b?.type==='tool-result')return textBlocks(b.content); if(b?.type==='image')return `[图片] ${b.name||''}`; return ''; }).filter(Boolean).join('\n'); };
-      const add = (item,prepend=false) => { if(!item.text?.trim() || seen.has(item.id))return; seen.add(item.id); if(prepend)state.items.unshift(item); else state.items.push(item); };
-      const parseEvent = (row,prepend=false) => { let e=row?.event||row; if(!e)return; const type=e.type||'', data=e.data||{}, seq=e.seq??row.seq??-1, id=`${seq}:${type}`; if(seq>=0)state.oldestSeq=state.oldestSeq==null?seq:Math.min(state.oldestSeq,seq);
-        if(type==='user/message') add({id,kind:'user',text:textBlocks(data.content),seq,time:e.time||0},prepend);
-        else if(type==='assistant/message') { add({id,kind:'assistant',text:textBlocks(data.message?.content),seq,time:e.time||0},prepend); state.generating=false; }
-        else if(type==='tool/call') add({id,kind:'tool',text:data.name||'工具调用',subtitle:data.arguments||'',seq,time:e.time||0},prepend);
-        else if(type==='tool/result') add({id,kind:'tool',text:textBlocks(data.message?.content)||'工具执行完成',subtitle:'结果',seq,time:e.time||0},prepend);
-        else if(type==='command/run') add({id,kind:'system',text:`/${data.name||'command'}${data.args||''}`,subtitle:'指令',seq,time:e.time||0},prepend);
-        else if(type==='command/done' && data.result?.text) add({id,kind:'system',text:data.result.text,subtitle:data.result.kind||'指令结果',seq,time:e.time||0},prepend);
-        else if(type==='assistant/chunk') { const c=data.chunk||{}; if(c.type==='block-end'&&c.block?.type==='text'){ const key=`live:${data.turn}:${data.step}:${c.index}`; const at=state.items.findIndex(x=>x.id===key); const item={id:key,kind:'assistant',text:c.block.text||'',subtitle:'生成中',seq,time:e.time||0}; if(at>=0)state.items[at]=item; else state.items.push(item); state.generating=true; } if(c.type==='finish')state.generating=false; }
-        else if(type.includes('error')) add({id,kind:'system',text:data.message||data.error||type,subtitle:'错误',seq,time:e.time||0},prepend);
-      };
-      const parseRecords = (records,prepend=false) => { const ordered=prepend?[...(records||[])].reverse():records||[]; for(const r of ordered)parseEvent(r,prepend); state.items.sort((a,b)=>a.seq-b.seq); };
-      const openSocket = () => { if(socket && socket.readyState<2)return socket; const protocol=location.protocol==='https:'?'wss:':'ws:'; socket=new WebSocket(`${protocol}//${location.host}/api/remote.mux`); socket.onopen=()=>{state.connected=true;publish()}; socket.onmessage=ev=>{try{const f=JSON.parse(ev.data);if(f.type==='item')acceptStream(f.streamId,f.value);else if(f.type==='error')throw new Error(f.error?.message||'stream error')}catch(e){fail(e)}}; socket.onclose=()=>{socket=null;state.connected=false;publish();if(!stopped){clearTimeout(reconnectTimer);reconnectTimer=setTimeout(openGlobalStreams,2000)}}; return socket; };
-      const openStream = (streamId,endpoint,args) => { const ws=openSocket(), message=()=>ws.send(JSON.stringify({type:'open',streamId,endpoint,payload:{args}})); if(ws.readyState===1)message(); else ws.addEventListener('open',message,{once:true}); };
-      const openGlobalStreams=()=>{openStream('workspace','workspace/follow',{});openStream('control','session/control',{});openStream('events','$events',{})};
-      const openFollow=id=>{ if(!id)return; state.items=[];seen.clear();state.cursor=null;state.oldestSeq=null;publish();openStream('follow','session/follow',{request:{address:{kind:'session',sessionId:id},maxMessages:50}}); };
-      const mergeProjection=(id,key,value)=>{const s=state.sessions.find(x=>x.id===id);if(!s)return;if(key==='title')s.title=value||'新会话';else if(key==='permissions')s.permission=value?.currentValue||'';else if(key==='agentPreset')s.preset=value||'standard';else if(key==='modelSelection'){const r=value?.next||value?.lastUsed||{};s.provider=r.provider||'';s.model=r.model||''}else if(key==='sessionStats'){s.turns=value?.turns||0;s.steps=value?.steps||0}else if(key==='contextPressure')s.contextUsed=value?.contextWindow?(value.pressureTokens||0)/value.contextWindow:null;};
-      const acceptStream=(id,v)=>{if(id==='workspace'){const b=v?.value;if(v?.type==='baseline')state.workspaces=(b?.items||[]).map(w=>({id:w.workspaceId,title:w.title,path:w.path,sessionIds:w.sessionIds||[]}));}
-        else if(id==='control'){if(v?.type==='baseline'){const p=v.value?.projections||{};for(const [sid,b] of Object.entries(p))for(const [k,val] of Object.entries(b.values||{}))mergeProjection(sid,k,val);const q=v.value?.queues?.[state.selectedSessionId]||[],j=v.value?.jobs?.[state.selectedSessionId]||[];state.generating=q.length>0||j.some(x=>x.status==='running');}else if(v?.type==='projection')mergeProjection(v.sessionId,v.key,v.value);else if(v?.sessionId===state.selectedSessionId&&(v.type==='queue'||v.type==='jobs'))state.generating=(v.items||v.jobs||[]).some(x=>x.status?x.status==='running':true);}
-        else if(id==='follow'){if(v?.type==='snapshot'){state.cursor=v.cursor;state.hasMore=!!v.hasMore;parseRecords(v.records||[]);}else parseEvent(v);}
-        else if(id==='events'){if(v?.type==='waterfall')post({type:'approval',clientId:window.__harnessClientId,eventId:v.eventId,event:v.event,agentId:v.agentId,request:v.request});else if(v?.type==='ready')window.__harnessClientId=v.clientId;}
-        publish(); };
-      const openSession=async id=>{state.selectedSessionId=id;publish();openFollow(id)};
-      const createSession=async workspaceId=>{try{const request={};if(workspaceId)request.workspaceId=workspaceId;const v=await rpc('session/create',{request});await refresh();openSession(v.sessionId)}catch(e){fail(e)}};
-      const prompt=async(text,mode='queue',images=[])=>{if(!state.selectedSessionId||(!text.trim()&&!images.length))return;const rid=crypto.randomUUID();add({id:`pending:${rid}`,kind:'user',text:text||images.map(x=>`[图片] ${x.name||''}`).join('\n'),subtitle:'发送中',seq:Number.MAX_SAFE_INTEGER-1,time:Date.now()});state.generating=true;publish();try{await rpc('session/prompt',{request:{requestId:rid,sessionId:state.selectedSessionId,mode,content:[...(text.trim()?[{type:'text',text}]:[]),...images],clientTimeZone:Intl.DateTimeFormat().resolvedOptions().timeZone}})}catch(e){fail(e)}};
-      const cancel=async()=>{try{await rpc('session/cancel',{request:{sessionId:state.selectedSessionId}});state.generating=false;publish()}catch(e){fail(e)}};
-      const selectModel=async(provider,model,reasoning)=>{try{const request={sessionId:state.selectedSessionId,provider,model};if(reasoning)request.reasoningEffort=reasoning;await rpc('session/selectModel',{request});await refresh()}catch(e){fail(e)}};
-      const setPermission=async value=>{try{await rpc('commands/execute',{agentId:state.selectedSessionId,line:`/permission ${value}`,images:[]})}catch(e){fail(e)}};
-      const rename=async title=>{try{await rpc('session/rename',{request:{sessionId:state.selectedSessionId,title}});await refresh()}catch(e){fail(e)}};
-      const renameWorkspace=async(workspaceId,title)=>{try{await rpc('workspace/rename',{workspaceId,title});await refresh()}catch(e){fail(e)}};
-      const deleteWorkspace=async workspaceId=>{try{await rpc('workspace/delete',{workspaceId});await refresh()}catch(e){fail(e)}};
-      const archiveSession=async sessionId=>{try{await rpc('workspace/archiveSession',{sessionId});await refresh()}catch(e){fail(e)}};
-      const forkSession=async sessionId=>{try{const v=await rpc('session/fork',{request:{sessionId}});await refresh();if(v?.sessionId)openSession(v.sessionId)}catch(e){fail(e)}};
-      const addWorkspace=async path=>{try{await rpc('workspace/create',{path});await refresh()}catch(e){fail(e)}};
-      const listDirectories=async path=>{try{const v=await rpc('directoryPicker/list',{path:path||undefined});return (v?.entries||v?.items||[]).map(x=>({name:x.name,path:x.path,isDirectory:x.isDirectory!==false,hidden:!!x.hidden}))}catch(e){fail(e);return[]}};
-      const createDirectory=async(path,name)=>{try{return await rpc('directoryPicker/createDirectory',{path,name})}catch(e){fail(e);return null}};
-      const loadOlder=async()=>{if(!state.selectedSessionId||state.cursor==null||state.oldestSeq==null)return;try{const v=await rpc('session/page',{request:{address:{kind:'session',sessionId:state.selectedSessionId},throughSeq:state.cursor,beforeSeq:state.oldestSeq,maxMessages:30}});parseRecords(v.records||[],true);state.hasMore=!!v.hasMore;publish()}catch(e){fail(e)}};
-      const answerApproval=async(clientId,eventId,decision)=>{try{await rpc('$events/result',{clientId,eventId,outcome:{kind:'result',value:decision}})}catch(e){fail(e)}};
-      window.__harnessNative={refresh,openSession,createSession,prompt,cancel,selectModel,setPermission,rename,renameWorkspace,deleteWorkspace,archiveSession,forkSession,addWorkspace,listDirectories,createDirectory,loadOlder,answerApproval};
-      addEventListener('DOMContentLoaded',()=>setTimeout(refresh,0),{once:true});
-    })();
-    """#
 }

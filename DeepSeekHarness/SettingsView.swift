@@ -1,5 +1,4 @@
 import SwiftUI
-import WebKit
 
 struct SettingsView: View {
     @EnvironmentObject private var appState: AppState

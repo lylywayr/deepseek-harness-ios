@@ -1,5 +1,4 @@
 import UIKit
-import WebKit
 
 /// Compatibility-only setup and Web surface. The native app never uses this
 /// controller for its main screen, but it remains available for unsupported
