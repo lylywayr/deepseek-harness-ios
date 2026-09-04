@@ -5,6 +5,16 @@ import UniformTypeIdentifiers
 final class PolishedConversationViewController: UIViewController, UITableViewDataSource, UITableViewDelegate, UITextViewDelegate, PHPickerViewControllerDelegate, UIDocumentPickerDelegate {
     private let runtime: HarnessRuntime
     private let tableView = UITableView(frame: .zero, style: .plain)
+    private let sessionHeader = UIView()
+    private let headerTitleButton = UIButton(type: .system)
+    private let headerPresetButton = UIButton(type: .system)
+    private let headerFilesButton = UIButton(type: .system)
+    private let sessionLogButton = UIButton(type: .system)
+    private let conversationTab = UIButton(type: .system)
+    private let trajectoryTab = UIButton(type: .system)
+    private let tabUnderline = UIView()
+    private var tabUnderlineCenter: NSLayoutConstraint!
+    private var showingTrajectory = false
     private let composer = UIView()
     private let input = UITextView()
     private let placeholder = UILabel()
@@ -34,6 +44,7 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = DHTheme.background
+        buildSessionHeader()
         buildTable()
         buildComposer()
         buildEmptyState()
@@ -44,6 +55,91 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
     }
 
     deinit { NotificationCenter.default.removeObserver(self) }
+
+    private func buildSessionHeader() {
+        sessionHeader.backgroundColor = DHTheme.surface
+        sessionHeader.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(sessionHeader)
+
+        configureHeaderButton(headerTitleButton, title: "新会话", icon: "sidebar.left")
+        headerTitleButton.addAction(UIAction { [weak self] _ in self?.renameSession() }, for: .touchUpInside)
+        configureHeaderButton(headerPresetButton, title: "标准模式", icon: "point.3.connected.trianglepath.dotted")
+        headerPresetButton.addAction(UIAction { [weak self] _ in self?.showPresetNotice() }, for: .touchUpInside)
+        configureHeaderButton(headerFilesButton, title: nil, icon: "folder")
+        headerFilesButton.accessibilityLabel = "文件"
+        headerFilesButton.addAction(UIAction { [weak self] _ in self?.showNativeFilesNotice() }, for: .touchUpInside)
+
+        var logConfig = UIButton.Configuration.bordered()
+        logConfig.title = "Session 日志"
+        logConfig.image = UIImage(systemName: "arrow.down.to.line")
+        logConfig.imagePlacement = .trailing
+        logConfig.imagePadding = 6
+        logConfig.cornerStyle = .capsule
+        logConfig.baseForegroundColor = DHTheme.text
+        sessionLogButton.configuration = logConfig
+        sessionLogButton.addAction(UIAction { [weak self] _ in self?.showSessionLog() }, for: .touchUpInside)
+
+        let top = UIStackView(arrangedSubviews: [headerTitleButton, headerPresetButton, headerFilesButton, UIView(), sessionLogButton])
+        top.axis = .horizontal
+        top.spacing = 3
+        top.alignment = .center
+        top.translatesAutoresizingMaskIntoConstraints = false
+        sessionHeader.addSubview(top)
+
+        configureTab(conversationTab, title: "对话", selected: true)
+        configureTab(trajectoryTab, title: "轨迹", selected: false)
+        conversationTab.addTarget(self, action: #selector(showConversation), for: .touchUpInside)
+        trajectoryTab.addTarget(self, action: #selector(showTrajectory), for: .touchUpInside)
+        let tabs = UIStackView(arrangedSubviews: [conversationTab, trajectoryTab, UIView()])
+        tabs.axis = .horizontal
+        tabs.spacing = 12
+        tabs.translatesAutoresizingMaskIntoConstraints = false
+        sessionHeader.addSubview(tabs)
+
+        tabUnderline.backgroundColor = DHTheme.accent
+        tabUnderline.layer.cornerRadius = 2
+        tabUnderline.translatesAutoresizingMaskIntoConstraints = false
+        sessionHeader.addSubview(tabUnderline)
+        tabUnderlineCenter = tabUnderline.centerXAnchor.constraint(equalTo: conversationTab.centerXAnchor)
+
+        NSLayoutConstraint.activate([
+            sessionHeader.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            sessionHeader.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            sessionHeader.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            sessionHeader.heightAnchor.constraint(equalToConstant: 94),
+            top.leadingAnchor.constraint(equalTo: sessionHeader.leadingAnchor, constant: 8),
+            top.trailingAnchor.constraint(equalTo: sessionHeader.trailingAnchor, constant: -8),
+            top.topAnchor.constraint(equalTo: sessionHeader.topAnchor, constant: 6),
+            top.heightAnchor.constraint(equalToConstant: 42),
+            tabs.leadingAnchor.constraint(equalTo: sessionHeader.leadingAnchor, constant: 14),
+            tabs.trailingAnchor.constraint(equalTo: sessionHeader.trailingAnchor),
+            tabs.bottomAnchor.constraint(equalTo: sessionHeader.bottomAnchor),
+            tabs.heightAnchor.constraint(equalToConstant: 42),
+            conversationTab.widthAnchor.constraint(equalToConstant: 58),
+            trajectoryTab.widthAnchor.constraint(equalToConstant: 58),
+            tabUnderline.bottomAnchor.constraint(equalTo: sessionHeader.bottomAnchor),
+            tabUnderline.widthAnchor.constraint(equalToConstant: 36),
+            tabUnderline.heightAnchor.constraint(equalToConstant: 3),
+            tabUnderlineCenter
+        ])
+    }
+
+    private func configureHeaderButton(_ button: UIButton, title: String?, icon: String) {
+        var config = UIButton.Configuration.plain()
+        config.title = title
+        config.image = UIImage(systemName: icon)
+        config.imagePadding = 5
+        config.baseForegroundColor = DHTheme.secondaryText
+        config.contentInsets = NSDirectionalEdgeInsets(top: 5, leading: 7, bottom: 5, trailing: 7)
+        button.configuration = config
+        button.titleLabel?.font = DHTheme.font(.subheadline, weight: .medium)
+    }
+
+    private func configureTab(_ button: UIButton, title: String, selected: Bool) {
+        button.setTitle(title, for: .normal)
+        button.titleLabel?.font = DHTheme.font(.body, weight: .semibold)
+        button.setTitleColor(selected ? DHTheme.accent : DHTheme.secondaryText, for: .normal)
+    }
 
     private func buildTable() {
         tableView.backgroundColor = .clear
@@ -122,7 +218,7 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
             permissionButton.leadingAnchor.constraint(equalTo: attachButton.trailingAnchor, constant: 3), permissionButton.centerYAnchor.constraint(equalTo: attachButton.centerYAnchor), permissionButton.widthAnchor.constraint(equalToConstant: 34), permissionButton.heightAnchor.constraint(equalToConstant: 34),
             modelButton.leadingAnchor.constraint(equalTo: permissionButton.trailingAnchor, constant: 3), modelButton.centerYAnchor.constraint(equalTo: attachButton.centerYAnchor), modelButton.trailingAnchor.constraint(lessThanOrEqualTo: sendButton.leadingAnchor, constant: -6), modelButton.heightAnchor.constraint(equalToConstant: 32),
             sendButton.trailingAnchor.constraint(equalTo: composer.trailingAnchor, constant: -9), sendButton.centerYAnchor.constraint(equalTo: attachButton.centerYAnchor), sendButton.widthAnchor.constraint(equalToConstant: 38), sendButton.heightAnchor.constraint(equalToConstant: 38),
-            tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor), tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor), tableView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor), tableView.bottomAnchor.constraint(equalTo: composer.topAnchor, constant: -6)
+            tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor), tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor), tableView.topAnchor.constraint(equalTo: sessionHeader.bottomAnchor), tableView.bottomAnchor.constraint(equalTo: composer.topAnchor, constant: -6)
         ])
     }
 
@@ -231,6 +327,8 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
         statusLabel.text = runtime.lastError ?? runtime.statusText
         statusLabel.textColor = runtime.lastError == nil ? DHTheme.secondaryText : DHTheme.danger
         if let session = runtime.sessions.first(where: { $0.id == runtime.selectedSessionID }) {
+            headerTitleButton.configuration?.title = session.title.isEmpty ? "新会话" : session.title
+            headerPresetButton.configuration?.title = session.preset == "standard" ? "标准模式" : session.preset
             modelButton.configuration?.title = session.model.isEmpty ? "选择模型" : session.model
             permissionButton.configuration?.image = UIImage(systemName: session.permission == "danger-full-access" ? "shield.slash" : "shield")
             permissionButton.accessibilityLabel = "权限：\(session.permission)"
@@ -246,6 +344,52 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
         sendButton.isEnabled = available
         sendButton.alpha = available ? 1 : 0.45
         placeholder.isHidden = !input.text.isEmpty
+    }
+
+    @objc private func showConversation() { setMode(trajectory: false) }
+    @objc private func showTrajectory() { setMode(trajectory: true) }
+
+    private func setMode(trajectory: Bool) {
+        showingTrajectory = trajectory
+        conversationTab.setTitleColor(trajectory ? DHTheme.secondaryText : DHTheme.accent, for: .normal)
+        trajectoryTab.setTitleColor(trajectory ? DHTheme.accent : DHTheme.secondaryText, for: .normal)
+        tabUnderlineCenter.isActive = false
+        tabUnderlineCenter = tabUnderline.centerXAnchor.constraint(equalTo: trajectory ? trajectoryTab.centerXAnchor : conversationTab.centerXAnchor)
+        tabUnderlineCenter.isActive = true
+        UIView.animate(withDuration: 0.18) { self.sessionHeader.layoutIfNeeded() }
+        tableView.reloadData()
+        emptyState.isHidden = trajectory || !runtime.items.isEmpty
+        placeholder.text = trajectory ? "轨迹为只读视图" : "描述你想要构建的内容… / 调用指令 @ 文件或对话"
+        input.isEditable = !trajectory
+        composer.alpha = trajectory ? 0.65 : 1
+    }
+
+    private func renameSession() {
+        guard let session = runtime.sessions.first(where: { $0.id == runtime.selectedSessionID }) else { return }
+        let alert = UIAlertController(title: "重命名会话", message: nil, preferredStyle: .alert)
+        alert.addTextField { $0.text = session.title }
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        alert.addAction(UIAlertAction(title: "保存", style: .default) { [weak self, weak alert] _ in
+            guard let title = alert?.textFields?.first?.text?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty else { return }
+            self?.runtime.rename(title)
+        })
+        present(alert, animated: true)
+    }
+
+    private func showNativeFilesNotice() {
+        showError("文件浏览页面将在下一阶段接入原生目录与文件 Remote。")
+    }
+
+    private func showSessionLog() {
+        let text = runtime.items.map { "[\($0.kind.rawValue)] \($0.text)" }.joined(separator: "\n\n")
+        let controller = SessionLogViewController(text: text.isEmpty ? "当前会话暂无日志" : text)
+        let navigation = UINavigationController(rootViewController: controller)
+        navigation.modalPresentationStyle = .pageSheet
+        present(navigation, animated: true)
+    }
+
+    private func trajectoryItems() -> [HarnessConversationItem] {
+        runtime.items.filter { $0.kind == .tool || $0.kind == .system }
     }
 
     @objc private func send() {
@@ -336,8 +480,9 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
 
     @objc private func keyboardChanged(_ note: Notification) { guard let f=note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect,let d=note.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double else{return};let c=view.convert(f,from:nil);composerBottom.constant = -10-max(0,view.bounds.maxY-c.minY-view.safeAreaInsets.bottom);UIView.animate(withDuration:d){self.view.layoutIfNeeded()} }
     func textViewDidChange(_ textView: UITextView) { inputHeight.constant=min(max(textView.contentSize.height,46),130);updateSend();view.layoutIfNeeded() }
-    func tableView(_ tableView:UITableView,numberOfRowsInSection section:Int)->Int{runtime.items.count}
-    func tableView(_ tableView:UITableView,cellForRowAt indexPath:IndexPath)->UITableViewCell{let c=tableView.dequeueReusableCell(withIdentifier:"message",for:indexPath) as! HarnessMessageCell;c.configure(runtime.items[indexPath.row]);return c}
+    private var visibleItems: [HarnessConversationItem] { showingTrajectory ? trajectoryItems() : runtime.items }
+    func tableView(_ tableView:UITableView,numberOfRowsInSection section:Int)->Int{visibleItems.count}
+    func tableView(_ tableView:UITableView,cellForRowAt indexPath:IndexPath)->UITableViewCell{let c=tableView.dequeueReusableCell(withIdentifier:"message",for:indexPath) as! HarnessMessageCell;c.configure(visibleItems[indexPath.row]);return c}
     func tableView(_ tableView:UITableView,willDisplay cell:UITableViewCell,forRowAt indexPath:IndexPath){if indexPath.row==0&&runtime.hasMore{runtime.loadOlder()}}
 }
 
@@ -391,4 +536,32 @@ final class HarnessMessageCell: UITableViewCell {
         card.backgroundColor = item.kind == .user ? DHTheme.accentSoft : item.kind == .tool ? DHTheme.surfaceMuted : DHTheme.surface
         title.textColor = item.kind == .user ? DHTheme.accent : DHTheme.secondaryText
     }
+}
+
+final class SessionLogViewController: UIViewController {
+    private let text: String
+    init(text: String) { self.text = text; super.init(nibName: nil, bundle: nil) }
+    @available(*, unavailable) required init?(coder: NSCoder) { fatalError() }
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        title = "Session 日志"
+        navigationItem.rightBarButtonItem = UIBarButtonItem(barButtonSystemItem: .done, target: self, action: #selector(close))
+        view.backgroundColor = DHTheme.background
+        let textView = UITextView()
+        textView.text = text
+        textView.isEditable = false
+        textView.backgroundColor = .clear
+        textView.textColor = DHTheme.text
+        textView.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
+        textView.textContainerInset = UIEdgeInsets(top: 18, left: 14, bottom: 18, right: 14)
+        textView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(textView)
+        NSLayoutConstraint.activate([
+            textView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            textView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            textView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            textView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+    }
+    @objc private func close() { dismiss(animated: true) }
 }
