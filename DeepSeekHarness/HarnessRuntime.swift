@@ -103,6 +103,22 @@ final class HarnessRuntime: NSObject, WKNavigationDelegate, WKScriptMessageHandl
     }
     func setPermission(_ value: String) { call("setPermission", arguments: [value]) }
     func rename(_ title: String) { call("rename", arguments: [title]) }
+    func renameWorkspace(_ id: String, title: String) { call("renameWorkspace", arguments: [id, title]) }
+    func deleteWorkspace(_ id: String) { call("deleteWorkspace", arguments: [id]) }
+    func archiveSession(_ id: String) { call("archiveSession", arguments: [id]) }
+    func forkSession(_ id: String) { call("forkSession", arguments: [id]) }
+    func addWorkspace(path: String) { call("addWorkspace", arguments: [path]) }
+    func listDirectories(path: String?, completion: @escaping ([[String: Any]]) -> Void) {
+        guard let data = try? JSONSerialization.data(withJSONObject: [path as Any]), let json = String(data: data, encoding: .utf8) else { completion([]); return }
+        webView.evaluateJavaScript("window.__harnessNative?.listDirectories.apply(window.__harnessNative, \(json))") { value, _ in
+            let rows = value as? [[String: Any]] ?? []
+            Task { @MainActor in completion(rows) }
+        }
+    }
+    func createDirectory(path: String, name: String, completion: @escaping (String?) -> Void) {
+        guard let data = try? JSONSerialization.data(withJSONObject: [path, name]), let json = String(data: data, encoding: .utf8) else { completion(nil); return }
+        webView.evaluateJavaScript("window.__harnessNative?.createDirectory.apply(window.__harnessNative, \(json))") { value, _ in Task { @MainActor in completion(value as? String) } }
+    }
     func answerApproval(clientID: String, eventID: String, decision: String) {
         call("answerApproval", arguments: [clientID, eventID, decision])
     }
@@ -232,9 +248,16 @@ final class HarnessRuntime: NSObject, WKNavigationDelegate, WKScriptMessageHandl
       const selectModel=async(provider,model,reasoning)=>{try{const request={sessionId:state.selectedSessionId,provider,model};if(reasoning)request.reasoningEffort=reasoning;await rpc('session/selectModel',{request});await refresh()}catch(e){fail(e)}};
       const setPermission=async value=>{try{await rpc('commands/execute',{agentId:state.selectedSessionId,line:`/permission ${value}`,images:[]})}catch(e){fail(e)}};
       const rename=async title=>{try{await rpc('session/rename',{request:{sessionId:state.selectedSessionId,title}});await refresh()}catch(e){fail(e)}};
+      const renameWorkspace=async(workspaceId,title)=>{try{await rpc('workspace/rename',{workspaceId,title});await refresh()}catch(e){fail(e)}};
+      const deleteWorkspace=async workspaceId=>{try{await rpc('workspace/delete',{workspaceId});await refresh()}catch(e){fail(e)}};
+      const archiveSession=async sessionId=>{try{await rpc('workspace/archiveSession',{sessionId});await refresh()}catch(e){fail(e)}};
+      const forkSession=async sessionId=>{try{const v=await rpc('session/fork',{request:{sessionId}});await refresh();if(v?.sessionId)openSession(v.sessionId)}catch(e){fail(e)}};
+      const addWorkspace=async path=>{try{await rpc('workspace/create',{path});await refresh()}catch(e){fail(e)}};
+      const listDirectories=async path=>{try{const v=await rpc('directoryPicker/list',{path:path||undefined});return (v?.entries||v?.items||[]).map(x=>({name:x.name,path:x.path,isDirectory:x.isDirectory!==false,hidden:!!x.hidden}))}catch(e){fail(e);return[]}};
+      const createDirectory=async(path,name)=>{try{return await rpc('directoryPicker/createDirectory',{path,name})}catch(e){fail(e);return null}};
       const loadOlder=async()=>{if(!state.selectedSessionId||state.cursor==null||state.oldestSeq==null)return;try{const v=await rpc('session/page',{request:{address:{kind:'session',sessionId:state.selectedSessionId},throughSeq:state.cursor,beforeSeq:state.oldestSeq,maxMessages:30}});parseRecords(v.records||[],true);state.hasMore=!!v.hasMore;publish()}catch(e){fail(e)}};
       const answerApproval=async(clientId,eventId,decision)=>{try{await rpc('$events/result',{clientId,eventId,outcome:{kind:'result',value:decision}})}catch(e){fail(e)}};
-      window.__harnessNative={refresh,openSession,createSession,prompt,cancel,selectModel,setPermission,rename,loadOlder,answerApproval};
+      window.__harnessNative={refresh,openSession,createSession,prompt,cancel,selectModel,setPermission,rename,renameWorkspace,deleteWorkspace,archiveSession,forkSession,addWorkspace,listDirectories,createDirectory,loadOlder,answerApproval};
       addEventListener('DOMContentLoaded',()=>setTimeout(refresh,0),{once:true});
     })();
     """#

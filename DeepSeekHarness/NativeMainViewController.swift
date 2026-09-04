@@ -233,7 +233,7 @@ final class NativeHomeViewController: UIViewController {
         railStack.addArrangedSubview(railButton(icon: "plus.message", label: "新建会话") { [weak self] in
             self?.runtime.createSession(workspaceID: self?.runtime.workspaces.first?.id)
         })
-        railStack.addArrangedSubview(railButton(icon: "folder.badge.plus", label: "添加工作区") { [weak self] in self?.showNotice("工作区选择协议正在接入") })
+        railStack.addArrangedSubview(railButton(icon: "folder.badge.plus", label: "添加工作区") { [weak self] in self?.showDirectoryPicker() })
         railStack.addArrangedSubview(railButton(icon: "magnifyingglass", label: "搜索会话") { [weak self] in self?.toggleSidebar() })
         let spacer = UIView()
         railStack.addArrangedSubview(spacer)
@@ -373,13 +373,13 @@ final class NativeHomeViewController: UIViewController {
         sidebarContent.addArrangedSubview(workspaceTitle)
 
         if let workspace = runtime.workspaces.first {
-            sidebarContent.addArrangedSubview(sidebarButton(title: workspace.title, icon: "folder") { })
+            sidebarContent.addArrangedSubview(sidebarButton(title: workspace.title, icon: "folder", menu: workspaceMenu(workspace)) { })
         }
 
         for session in runtime.sessions.filter({ !$0.blank }).prefix(12) {
             let title = session.title.isEmpty ? "新会话" : session.title
             let selected = session.id == runtime.selectedSessionID
-            sidebarContent.addArrangedSubview(sidebarButton(title: title, icon: session.running ? "circle.dotted" : "message", selected: selected) { [weak self] in
+            sidebarContent.addArrangedSubview(sidebarButton(title: title, icon: session.running ? "circle.dotted" : "message", selected: selected, menu: sessionMenu(session)) { [weak self] in
                 self?.runtime.openSession(session.id)
                 self?.toggleSidebar()
             })
@@ -389,6 +389,51 @@ final class NativeHomeViewController: UIViewController {
         spacer.setContentHuggingPriority(.defaultLow, for: .vertical)
         sidebarContent.addArrangedSubview(spacer)
         sidebarContent.addArrangedSubview(sidebarButton(title: "设置", icon: "gearshape") { [weak self] in self?.onSettings() })
+    }
+
+    private func workspaceMenu(_ workspace: HarnessWorkspace) -> UIMenu {
+        UIMenu(children: [
+            UIAction(title: "重命名", image: UIImage(systemName: "pencil")) { [weak self] _ in self?.renameWorkspace(workspace) },
+            UIAction(title: "删除工作区", image: UIImage(systemName: "trash"), attributes: .destructive) { [weak self] _ in self?.confirmDelete(workspace) }
+        ])
+    }
+
+    private func sessionMenu(_ session: HarnessSessionSummary) -> UIMenu {
+        UIMenu(children: [
+            UIAction(title: "重命名", image: UIImage(systemName: "pencil")) { [weak self] _ in self?.runtime.openSession(session.id); self?.renameSession(session) },
+            UIAction(title: "分叉会话", image: UIImage(systemName: "point.topleft.down.curvedto.point.bottomright.up")) { [weak self] _ in self?.runtime.forkSession(session.id) },
+            UIAction(title: "归档会话", image: UIImage(systemName: "archivebox")) { [weak self] _ in self?.runtime.archiveSession(session.id) }
+        ])
+    }
+
+    private func renameWorkspace(_ workspace: HarnessWorkspace) {
+        let alert = UIAlertController(title: "重命名工作区", message: nil, preferredStyle: .alert)
+        alert.addTextField { $0.text = workspace.title }
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        alert.addAction(UIAlertAction(title: "保存", style: .default) { [weak self, weak alert] _ in guard let title=alert?.textFields?.first?.text, !title.isEmpty else{return}; self?.runtime.renameWorkspace(workspace.id,title:title) })
+        present(alert,animated:true)
+    }
+
+    private func renameSession(_ session: HarnessSessionSummary) {
+        let alert = UIAlertController(title: "重命名会话", message: nil, preferredStyle: .alert)
+        alert.addTextField { $0.text = session.title }
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        alert.addAction(UIAlertAction(title: "保存", style: .default) { [weak self, weak alert] _ in guard let title=alert?.textFields?.first?.text, !title.isEmpty else{return}; self?.runtime.rename(title) })
+        present(alert,animated:true)
+    }
+
+    private func confirmDelete(_ workspace: HarnessWorkspace) {
+        let alert=UIAlertController(title:"删除工作区？",message:"只会从 Harness 列表移除，不删除目录内容。",preferredStyle:.alert)
+        alert.addAction(UIAlertAction(title:"取消",style:.cancel))
+        alert.addAction(UIAlertAction(title:"删除",style:.destructive){[weak self] _ in self?.runtime.deleteWorkspace(workspace.id)})
+        present(alert,animated:true)
+    }
+
+    private func showDirectoryPicker() {
+        let picker = HarnessDirectoryPickerViewController(runtime: runtime) { [weak self] path in self?.runtime.addWorkspace(path:path) }
+        let navigation=UINavigationController(rootViewController:picker)
+        navigation.modalPresentationStyle = .pageSheet
+        present(navigation,animated:true)
     }
 
     private func sidebarHint(icon: String, title: String, message: String) -> UIView {
@@ -421,7 +466,7 @@ final class NativeHomeViewController: UIViewController {
         return card
     }
 
-    private func sidebarButton(title: String, icon: String, prominent: Bool = false, selected: Bool = false, action: @escaping () -> Void) -> UIButton {
+    private func sidebarButton(title: String, icon: String, prominent: Bool = false, selected: Bool = false, menu: UIMenu? = nil, action: @escaping () -> Void) -> UIButton {
         var configuration = prominent ? UIButton.Configuration.filled() : UIButton.Configuration.plain()
         configuration.title = title
         configuration.image = UIImage(systemName: icon)
@@ -434,6 +479,10 @@ final class NativeHomeViewController: UIViewController {
         button.contentHorizontalAlignment = .leading
         button.titleLabel?.font = DHTheme.font(.body, weight: prominent ? .semibold : .medium)
         button.addAction(UIAction { _ in action() }, for: .touchUpInside)
+        if let menu {
+            button.menu = menu
+            button.showsMenuAsPrimaryAction = false
+        }
         return button
     }
 
@@ -831,4 +880,35 @@ final class DHNavigationAppearance {
         appearance.titleTextAttributes = [.foregroundColor: DHTheme.text, .font: DHTheme.font(.headline, weight: .semibold)]
         return appearance
     }
+}
+
+final class HarnessDirectoryPickerViewController: UITableViewController {
+    private let runtime: HarnessRuntime
+    private let onOpen: (String) -> Void
+    private var path: String?
+    private var rows: [(name:String,path:String,hidden:Bool)] = []
+    private var showHidden = false
+
+    init(runtime: HarnessRuntime, onOpen: @escaping (String) -> Void) {
+        self.runtime=runtime; self.onOpen=onOpen
+        super.init(style:.plain)
+    }
+    @available(*, unavailable) required init?(coder:NSCoder){fatalError()}
+
+    override func viewDidLoad(){
+        super.viewDidLoad(); title="选择工作区目录"; view.backgroundColor=DHTheme.surface
+        navigationItem.leftBarButtonItem=UIBarButtonItem(title:"取消",style:.plain,target:self,action:#selector(close))
+        navigationItem.rightBarButtonItem=UIBarButtonItem(title:"打开",style:.done,target:self,action:#selector(open))
+        tableView.register(UITableViewCell.self,forCellReuseIdentifier:"dir")
+        toolbarItems=[UIBarButtonItem(title:"＋ 新建文件夹",style:.plain,target:self,action:#selector(newFolder)),UIBarButtonItem.flexibleSpace(),UIBarButtonItem(title:"显示隐藏文件",style:.plain,target:self,action:#selector(toggleHidden))]
+        navigationController?.isToolbarHidden=false; load()
+    }
+    private func load(){ runtime.listDirectories(path:path){[weak self] values in guard let self else{return}; self.rows=values.compactMap{v in guard let name=v["name"] as? String,let path=v["path"] as? String,(v["isDirectory"] as? Bool) != false else{return nil};return(name,path,(v["hidden"] as? Bool) ?? name.hasPrefix("."))};self.tableView.reloadData()} }
+    override func tableView(_ tableView:UITableView,numberOfRowsInSection section:Int)->Int{rows.filter{showHidden || !$0.hidden}.count}
+    override func tableView(_ tableView:UITableView,cellForRowAt indexPath:IndexPath)->UITableViewCell{let row=rows.filter{showHidden || !$0.hidden}[indexPath.row];let c=tableView.dequeueReusableCell(withIdentifier:"dir",for:indexPath);var config=c.defaultContentConfiguration();config.text=row.name;config.image=UIImage(systemName:"folder");c.contentConfiguration=config;c.accessoryType=.disclosureIndicator;return c}
+    override func tableView(_ tableView:UITableView,didSelectRowAt indexPath:IndexPath){let row=rows.filter{showHidden || !$0.hidden}[indexPath.row];path=row.path;title=row.name;load()}
+    @objc private func close(){dismiss(animated:true)}
+    @objc private func open(){guard let path else{return};onOpen(path);dismiss(animated:true)}
+    @objc private func toggleHidden(){showHidden.toggle();toolbarItems?.last?.title=showHidden ? "隐藏隐藏文件":"显示隐藏文件";tableView.reloadData()}
+    @objc private func newFolder(){let a=UIAlertController(title:"新建文件夹",message:nil,preferredStyle:.alert);a.addTextField{$0.placeholder="文件夹名称"};a.addAction(UIAlertAction(title:"取消",style:.cancel));a.addAction(UIAlertAction(title:"创建",style:.default){[weak self,weak a] _ in guard let self,let name=a?.textFields?.first?.text,!name.isEmpty else{return};self.runtime.createDirectory(path:self.path ?? "",name:name){_ in self.load()}});present(a,animated:true)}
 }
