@@ -501,9 +501,9 @@ final class HarnessRuntime: NSObject {
             let providerName = group["name"] as? String ?? provider
             return (group["models"] as? [[String: Any]] ?? []).compactMap { (model: [String: Any]) -> HarnessModelOption? in
                 guard let id = model["id"] as? String else { return nil }
-                let efforts = ((model["reasoning"] as? [String: Any])?["efforts"] as? [[String: Any]] ?? []).compactMap {
-                    guard let effortID = $0["id"] as? String else { return nil }
-                    return ["id": effortID, "name": $0["name"] as? String ?? effortID]
+                let efforts: [[String: String]] = ((model["reasoning"] as? [String: Any])?["efforts"] as? [[String: Any]] ?? []).compactMap { effort -> [String: String]? in
+                    guard let effortID = effort["id"] as? String else { return nil }
+                    return ["id": effortID, "name": effort["name"] as? String ?? effortID]
                 }
                 return HarnessModelOption(provider: provider, providerName: providerName, model: id, modelName: model["name"] as? String ?? id, reasoning: efforts)
             }
