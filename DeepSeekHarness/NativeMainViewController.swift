@@ -49,6 +49,7 @@ final class MainViewController: UIViewController {
     private func render() {
         removeCurrentChild()
         guard let endpoint = appState.endpointURL else {
+            navigationController?.setNavigationBarHidden(false, animated: false)
             let setup = SetupViewController(initialValue: appState.endpointString)
             setup.onSave = { [weak self] value in
                 guard let self, self.appState.saveEndpoint(value) else { return }
@@ -69,19 +70,10 @@ final class MainViewController: UIViewController {
             onSettings: { [weak self] in self?.openSettings() }
         )
         addChildController(home)
-        navigationItem.title = "Harness"
-        navigationItem.leftBarButtonItem = UIBarButtonItem(
-            image: UIImage(systemName: "sidebar.left"),
-            style: .plain,
-            target: home,
-            action: #selector(NativeHomeViewController.toggleSidebar)
-        )
-        navigationItem.rightBarButtonItem = UIBarButtonItem(
-            image: UIImage(systemName: "gearshape"),
-            style: .plain,
-            target: self,
-            action: #selector(openSettings)
-        )
+        navigationController?.setNavigationBarHidden(true, animated: false)
+        navigationItem.title = nil
+        navigationItem.leftBarButtonItem = nil
+        navigationItem.rightBarButtonItem = nil
     }
 
     private func addChildController(_ controller: UIViewController) {
@@ -160,6 +152,8 @@ final class NativeHomeViewController: UIViewController {
     private let onSettings: () -> Void
 
     private let conversationContainer = UIView()
+    private let rail = UIView()
+    private let railStack = UIStackView()
     private let sidebar = UIView()
     private let sidebarContent = UIStackView()
     private let sidebarScrim = UIControl()
@@ -202,11 +196,68 @@ final class NativeHomeViewController: UIViewController {
 
     deinit { stopObserving?() }
 
+    private func buildRail() {
+        rail.backgroundColor = UIColor { traits in traits.userInterfaceStyle == .dark ? DHTheme.surface : UIColor(red: 0.975, green: 0.980, blue: 0.985, alpha: 1) }
+        rail.layer.borderColor = DHTheme.separator.withAlphaComponent(0.45).cgColor
+        rail.layer.borderWidth = 0.5
+        rail.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(rail)
+        NSLayoutConstraint.activate([
+            rail.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            rail.topAnchor.constraint(equalTo: view.topAnchor),
+            rail.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            rail.widthAnchor.constraint(equalToConstant: 56)
+        ])
+
+        railStack.axis = .vertical
+        railStack.spacing = 12
+        railStack.alignment = .center
+        railStack.translatesAutoresizingMaskIntoConstraints = false
+        rail.addSubview(railStack)
+        NSLayoutConstraint.activate([
+            railStack.topAnchor.constraint(equalTo: rail.safeAreaLayoutGuide.topAnchor, constant: 14),
+            railStack.leadingAnchor.constraint(equalTo: rail.leadingAnchor),
+            railStack.trailingAnchor.constraint(equalTo: rail.trailingAnchor),
+            railStack.bottomAnchor.constraint(equalTo: rail.safeAreaLayoutGuide.bottomAnchor, constant: -10)
+        ])
+
+        let fishButton = UIButton(type: .system)
+        fishButton.setImage(UIImage(named: "FishLogo")?.withRenderingMode(.alwaysTemplate), for: .normal)
+        fishButton.tintColor = DHTheme.text
+        fishButton.imageView?.contentMode = .scaleAspectFit
+        fishButton.accessibilityLabel = "打开侧边栏"
+        fishButton.addTarget(self, action: #selector(toggleSidebar), for: .touchUpInside)
+        fishButton.widthAnchor.constraint(equalToConstant: 42).isActive = true
+        fishButton.heightAnchor.constraint(equalToConstant: 42).isActive = true
+        railStack.addArrangedSubview(fishButton)
+        railStack.addArrangedSubview(railButton(icon: "plus.message", label: "新建会话") { [weak self] in
+            self?.runtime.createSession(workspaceID: self?.runtime.workspaces.first?.id)
+        })
+        railStack.addArrangedSubview(railButton(icon: "folder.badge.plus", label: "添加工作区") { [weak self] in self?.showNotice("工作区选择协议正在接入") })
+        railStack.addArrangedSubview(railButton(icon: "magnifyingglass", label: "搜索会话") { [weak self] in self?.toggleSidebar() })
+        let spacer = UIView()
+        railStack.addArrangedSubview(spacer)
+        railStack.addArrangedSubview(railButton(icon: "gearshape", label: "设置") { [weak self] in self?.onSettings() })
+    }
+
+    private func railButton(icon: String, label: String, action: @escaping () -> Void) -> UIButton {
+        var config = UIButton.Configuration.plain()
+        config.image = UIImage(systemName: icon)
+        config.baseForegroundColor = DHTheme.text
+        let button = UIButton(configuration: config)
+        button.accessibilityLabel = label
+        button.addAction(UIAction { _ in action() }, for: .touchUpInside)
+        button.widthAnchor.constraint(equalToConstant: 42).isActive = true
+        button.heightAnchor.constraint(equalToConstant: 42).isActive = true
+        return button
+    }
+
     private func buildLayout() {
+        buildRail()
         conversationContainer.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(conversationContainer)
         NSLayoutConstraint.activate([
-            conversationContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            conversationContainer.leadingAnchor.constraint(equalTo: rail.trailingAnchor),
             conversationContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             conversationContainer.topAnchor.constraint(equalTo: view.topAnchor),
             conversationContainer.bottomAnchor.constraint(equalTo: view.bottomAnchor)
@@ -239,7 +290,7 @@ final class NativeHomeViewController: UIViewController {
         sidebarScrim.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(sidebarScrim)
         NSLayoutConstraint.activate([
-            sidebarScrim.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            sidebarScrim.leadingAnchor.constraint(equalTo: rail.trailingAnchor),
             sidebarScrim.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             sidebarScrim.topAnchor.constraint(equalTo: view.topAnchor),
             sidebarScrim.bottomAnchor.constraint(equalTo: view.bottomAnchor)
@@ -249,7 +300,7 @@ final class NativeHomeViewController: UIViewController {
         sidebar.dhApplyCard(backgroundColor: DHTheme.surface, cornerRadius: 0, shadow: true)
         sidebar.isHidden = true
         view.addSubview(sidebar)
-        sidebarWidthConstraint = sidebar.widthAnchor.constraint(equalToConstant: 304)
+        sidebarWidthConstraint = sidebar.widthAnchor.constraint(equalToConstant: 280)
         NSLayoutConstraint.activate([
             sidebar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             sidebar.topAnchor.constraint(equalTo: view.topAnchor),
@@ -278,118 +329,65 @@ final class NativeHomeViewController: UIViewController {
 
         let brand = UIView()
         brand.translatesAutoresizingMaskIntoConstraints = false
-        let icon = dhIconView(systemName: "sparkles", size: 44, symbolSize: 19)
+        let fish = UIImageView(image: UIImage(named: "FishLogo"))
+        fish.contentMode = .scaleAspectFit
+        fish.translatesAutoresizingMaskIntoConstraints = false
         let title = UILabel()
-        title.text = "Harness"
-        title.font = DHTheme.font(.title3, weight: .bold)
-        let subtitle = UILabel()
-        subtitle.text = "原生工作台"
-        subtitle.font = DHTheme.font(.caption1)
-        subtitle.textColor = DHTheme.secondaryText
-        let labels = UIStackView(arrangedSubviews: [title, subtitle])
-        labels.axis = .vertical
-        labels.spacing = 2
-        labels.translatesAutoresizingMaskIntoConstraints = false
-        brand.addSubview(icon)
-        brand.addSubview(labels)
+        title.text = "deepseek"
+        title.font = .systemFont(ofSize: 22, weight: .bold)
+        let badge = UILabel()
+        badge.text = " HARNESS "
+        badge.font = .monospacedSystemFont(ofSize: 11, weight: .bold)
+        badge.textColor = .white
+        badge.backgroundColor = DHTheme.text
+        badge.layer.cornerRadius = 4
+        badge.clipsToBounds = true
+        let close = UIButton(type: .system)
+        close.setImage(UIImage(systemName: "sidebar.left"), for: .normal)
+        close.tintColor = DHTheme.secondaryText
+        close.addTarget(self, action: #selector(toggleSidebar), for: .touchUpInside)
+        close.translatesAutoresizingMaskIntoConstraints = false
+        brand.addSubview(fish)
+        brand.addSubview(title)
+        brand.addSubview(badge)
+        brand.addSubview(close)
         NSLayoutConstraint.activate([
             brand.heightAnchor.constraint(equalToConstant: 52),
-            icon.leadingAnchor.constraint(equalTo: brand.leadingAnchor),
-            icon.centerYAnchor.constraint(equalTo: brand.centerYAnchor),
-            labels.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 11),
-            labels.centerYAnchor.constraint(equalTo: brand.centerYAnchor),
-            labels.trailingAnchor.constraint(equalTo: brand.trailingAnchor)
+            fish.leadingAnchor.constraint(equalTo: brand.leadingAnchor), fish.centerYAnchor.constraint(equalTo: brand.centerYAnchor), fish.widthAnchor.constraint(equalToConstant: 34), fish.heightAnchor.constraint(equalToConstant: 26),
+            title.leadingAnchor.constraint(equalTo: fish.trailingAnchor, constant: 7), title.centerYAnchor.constraint(equalTo: brand.centerYAnchor),
+            badge.leadingAnchor.constraint(equalTo: title.trailingAnchor, constant: 7), badge.centerYAnchor.constraint(equalTo: brand.centerYAnchor),
+            close.trailingAnchor.constraint(equalTo: brand.trailingAnchor), close.centerYAnchor.constraint(equalTo: brand.centerYAnchor), close.widthAnchor.constraint(equalToConstant: 30), close.heightAnchor.constraint(equalToConstant: 30)
         ])
         sidebarContent.addArrangedSubview(brand)
-        sidebarContent.addArrangedSubview(dhSeparator())
 
-        sidebarContent.addArrangedSubview(sidebarButton(title: "新建会话", icon: "square.and.pencil", prominent: true) { [weak self] in
+        sidebarContent.addArrangedSubview(sidebarButton(title: "新会话", icon: "plus.message") { [weak self] in
             let workspace = self?.runtime.workspaces.first?.id
             self?.runtime.createSession(workspaceID: workspace)
             self?.toggleSidebar()
         })
 
         let workspaceTitle = UILabel()
-        workspaceTitle.text = runtime.workspaces.first.map { "工作区 · \($0.title)" } ?? "会话"
-        workspaceTitle.font = DHTheme.font(.caption1, weight: .semibold)
-        workspaceTitle.textColor = DHTheme.tertiaryText
+        workspaceTitle.text = "工作区"
+        workspaceTitle.font = DHTheme.font(.subheadline, weight: .medium)
+        workspaceTitle.textColor = DHTheme.secondaryText
         sidebarContent.addArrangedSubview(workspaceTitle)
 
+        if let workspace = runtime.workspaces.first {
+            sidebarContent.addArrangedSubview(sidebarButton(title: workspace.title, icon: "folder") { })
+        }
+
         for session in runtime.sessions.filter({ !$0.blank }).prefix(12) {
-            let title = session.title.isEmpty ? "未命名会话" : session.title
-            sidebarContent.addArrangedSubview(sidebarButton(title: title, icon: session.running ? "circle.dotted" : "message") { [weak self] in
+            let title = session.title.isEmpty ? "新会话" : session.title
+            let selected = session.id == runtime.selectedSessionID
+            sidebarContent.addArrangedSubview(sidebarButton(title: title, icon: session.running ? "circle.dotted" : "message", selected: selected) { [weak self] in
                 self?.runtime.openSession(session.id)
                 self?.toggleSidebar()
             })
         }
 
-        sidebarContent.addArrangedSubview(sidebarButton(title: "插件与扩展", icon: "puzzlepiece.extension") { [weak self] in
-            self?.openPluginCenter()
-        })
-
-        let sectionTitle = UILabel()
-        sectionTitle.text = "扩展入口"
-        sectionTitle.font = DHTheme.font(.caption1, weight: .semibold)
-        sectionTitle.textColor = DHTheme.tertiaryText
-        sectionTitle.text = sectionTitle.text?.uppercased()
-        sectionTitle.translatesAutoresizingMaskIntoConstraints = false
-        sidebarContent.addArrangedSubview(sectionTitle)
-        sidebarContent.setCustomSpacing(14, after: sectionTitle)
-
-        let surfaces = store.surfaces(at: "sidebar")
-        if surfaces.isEmpty {
-            let empty = sidebarHint(
-                icon: "wand.and.stars",
-                title: "正在发现插件",
-                message: "原生入口会在服务端清单或自动适配完成后显示。"
-            )
-            sidebarContent.addArrangedSubview(empty)
-        } else {
-            surfaces.forEach { surface in
-                sidebarContent.addArrangedSubview(
-                    sidebarButton(title: surface.title, icon: surface.icon ?? "circle.grid.2x2") { [weak self] in
-                        self?.open(surface: surface)
-                    }
-                )
-            }
-        }
-
         let spacer = UIView()
         spacer.setContentHuggingPriority(.defaultLow, for: .vertical)
         sidebarContent.addArrangedSubview(spacer)
-
-        let connection = UIView()
-        connection.dhApplyCard(backgroundColor: DHTheme.surfaceMuted, cornerRadius: DHTheme.cornerSmall)
-        connection.translatesAutoresizingMaskIntoConstraints = false
-        let dot = UIView()
-        dot.backgroundColor = runtime?.connected == true ? DHTheme.success : DHTheme.warning
-        dot.layer.cornerRadius = 4
-        dot.translatesAutoresizingMaskIntoConstraints = false
-        let status = UILabel()
-        status.text = runtime?.statusText ?? "正在连接服务"
-        status.font = DHTheme.font(.caption1, weight: .medium)
-        status.textColor = DHTheme.secondaryText
-        let endpoint = UILabel()
-        endpoint.text = appState.endpointURL?.host ?? "未配置服务"
-        endpoint.font = DHTheme.font(.caption2)
-        endpoint.textColor = DHTheme.tertiaryText
-        let connectionLabels = UIStackView(arrangedSubviews: [status, endpoint])
-        connectionLabels.axis = .vertical
-        connectionLabels.spacing = 2
-        connectionLabels.translatesAutoresizingMaskIntoConstraints = false
-        connection.addSubview(dot)
-        connection.addSubview(connectionLabels)
-        NSLayoutConstraint.activate([
-            connection.heightAnchor.constraint(equalToConstant: 58),
-            dot.leadingAnchor.constraint(equalTo: connection.leadingAnchor, constant: 14),
-            dot.centerYAnchor.constraint(equalTo: connection.centerYAnchor),
-            dot.widthAnchor.constraint(equalToConstant: 8),
-            dot.heightAnchor.constraint(equalToConstant: 8),
-            connectionLabels.leadingAnchor.constraint(equalTo: dot.trailingAnchor, constant: 10),
-            connectionLabels.centerYAnchor.constraint(equalTo: connection.centerYAnchor),
-            connectionLabels.trailingAnchor.constraint(equalTo: connection.trailingAnchor, constant: -10)
-        ])
-        sidebarContent.addArrangedSubview(connection)
         sidebarContent.addArrangedSubview(sidebarButton(title: "设置", icon: "gearshape") { [weak self] in self?.onSettings() })
     }
 
@@ -423,7 +421,7 @@ final class NativeHomeViewController: UIViewController {
         return card
     }
 
-    private func sidebarButton(title: String, icon: String, prominent: Bool = false, action: @escaping () -> Void) -> UIButton {
+    private func sidebarButton(title: String, icon: String, prominent: Bool = false, selected: Bool = false, action: @escaping () -> Void) -> UIButton {
         var configuration = prominent ? UIButton.Configuration.filled() : UIButton.Configuration.plain()
         configuration.title = title
         configuration.image = UIImage(systemName: icon)
@@ -431,7 +429,7 @@ final class NativeHomeViewController: UIViewController {
         configuration.cornerStyle = .medium
         configuration.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 12, bottom: 12, trailing: 12)
         configuration.baseForegroundColor = prominent ? .white : DHTheme.text
-        configuration.baseBackgroundColor = prominent ? DHTheme.accent : .clear
+        configuration.baseBackgroundColor = prominent ? DHTheme.accent : (selected ? DHTheme.surfaceStrong : .clear)
         let button = UIButton(configuration: configuration)
         button.contentHorizontalAlignment = .leading
         button.titleLabel?.font = DHTheme.font(.body, weight: prominent ? .semibold : .medium)
@@ -515,12 +513,18 @@ final class NativeHomeViewController: UIViewController {
 
     @objc func toggleSidebar() {
         isSidebarVisible.toggle()
+        if isSidebarVisible {
+            renderSidebar()
+            sidebar.isHidden = false
+            sidebar.transform = CGAffineTransform(translationX: -280, y: 0)
+        }
         sidebarScrim.isHidden = false
         UIView.animate(withDuration: 0.24, delay: 0, options: [.curveEaseOut]) {
-            self.sidebar.transform = self.isSidebarVisible ? .identity : CGAffineTransform(translationX: -320, y: 0)
+            self.sidebar.transform = self.isSidebarVisible ? .identity : CGAffineTransform(translationX: -280, y: 0)
             self.sidebarScrim.alpha = self.isSidebarVisible ? 1 : 0
         } completion: { _ in
             self.sidebarScrim.isHidden = !self.isSidebarVisible
+            self.sidebar.isHidden = !self.isSidebarVisible
         }
         if !isSidebarVisible { view.endEditing(true) }
     }
