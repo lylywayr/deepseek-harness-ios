@@ -886,33 +886,88 @@ final class HarnessDirectoryPickerViewController: UITableViewController {
     private let runtime: HarnessRuntime
     private let onOpen: (String) -> Void
     private var path: String?
-    private var rows: [(name:String,path:String,hidden:Bool)] = []
+    private var rows: [(name: String, path: String, hidden: Bool)] = []
     private var showHidden = false
 
     init(runtime: HarnessRuntime, onOpen: @escaping (String) -> Void) {
-        self.runtime=runtime; self.onOpen=onOpen
-        super.init(style:.plain)
+        self.runtime = runtime
+        self.onOpen = onOpen
+        super.init(style: .plain)
     }
-    @available(*, unavailable) required init?(coder:NSCoder){fatalError()}
 
-    override func viewDidLoad(){
-        super.viewDidLoad(); title="选择工作区目录"; view.backgroundColor=DHTheme.surface
-        navigationItem.leftBarButtonItem=UIBarButtonItem(title:"取消",style:.plain,target:self,action:#selector(close))
-        navigationItem.rightBarButtonItem=UIBarButtonItem(title:"打开",style:.done,target:self,action:#selector(open))
-        tableView.register(UITableViewCell.self,forCellReuseIdentifier:"dir")
-        toolbarItems=[UIBarButtonItem(title:"＋ 新建文件夹",style:.plain,target:self,action:#selector(newFolder)),UIBarButtonItem.flexibleSpace(),UIBarButtonItem(title:"显示隐藏文件",style:.plain,target:self,action:#selector(toggleHidden))]
-        navigationController?.isToolbarHidden=false; load()
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        title = "选择工作区目录"
+        view.backgroundColor = DHTheme.surface
+        navigationItem.leftBarButtonItem = UIBarButtonItem(title: "取消", style: .plain, target: self, action: #selector(close))
+        navigationItem.rightBarButtonItem = UIBarButtonItem(title: "打开", style: .done, target: self, action: #selector(open))
+        tableView.register(UITableViewCell.self, forCellReuseIdentifier: "dir")
+        toolbarItems = [
+            UIBarButtonItem(title: "＋ 新建文件夹", style: .plain, target: self, action: #selector(newFolder)),
+            UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil),
+            UIBarButtonItem(title: "显示隐藏文件", style: .plain, target: self, action: #selector(toggleHidden))
+        ]
+        navigationController?.isToolbarHidden = false
+        load()
     }
-    private func load(){ runtime.listDirectories(path:path){[weak self] values in guard let self else{return}; self.rows=values.compactMap{v in guard let name=v["name"] as? String,let path=v["path"] as? String,(v["isDirectory"] as? Bool) != false else{return nil};return(name,path,(v["hidden"] as? Bool) ?? name.hasPrefix("."))};self.tableView.reloadData()} }
-    override func tableView(_ tableView:UITableView,numberOfRowsInSection section:Int)->Int{rows.filter{showHidden || !$0.hidden}.count}
-    override func tableView(_ tableView:UITableView,cellForRowAt indexPath:IndexPath)->UITableViewCell{let row=rows.filter{showHidden || !$0.hidden}[indexPath.row];let c=tableView.dequeueReusableCell(withIdentifier:"dir",for:indexPath);var config=c.defaultContentConfiguration();config.text=row.name;config.image=UIImage(systemName:"folder");c.contentConfiguration=config;c.accessoryType=.disclosureIndicator;return c}
-    override func tableView(_ tableView:UITableView,didSelectRowAt indexPath:IndexPath){let row=rows.filter{showHidden || !$0.hidden}[indexPath.row];path=row.path;title=row.name;load()}
-    @objc private func close(){dismiss(animated:true)}
-    @objc private func open(){guard let path else{return};onOpen(path);dismiss(animated:true)}
+
+    private func load() {
+        runtime.listDirectories(path: path) { [weak self] values in
+            guard let self else { return }
+            self.rows = values.compactMap { value in
+                guard let name = value["name"] as? String,
+                      let path = value["path"] as? String,
+                      (value["isDirectory"] as? Bool) != false else { return nil }
+                return (name, path, (value["hidden"] as? Bool) ?? name.hasPrefix("."))
+            }
+            self.tableView.reloadData()
+        }
+    }
+
+    override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        rows.filter { showHidden || !$0.hidden }.count
+    }
+
+    override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let row = rows.filter { showHidden || !$0.hidden }[indexPath.row]
+        let cell = tableView.dequeueReusableCell(withIdentifier: "dir", for: indexPath)
+        var configuration = cell.defaultContentConfiguration()
+        configuration.text = row.name
+        configuration.image = UIImage(systemName: "folder")
+        cell.contentConfiguration = configuration
+        cell.accessoryType = .disclosureIndicator
+        return cell
+    }
+
+    override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        let row = rows.filter { showHidden || !$0.hidden }[indexPath.row]
+        path = row.path
+        title = row.name
+        load()
+    }
+
+    @objc private func close() { dismiss(animated: true) }
+    @objc private func open() {
+        guard let path else { return }
+        onOpen(path)
+        dismiss(animated: true)
+    }
     @objc private func toggleHidden() {
         showHidden.toggle()
         toolbarItems?.last?.title = showHidden ? "隐藏隐藏文件" : "显示隐藏文件"
         tableView.reloadData()
     }
-    @objc private func newFolder(){let a=UIAlertController(title:"新建文件夹",message:nil,preferredStyle:.alert);a.addTextField{$0.placeholder="文件夹名称"};a.addAction(UIAlertAction(title:"取消",style:.cancel));a.addAction(UIAlertAction(title:"创建",style:.default){[weak self,weak a] _ in guard let self,let name=a?.textFields?.first?.text,!name.isEmpty else{return};self.runtime.createDirectory(path:self.path ?? "",name:name){_ in self.load()}});present(a,animated:true)}
+    @objc private func newFolder() {
+        let alert = UIAlertController(title: "新建文件夹", message: nil, preferredStyle: .alert)
+        alert.addTextField { $0.placeholder = "文件夹名称" }
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        alert.addAction(UIAlertAction(title: "创建", style: .default) { [weak self, weak alert] _ in
+            guard let self, let name = alert?.textFields?.first?.text, !name.isEmpty else { return }
+            self.runtime.createDirectory(path: self.path ?? "", name: name) { _ in self.load() }
+        })
+        present(alert, animated: true)
+    }
 }
