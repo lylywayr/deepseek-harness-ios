@@ -123,8 +123,9 @@ private final class HarnessClient {
 
     init(baseURL: URL) {
         var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)
-        tokenFromURL = components?.queryItems?.first(where: { $0.name == "token" })?.value
-        components?.queryItems = components?.queryItems?.filter { $0.name != "token" }
+        let queryItems = components?.queryItems ?? []
+        tokenFromURL = queryItems.first(where: { $0.name == "token" })?.value
+        components?.queryItems = queryItems.filter { $0.name != "token" }
         self.baseURL = components?.url ?? baseURL
         credentials = HarnessCredentialStore(baseURL: self.baseURL)
         let configuration = URLSessionConfiguration.default
