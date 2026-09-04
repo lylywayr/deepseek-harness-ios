@@ -2,7 +2,7 @@ import UIKit
 import PhotosUI
 import UniformTypeIdentifiers
 
-final class PolishedConversationViewController: UIViewController, UITableViewDataSource, UITableViewDelegate, UITextViewDelegate, PHPickerViewControllerDelegate, UIDocumentPickerDelegate {
+final class PolishedConversationViewController: UIViewController, UITableViewDataSource, UITableViewDelegate, UITextViewDelegate, UISearchBarDelegate, PHPickerViewControllerDelegate, UIDocumentPickerDelegate {
     private let runtime: HarnessRuntime
     private let tableView = UITableView(frame: .zero, style: .plain)
     private let sessionHeader = UIView()
@@ -13,6 +13,16 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
     private let conversationTab = UIButton(type: .system)
     private let trajectoryTab = UIButton(type: .system)
     private let tabUnderline = UIView()
+    private let trajectoryControls = UIView()
+    private let durationButton = UIButton(type: .system)
+    private let turnsButton = UIButton(type: .system)
+    private let callsButton = UIButton(type: .system)
+    private let trajectorySearch = UISearchBar()
+    private let timeline = TrajectoryTimelineView()
+    private var trajectoryControlsHeight: NSLayoutConstraint!
+    private var trajectoryQuery = ""
+    private var showTurns = true
+    private var showCalls = true
     private var tabUnderlineCenter: NSLayoutConstraint!
     private var showingTrajectory = false
     private let composer = UIView()
@@ -45,6 +55,7 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
         super.viewDidLoad()
         view.backgroundColor = DHTheme.background
         buildSessionHeader()
+        buildTrajectoryControls()
         buildTable()
         buildComposer()
         buildEmptyState()
@@ -141,6 +152,62 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
         button.setTitleColor(selected ? DHTheme.accent : DHTheme.secondaryText, for: .normal)
     }
 
+    private func buildTrajectoryControls() {
+        trajectoryControls.backgroundColor = DHTheme.surface
+        trajectoryControls.isHidden = true
+        trajectoryControls.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(trajectoryControls)
+
+        configureTrajectoryControl(durationButton, title: "时长", icon: "clock")
+        configureTrajectoryControl(turnsButton, title: "轮次", icon: "rectangle.compress.vertical")
+        configureTrajectoryControl(callsButton, title: "调用", icon: "rectangle.compress.vertical")
+        turnsButton.addAction(UIAction { [weak self] _ in self?.toggleTurns() }, for: .touchUpInside)
+        callsButton.addAction(UIAction { [weak self] _ in self?.toggleCalls() }, for: .touchUpInside)
+        durationButton.addAction(UIAction { [weak self] _ in self?.showDurationMenu() }, for: .touchUpInside)
+        let buttons = UIStackView(arrangedSubviews: [durationButton, turnsButton, callsButton])
+        buttons.axis = .horizontal
+        buttons.spacing = 2
+        buttons.translatesAutoresizingMaskIntoConstraints = false
+        trajectoryControls.addSubview(buttons)
+
+        trajectorySearch.placeholder = "搜索"
+        trajectorySearch.searchBarStyle = .minimal
+        trajectorySearch.delegate = self
+        trajectorySearch.translatesAutoresizingMaskIntoConstraints = false
+        trajectoryControls.addSubview(trajectorySearch)
+
+        timeline.translatesAutoresizingMaskIntoConstraints = false
+        trajectoryControls.addSubview(timeline)
+        trajectoryControlsHeight = trajectoryControls.heightAnchor.constraint(equalToConstant: 0)
+        NSLayoutConstraint.activate([
+            trajectoryControls.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            trajectoryControls.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            trajectoryControls.topAnchor.constraint(equalTo: sessionHeader.bottomAnchor),
+            trajectoryControlsHeight,
+            buttons.leadingAnchor.constraint(equalTo: trajectoryControls.leadingAnchor, constant: 10),
+            buttons.topAnchor.constraint(equalTo: trajectoryControls.topAnchor, constant: 5),
+            buttons.heightAnchor.constraint(equalToConstant: 38),
+            trajectorySearch.leadingAnchor.constraint(equalTo: buttons.trailingAnchor, constant: 4),
+            trajectorySearch.trailingAnchor.constraint(equalTo: trajectoryControls.trailingAnchor, constant: -6),
+            trajectorySearch.centerYAnchor.constraint(equalTo: buttons.centerYAnchor),
+            timeline.leadingAnchor.constraint(equalTo: trajectoryControls.leadingAnchor),
+            timeline.trailingAnchor.constraint(equalTo: trajectoryControls.trailingAnchor),
+            timeline.topAnchor.constraint(equalTo: buttons.bottomAnchor, constant: 2),
+            timeline.bottomAnchor.constraint(equalTo: trajectoryControls.bottomAnchor)
+        ])
+    }
+
+    private func configureTrajectoryControl(_ button: UIButton, title: String, icon: String) {
+        var config = UIButton.Configuration.plain()
+        config.title = title
+        config.image = UIImage(systemName: icon)
+        config.imagePadding = 5
+        config.baseForegroundColor = DHTheme.secondaryText
+        config.contentInsets = NSDirectionalEdgeInsets(top: 4, leading: 7, bottom: 4, trailing: 7)
+        button.configuration = config
+        button.titleLabel?.font = DHTheme.font(.caption1, weight: .medium)
+    }
+
     private func buildTable() {
         tableView.backgroundColor = .clear
         tableView.separatorStyle = .none
@@ -218,7 +285,7 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
             permissionButton.leadingAnchor.constraint(equalTo: attachButton.trailingAnchor, constant: 3), permissionButton.centerYAnchor.constraint(equalTo: attachButton.centerYAnchor), permissionButton.widthAnchor.constraint(equalToConstant: 34), permissionButton.heightAnchor.constraint(equalToConstant: 34),
             modelButton.leadingAnchor.constraint(equalTo: permissionButton.trailingAnchor, constant: 3), modelButton.centerYAnchor.constraint(equalTo: attachButton.centerYAnchor), modelButton.trailingAnchor.constraint(lessThanOrEqualTo: sendButton.leadingAnchor, constant: -6), modelButton.heightAnchor.constraint(equalToConstant: 32),
             sendButton.trailingAnchor.constraint(equalTo: composer.trailingAnchor, constant: -9), sendButton.centerYAnchor.constraint(equalTo: attachButton.centerYAnchor), sendButton.widthAnchor.constraint(equalToConstant: 38), sendButton.heightAnchor.constraint(equalToConstant: 38),
-            tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor), tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor), tableView.topAnchor.constraint(equalTo: sessionHeader.bottomAnchor), tableView.bottomAnchor.constraint(equalTo: composer.topAnchor, constant: -6)
+            tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor), tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor), tableView.topAnchor.constraint(equalTo: trajectoryControls.bottomAnchor), tableView.bottomAnchor.constraint(equalTo: composer.topAnchor, constant: -6)
         ])
     }
 
@@ -351,6 +418,8 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
 
     private func setMode(trajectory: Bool) {
         showingTrajectory = trajectory
+        trajectoryControls.isHidden = !trajectory
+        trajectoryControlsHeight.constant = trajectory ? 118 : 0
         conversationTab.setTitleColor(trajectory ? DHTheme.secondaryText : DHTheme.accent, for: .normal)
         trajectoryTab.setTitleColor(trajectory ? DHTheme.accent : DHTheme.secondaryText, for: .normal)
         tabUnderlineCenter.isActive = false
@@ -358,6 +427,7 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
         tabUnderlineCenter.isActive = true
         UIView.animate(withDuration: 0.18) { self.sessionHeader.layoutIfNeeded() }
         tableView.reloadData()
+        timeline.update(items: runtime.items)
         emptyState.isHidden = trajectory || !runtime.items.isEmpty
         placeholder.text = trajectory ? "轨迹为只读视图" : "描述你想要构建的内容… / 调用指令 @ 文件或对话"
         input.isEditable = !trajectory
@@ -389,7 +459,37 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
     }
 
     private func trajectoryItems() -> [HarnessConversationItem] {
-        runtime.items.filter { $0.kind == .tool || $0.kind == .system }
+        let source = runtime.items.filter { item in
+            if item.kind == .tool { return showCalls }
+            return showTurns && (item.kind == .user || item.kind == .assistant || item.kind == .system)
+        }
+        guard !trajectoryQuery.isEmpty else { return source }
+        return source.filter { ($0.text + " " + ($0.subtitle ?? "")).localizedCaseInsensitiveContains(trajectoryQuery) }
+    }
+
+    private func toggleTurns() {
+        showTurns.toggle()
+        turnsButton.configuration?.image = UIImage(systemName: showTurns ? "rectangle.compress.vertical" : "rectangle.expand.vertical")
+        tableView.reloadData()
+    }
+
+    private func toggleCalls() {
+        showCalls.toggle()
+        callsButton.configuration?.image = UIImage(systemName: showCalls ? "rectangle.compress.vertical" : "rectangle.expand.vertical")
+        tableView.reloadData()
+    }
+
+    private func showDurationMenu() {
+        let alert = UIAlertController(title: "轨迹时长", message: "时间轴可按实际时间或相对耗时显示。", preferredStyle: .actionSheet)
+        alert.addAction(UIAlertAction(title: "实际时间 ✓", style: .default))
+        alert.addAction(UIAlertAction(title: "相对耗时", style: .default))
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        presentSheet(alert, source: durationButton)
+    }
+
+    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
+        trajectoryQuery = searchText
+        tableView.reloadData()
     }
 
     @objc private func send() {
@@ -483,6 +583,15 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
     private var visibleItems: [HarnessConversationItem] { showingTrajectory ? trajectoryItems() : runtime.items }
     func tableView(_ tableView:UITableView,numberOfRowsInSection section:Int)->Int{visibleItems.count}
     func tableView(_ tableView:UITableView,cellForRowAt indexPath:IndexPath)->UITableViewCell{let c=tableView.dequeueReusableCell(withIdentifier:"message",for:indexPath) as! HarnessMessageCell;c.configure(visibleItems[indexPath.row]);return c}
+    func tableView(_ tableView:UITableView,didSelectRowAt indexPath:IndexPath){
+        tableView.deselectRow(at:indexPath,animated:true)
+        guard showingTrajectory, visibleItems.indices.contains(indexPath.row) else{return}
+        let item=visibleItems[indexPath.row]
+        let detail=TrajectoryDetailViewController(item:item)
+        let navigation=UINavigationController(rootViewController:detail)
+        navigation.modalPresentationStyle = .pageSheet
+        present(navigation,animated:true)
+    }
     func tableView(_ tableView:UITableView,willDisplay cell:UITableViewCell,forRowAt indexPath:IndexPath){if indexPath.row==0&&runtime.hasMore{runtime.loadOlder()}}
 }
 
@@ -564,4 +673,41 @@ final class SessionLogViewController: UIViewController {
         ])
     }
     @objc private func close() { dismiss(animated: true) }
+}
+
+final class TrajectoryTimelineView: UIView {
+    private let input = UILabel(), model = UILabel(), tools = UILabel()
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        input.text = "输入"; model.text = "模型"; tools.text = "工具"
+        [input, model, tools].forEach { $0.font = .monospacedSystemFont(ofSize: 11, weight: .medium); $0.textColor = DHTheme.secondaryText }
+        let labels = UIStackView(arrangedSubviews: [input, model, tools]); labels.axis = .vertical; labels.spacing = 4; labels.tag = 700; labels.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(labels)
+        NSLayoutConstraint.activate([labels.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12), labels.topAnchor.constraint(equalTo: topAnchor, constant: 5), labels.widthAnchor.constraint(equalToConstant: 34)])
+    }
+    @available(*, unavailable) required init?(coder: NSCoder) { fatalError() }
+    func update(items: [HarnessConversationItem]) {
+        let count = max(items.count, 1)
+        let make = { (color: UIColor) -> UIView in
+            let stack = UIStackView(); stack.axis = .horizontal; stack.spacing = 5
+            for _ in 0..<min(count, 44) { let v=UIView(); v.backgroundColor=color; v.layer.cornerRadius=2; stack.addArrangedSubview(v); v.widthAnchor.constraint(equalToConstant: 5).isActive=true; v.heightAnchor.constraint(equalToConstant: 14).isActive=true }
+            return stack
+        }
+        subviews.filter { $0.tag != 700 }.forEach { $0.removeFromSuperview() }
+        let rows=[make(DHTheme.accent.withAlphaComponent(0.65)),make(DHTheme.accent.withAlphaComponent(0.35)),make(DHTheme.warning.withAlphaComponent(0.75))]
+        for (i,row) in rows.enumerated(){ row.translatesAutoresizingMaskIntoConstraints=false; addSubview(row); NSLayoutConstraint.activate([row.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 52),row.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -5),row.topAnchor.constraint(equalTo: topAnchor, constant: 6+CGFloat(i)*18)]) }
+    }
+}
+
+final class TrajectoryDetailViewController: UIViewController {
+    private let item: HarnessConversationItem
+    init(item: HarnessConversationItem){self.item=item;super.init(nibName:nil,bundle:nil)}
+    @available(*, unavailable) required init?(coder:NSCoder){fatalError()}
+    override func viewDidLoad(){
+        super.viewDidLoad(); title="调用详情"; view.backgroundColor=DHTheme.background
+        navigationItem.rightBarButtonItem=UIBarButtonItem(barButtonSystemItem:.done,target:self,action:#selector(close))
+        let text=UITextView(); text.isEditable=false; text.backgroundColor=.clear; text.textColor=DHTheme.text; text.font=.monospacedSystemFont(ofSize:13,weight:.regular); text.textContainerInset=UIEdgeInsets(top:20,left:16,bottom:20,right:16); text.text="类型：\(item.kind)\n\n\(item.text)\n\n\(item.subtitle ?? "")"; text.translatesAutoresizingMaskIntoConstraints=false; view.addSubview(text)
+        NSLayoutConstraint.activate([text.leadingAnchor.constraint(equalTo:view.leadingAnchor),text.trailingAnchor.constraint(equalTo:view.trailingAnchor),text.topAnchor.constraint(equalTo:view.safeAreaLayoutGuide.topAnchor),text.bottomAnchor.constraint(equalTo:view.bottomAnchor)])
+    }
+    @objc private func close(){dismiss(animated:true)}
 }
