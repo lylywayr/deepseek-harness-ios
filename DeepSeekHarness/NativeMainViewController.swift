@@ -909,6 +909,10 @@ final class HarnessDirectoryPickerViewController: UITableViewController {
     override func tableView(_ tableView:UITableView,didSelectRowAt indexPath:IndexPath){let row=rows.filter{showHidden || !$0.hidden}[indexPath.row];path=row.path;title=row.name;load()}
     @objc private func close(){dismiss(animated:true)}
     @objc private func open(){guard let path else{return};onOpen(path);dismiss(animated:true)}
-    @objc private func toggleHidden(){showHidden.toggle();toolbarItems?.last?.title=showHidden ? "隐藏隐藏文件":"显示隐藏文件";tableView.reloadData()}
+    @objc private func toggleHidden() {
+        showHidden.toggle()
+        toolbarItems?.last?.title = showHidden ? "隐藏隐藏文件" : "显示隐藏文件"
+        tableView.reloadData()
+    }
     @objc private func newFolder(){let a=UIAlertController(title:"新建文件夹",message:nil,preferredStyle:.alert);a.addTextField{$0.placeholder="文件夹名称"};a.addAction(UIAlertAction(title:"取消",style:.cancel));a.addAction(UIAlertAction(title:"创建",style:.default){[weak self,weak a] _ in guard let self,let name=a?.textFields?.first?.text,!name.isEmpty else{return};self.runtime.createDirectory(path:self.path ?? "",name:name){_ in self.load()}});present(a,animated:true)}
 }
