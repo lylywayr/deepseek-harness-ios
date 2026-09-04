@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A10000000000000000000010 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000011 /* Assets.xcassets */; };
 		A10000000000000000000002 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000002 /* AppState.swift */; };
 		A10000000000000000000005 /* HarnessWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000005 /* HarnessWebView.swift */; };
 		A10000000000000000000006 /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000007 /* MainViewController.swift */; };
@@ -22,6 +23,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		B10000000000000000000011 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B10000000000000000000000 /* DeepSeekHarness.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DeepSeekHarness.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B10000000000000000000001 /* DeepSeekHarnessApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeepSeekHarnessApp.swift; sourceTree = "<group>"; };
 		B10000000000000000000002 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
@@ -79,6 +81,7 @@
 				B1000000000000000000000E /* PolishedConversationViewController.swift */,
 				B1000000000000000000000F /* HarnessRuntime.swift */,
 				B10000000000000000000010 /* HarnessSettingsCenterViewController.swift */,
+				B10000000000000000000011 /* Assets.xcassets */,
 			);
 			path = DeepSeekHarness;
 			sourceTree = "<group>";
@@ -144,6 +147,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A10000000000000000000010 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -13,7 +13,10 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
     private let modelButton = UIButton(type: .system)
     private let permissionButton = UIButton(type: .system)
     private let statusLabel = UILabel()
-    private let emptyState = UILabel()
+    private let emptyState = UIStackView()
+    private let emptyTitleRow = UIStackView()
+    private let workspaceButton = UIButton(type: .system)
+    private let presetButton = UIButton(type: .system)
     private let attachmentStrip = UIStackView()
     private var inputHeight: NSLayoutConstraint!
     private var composerBottom: NSLayoutConstraint!
@@ -74,7 +77,7 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
         input.translatesAutoresizingMaskIntoConstraints = false
         composer.addSubview(input)
 
-        placeholder.text = "发消息或做任务…"
+        placeholder.text = "描述你想要构建的内容… / 调用指令 @ 文件或对话"
         placeholder.font = DHTheme.font(.body)
         placeholder.textColor = DHTheme.tertiaryText
         placeholder.translatesAutoresizingMaskIntoConstraints = false
@@ -86,7 +89,7 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
         attachmentStrip.isHidden = true
         composer.addSubview(attachmentStrip)
 
-        configureIcon(attachButton, "paperclip", label: "添加图片")
+        configureIcon(attachButton, "plus", label: "添加")
         attachButton.addTarget(self, action: #selector(chooseAttachment), for: .touchUpInside)
         composer.addSubview(attachButton)
         configureText(modelButton, "默认模型")
@@ -124,14 +127,86 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
     }
 
     private func buildEmptyState() {
-        emptyState.text = "选择或新建一个会话\n开始使用 Harness"
-        emptyState.font = DHTheme.font(.title3, weight: .semibold)
-        emptyState.textColor = DHTheme.secondaryText
-        emptyState.textAlignment = .center
-        emptyState.numberOfLines = 0
+        let fish = UIImageView(image: UIImage(named: "FishLogo"))
+        fish.contentMode = .scaleAspectFit
+        fish.translatesAutoresizingMaskIntoConstraints = false
+        fish.widthAnchor.constraint(equalToConstant: 52).isActive = true
+        fish.heightAnchor.constraint(equalToConstant: 40).isActive = true
+
+        let title = UILabel()
+        title.text = "探索未至之境"
+        title.font = .systemFont(ofSize: 29, weight: .bold)
+        title.textColor = DHTheme.text
+
+        let preview = UILabel()
+        preview.text = "预览版"
+        preview.font = DHTheme.font(.caption1, weight: .semibold)
+        preview.textColor = DHTheme.accent
+        preview.backgroundColor = DHTheme.accentSoft
+        preview.layer.cornerRadius = 13
+        preview.clipsToBounds = true
+        preview.textAlignment = .center
+        preview.translatesAutoresizingMaskIntoConstraints = false
+        preview.widthAnchor.constraint(equalToConstant: 60).isActive = true
+        preview.heightAnchor.constraint(equalToConstant: 28).isActive = true
+
+        emptyTitleRow.axis = .horizontal
+        emptyTitleRow.spacing = 10
+        emptyTitleRow.alignment = .center
+        emptyTitleRow.addArrangedSubview(fish)
+        emptyTitleRow.addArrangedSubview(title)
+        emptyTitleRow.addArrangedSubview(preview)
+
+        configureEmptyChoice(workspaceButton, icon: "folder", title: "工作区")
+        workspaceButton.addAction(UIAction { [weak self] _ in self?.showWorkspacePicker() }, for: .touchUpInside)
+        configureEmptyChoice(presetButton, icon: "point.3.connected.trianglepath.dotted", title: "标准模式")
+        presetButton.addAction(UIAction { [weak self] _ in self?.showPresetNotice() }, for: .touchUpInside)
+        let choices = UIStackView(arrangedSubviews: [workspaceButton, presetButton])
+        choices.axis = .horizontal
+        choices.spacing = 12
+        choices.alignment = .center
+
+        emptyState.axis = .vertical
+        emptyState.spacing = 18
+        emptyState.alignment = .center
+        emptyState.addArrangedSubview(emptyTitleRow)
+        emptyState.addArrangedSubview(choices)
         emptyState.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(emptyState)
-        NSLayoutConstraint.activate([emptyState.centerXAnchor.constraint(equalTo: view.centerXAnchor), emptyState.centerYAnchor.constraint(equalTo: tableView.centerYAnchor), emptyState.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 30)])
+        NSLayoutConstraint.activate([
+            emptyState.centerXAnchor.constraint(equalTo: tableView.centerXAnchor),
+            emptyState.bottomAnchor.constraint(equalTo: composer.topAnchor, constant: -24),
+            emptyState.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 22),
+            emptyState.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -22)
+        ])
+    }
+
+    private func configureEmptyChoice(_ button: UIButton, icon: String, title: String) {
+        var config = UIButton.Configuration.plain()
+        config.image = UIImage(systemName: icon)
+        config.title = title
+        config.imagePadding = 7
+        config.baseForegroundColor = DHTheme.text
+        config.contentInsets = NSDirectionalEdgeInsets(top: 5, leading: 7, bottom: 5, trailing: 7)
+        button.configuration = config
+        button.titleLabel?.font = DHTheme.font(.subheadline, weight: .medium)
+    }
+
+    private func showWorkspacePicker() {
+        let alert = UIAlertController(title: "选择工作区", message: nil, preferredStyle: .actionSheet)
+        for workspace in runtime.workspaces {
+            alert.addAction(UIAlertAction(title: workspace.title, style: .default))
+        }
+        if runtime.workspaces.isEmpty { alert.message = "正在读取工作区" }
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        presentSheet(alert, source: workspaceButton)
+    }
+
+    private func showPresetNotice() {
+        let alert = UIAlertController(title: "Agent 预设", message: "当前使用标准模式。其他预设将在对应 Remote 接入后开放切换。", preferredStyle: .actionSheet)
+        alert.addAction(UIAlertAction(title: "标准模式 ✓", style: .default))
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        presentSheet(alert, source: presetButton)
     }
 
     private func configureIcon(_ button: UIButton, _ name: String, label: String) {
@@ -148,7 +223,11 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
         let old = displayedIDs
         displayedIDs = runtime.items.map(\.id)
         tableView.reloadData()
-        emptyState.isHidden = !runtime.items.isEmpty || runtime.selectedSessionID != nil
+        emptyState.isHidden = !runtime.items.isEmpty
+        statusLabel.isHidden = runtime.items.isEmpty && runtime.lastError == nil
+        if let workspace = runtime.workspaces.first {
+            workspaceButton.configuration?.title = workspace.title
+        }
         statusLabel.text = runtime.lastError ?? runtime.statusText
         statusLabel.textColor = runtime.lastError == nil ? DHTheme.secondaryText : DHTheme.danger
         if let session = runtime.sessions.first(where: { $0.id == runtime.selectedSessionID }) {
