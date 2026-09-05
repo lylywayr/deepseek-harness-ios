@@ -11,7 +11,7 @@
 - 原生设置：外观、字号、对话显示、繁忙时 Enter、默认权限和连接入口；客户端设置写入 UserDefaults，语言项未伪造。
 - 对话：流式消息、工具调用/结果/错误详情、审批确认、用户问题单选/多选/自由输入、历史分页滚动保持、图片选择/预览条/删除/发送。
 - 目录：面包屑、home/根路径、隐藏目录切换、新建文件夹、选择与失败提示。
-- 原生截图夹具：提供 8 个 Native-only 场景，仅由 `-UITestFixture` 启动参数进入，不影响正常生产入口。
+- 原生截图夹具：提供 8 个 Native-only 场景，仅由 `-UITestFixture -NativeFixtureScreen <scene>` 启动参数进入，不影响正常生产入口。
 
 ## 真实 Harness Gate 1 脱敏证据
 
@@ -45,24 +45,24 @@ python3 scripts/verify_native_rework.py 全部 ok
 python3 scripts/verify_native_ui_fixture.py 全部 ok
 ```
 
-本地没有 Xcode/swiftc，未声称本地 Swift 编译通过。最终 CI Run `33973270705` 成功执行 Swift XCTest、Release device archive、IPA verify 和 artifact upload；同一 Run 的 `native-ui-screenshots` job 成功生成并上传 8 张原生截图。
+本地没有 Xcode/swiftc，未声称本地 Swift 编译通过。最终 CI Run `33974638916` 成功执行 Swift XCTest、Release device archive、IPA verify 和 artifact upload；同一 Run 的 `native-ui-screenshots` job 成功生成并上传 8 张原生截图。
 
 ## 代码与分支
 
 - 当前分支：`feature/native-renderer`
-- 最新代码提交：`b07d000b2b32e4502e110d28067a846fc7ed5f20`（截图设备固定为可用 iPhone 16 Simulator）
+- 最新代码提交：`102956489ab2e518d0c05187b1650990d881c37f`（截图场景改用启动参数传递）
 - 已推送：`origin/feature/native-renderer`
 - 未修改 `main`，未 force push
 - 工作树另有用户已有未跟踪移交/验收文档，未纳入代码提交：`HANDOFF-*`、`REWORK-*`、`docs/native-request-acceptance-report.md`
 
 ## 最终 CI / IPA / 截图证据
 
-- Actions Run：`33974097686`，`completed / success`
-- Workflow：`https://github.com/lylywayr/deepseek-harness-ios/actions/runs/33974097686`
+- Actions Run：`33974638916`，`completed / success`
+- Workflow：`https://github.com/lylywayr/deepseek-harness-ios/actions/runs/33974638916`
 - 成功 jobs：unsigned IPA 构建与 `Native UI screenshots 390x844`
-- 截图目录：[Native UI 390×844 截图](minis://attachments/native-ui-390x844-33974097686/)
+- 截图目录：[Native UI 390×844 截图](minis://attachments/native-ui-390x844-33974638916/)
 - 截图文件：`connection`、`conversation`、`sidebar`、`settings`、`directory`、`approval`、`question`、`trajectory`，共 8 张；PNG 原始尺寸为 1206×2622（iPhone 16 Simulator 截图，夹具内容区域固定为 390×844pt）。
-- IPA：[最终未签名 IPA](minis://attachments/native-rework-33974097686/DeepSeekHarness-unsigned.ipa)
+- IPA：[最终未签名 IPA](minis://attachments/native-rework-33974638916/DeepSeekHarness-unsigned.ipa)
 - IPA SHA-256：`b618544f1fd554dbad057c8f39430a53669d68cf84cdfa9862c3c50b30ffa0fe`
 - `verify_ipa.py`：`bundleIdentifier=com.example.DeepSeekHarness`、`minimumOSVersion=15.0`、`unsigned=true`、`forbiddenMarkers=0`
 - Mach-O：`arm64`；IPA 中未发现 `_CodeSignature` 或 `embedded.mobileprovision`
