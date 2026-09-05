@@ -1,6 +1,22 @@
 import Foundation
 import UIKit
 
+struct HarnessSessionSummary {
+    let id: String
+    var title: String
+    var cwd: String
+    var updatedAt: Double
+    var running: Bool
+    var blank: Bool
+    var preset: String
+    var permission: String
+    var provider: String
+    var model: String
+    var turns: Int
+    var steps: Int
+    var contextUsed: Double?
+}
+
 struct HarnessSearchResult: Equatable {
     let sessionID: String
     let snippet: String
