@@ -468,7 +468,7 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
             showError("当前没有选中的会话。")
             return
         }
-        let picker = DirectoryPickerViewController(runtime: runtime, initialPath: session.cwd) { [weak self] path in
+        let picker = HarnessDirectoryPickerViewController(runtime: runtime) { [weak self] path in
             self?.showError("已选择目录：\(path)")
         }
         let navigation = UINavigationController(rootViewController: picker)
