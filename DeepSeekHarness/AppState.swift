@@ -28,7 +28,7 @@ final class AppState: ObservableObject {
             hasConfiguredEndpoint = true
             if let token = parsed.token, !token.isEmpty {
                 HarnessCredentialStore(baseURL: parsed.url).write(token)
-                defaults.set(endpointString, forKey: Keys.endpoint)
+                defaults.set(parsed.url.absoluteString, forKey: Keys.endpoint)
             }
         } else {
             endpointString = ""
