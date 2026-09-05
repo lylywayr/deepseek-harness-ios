@@ -17,7 +17,7 @@ OUT="$ROOT/artifacts/native-ui-390x844"
 rm -rf "$OUT"
 mkdir -p "$OUT"
 for screen in connection conversation sidebar settings directory approval question trajectory; do
-  NATIVE_FIXTURE_SCREEN="$screen" xcrun simctl launch "$UDID" com.example.DeepSeekHarness -UITestFixture >/tmp/native-fixture-launch.log
+  xcrun simctl launch "$UDID" com.example.DeepSeekHarness -UITestFixture --env NATIVE_FIXTURE_SCREEN="$screen" >/tmp/native-fixture-launch.log
   sleep 1
   xcrun simctl io "$UDID" screenshot "$OUT/$screen-390x844.png"
   xcrun simctl terminate "$UDID" com.example.DeepSeekHarness || true
