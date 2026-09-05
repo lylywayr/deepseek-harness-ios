@@ -56,25 +56,29 @@ Swift 测试是否可执行、目标配置是否被 Xcode 接受，以本次 Act
 - 目录 picker 采用官方 listing 字段，不假设 entry 有 `isDirectory`。
 - 插件入口只消费声明式 Native manifest；没有清单时显示空态或不可用说明，不安装插件、不打开网页。
 
-## 本次最终 CI / IPA（待本次 Actions 成功后回填）
+## 本次最终 CI / IPA
 
-- Commit：`b131b16`（已 push 到 `feature/native-renderer`）
-- Actions run：待 dispatch 后回填
-- Workflow URL：待 dispatch 后回填
-- Artifact URL：待下载后回填
-- IPA 文件：待下载后回填
-- SHA-256：待下载后回填
+- Commit：`72824cb9afc58731286cc1d90dbed793f09e6318`（`feature/native-renderer`，已 push；未改 `main`，未 force push）
+- Actions run：`33942372915`，成功
+- Workflow URL：<https://github.com/lylywayr/deepseek-harness-ios/actions/runs/33942372915>
+- Artifact：`DeepSeekHarness-unsigned-ipa`（artifact ID `9962298364`，14 天保留）
+- Artifact 页面：<https://github.com/lylywayr/deepseek-harness-ios/actions/runs/33942372915>
+- IPA 文件：`DeepSeekHarness-unsigned-72824cb.ipa`
+- 本地产物：[下载最终未签名 IPA](minis://attachments/DeepSeekHarness-unsigned-72824cb.ipa)
+- SHA-256：`550200c90e30a913827cda0a6e20cb1368fe227236db6476def555244654a967`
 - Bundle ID：`com.example.DeepSeekHarness`
 - MinimumOSVersion：`15.0`
-- 架构：`arm64` device archive
-- 签名：unsigned
-- IPA 门禁：`scripts/verify_ipa.py` 应通过；最终结果待本次 artifact 验证
+- 平台/架构：`iPhoneOS` device archive，arm64（CI `verify_ipa.py` 与本地门禁通过）
+- 签名：unsigned；未发现 `_CodeSignature`
+- IPA 门禁：通过；`forbiddenMarkers=0`，Payload 结构和 Info.plist 已本地回读
+
+CI 步骤证据：Python fixtures、Swift protocol regression tests、device archive、IPA verify、artifact upload 全部成功。Swift 测试实际由 Scheme 中的 `HarnessWireTests` XCTest target 执行，不再只是独立 Python 模型。
 
 ## 未验证风险
 
-1. 本次返工没有访问 NAS、目标 Harness endpoint 或服务端插件；因此真实鉴权、只读 `session/list` 返回、模型 catalog、真实 WebSocket follow/control/events、分页、发送/停止、目录 capability、审批和 Native manifest 仍需真实环境复核。
+1. 本次返工未访问 NAS、目标 Harness endpoint 或服务端插件；因此真实鉴权、只读 `session/list` 返回、模型 catalog、真实 WebSocket follow/control/events、分页、发送/停止、目录 capability、审批和 Native manifest 仍未验证。此前仅有的真实只读证据是返工单记录：`session/list` 的空 args 会收到 `gateway/arguments-invalid`，`{ "_request": {} }` 返回 HTTP 200；本次未重新连接目标服务。
 2. 未进行签名安装、真机交互和 390×844 原生 App 截图采集；unsigned IPA 不能直接作为安装成功证据。
-3. Swift XCTest 在 CI 中的最终通过状态必须以本次 workflow 日志核对；本地无法代替该证据。
+3. Swift XCTest 已由 Actions run `33942372915` 实际执行并成功；本地 iSH 仅执行 Python/静态门禁，不能代替 Xcode 测试。
 4. Native manifest/action 是本客户端可选协议，不等于官方 Harness 或任一现有插件已实现该协议。
 
 ## 验收复核项
