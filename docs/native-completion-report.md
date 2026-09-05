@@ -49,18 +49,28 @@ python3 scripts/verify_native_rework.py 全部 ok
 ## 代码与分支
 
 - 当前分支：`feature/native-renderer`
-- 本轮代码提交：`bf1d6c1`（`feat: complete native client interaction pass`）
-- 已推送：`origin/feature/native-renderer`
+- 本轮代码提交：`f594357802face97fa5030c87efbecc1a8f27642`（`fix: include tool detail in native inspector`）
+- 已推送：`origin/feature/native-renderer`；当前 HEAD 与远端一致
 - 未修改 `main`，未 force push
 - 工作树另有用户已有移交/验收文档改动，未纳入本轮代码提交：`docs/native-completion-report.md`、`HANDOFF-*`、`REWORK-*`、`docs/native-request-acceptance-report.md`
 
+## 最终 CI / IPA（本轮）
+
+- Actions Run：`33969736548`，`completed / success`
+- Workflow：`https://github.com/ly****yr/deepseek-harness-ios/actions/runs/33969736548`
+- 实际成功步骤：Python fixtures、`verify_native_rework.py`、Swift XCTest、Release device archive、unsigned IPA 打包、`verify_ipa.py`、artifact upload
+- Artifact：`DeepSeekHarness-unsigned-ipa`
+- 本地下载：[最终未签名 IPA](minis://attachments/native-rework-33969736548/DeepSeekHarness-unsigned.ipa)
+- SHA-256：`2dcdbd0c5febbb1b15a3cfd211eeca346cafa9b58ba4241449532ad5d8dc86a6`
+- `verify_ipa.py`：`bundleIdentifier=com.example.DeepSeekHarness`、`minimumOSVersion=15.0`、`unsigned=true`、`forbiddenMarkers=0`
+- Mach-O：`arm64`；IPA 中未发现 `_CodeSignature` 或 `embedded.mobileprovision`
 ## 仍需明确的门禁
 
-- 本轮提交后 GitHub Actions 的最终 Swift/Xcode/IPA Run 尚未回读；因此最终 IPA SHA、截图 artifact 和 Run ID 不能伪造填写。
+- Gate 4 的 390×844 原生模拟器截图尚未加入 CI，不能声称截图证据已完成。
 - 未完成签名真机安装；需要用户 Team 签名后才能验证真机行为。
 - prompt、真实审批/用户问题事件、图片发送、分页 UI、原生设置页面和目录页面尚未在真实服务上逐项走通；代码与结构测试已覆盖基础路径，但不替代真实事件联调。
 - Native manifest/action 是可选声明式协议，不代表官方 Harness 或现有插件已实现。
 
 ## 关键限制
 
-本报告不把代码提交或静态检查等同于 Gate 1–5 全部完成。最终交付前必须补回本轮 Actions 成功 Run、下载并验证最终 unsigned arm64/iOS 15 IPA、SHA-256，以及 390×844 原生模拟器截图证据。
+本报告不把代码提交、静态检查或绿色构建等同于 Gate 1–5 全部完成。当前已具备可审计的代码/测试/CI/IPA 证据，但 Gate 4 截图和若干真实服务交互仍是明确遗留项。
