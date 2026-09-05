@@ -58,7 +58,7 @@ Swift 测试是否可执行、目标配置是否被 Xcode 接受，以本次 Act
 
 ## 本次最终 CI / IPA（待本次 Actions 成功后回填）
 
-- Commit：待提交后回填
+- Commit：`b131b16`（已 push 到 `feature/native-renderer`）
 - Actions run：待 dispatch 后回填
 - Workflow URL：待 dispatch 后回填
 - Artifact URL：待下载后回填
