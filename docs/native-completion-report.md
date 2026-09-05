@@ -51,26 +51,26 @@ python3 scripts/verify_native_rework.py 全部 ok
 python3 scripts/verify_native_ui_fixture.py 全部 ok
 ```
 
-Swift XCTest、Release device archive、IPA gate 和原生截图 job 均由最终 CI 执行成功：Run `33981502636`，对应代码 HEAD `9bd1ea98b61221d902c3449e560bc27f155fe6c1`。其中 Swift 协议回归测试通过，包含生产模型的 workspace/flat、归档过滤、Compact 过程显示、busy Enter、Markdown inline code/link 断言及创建权限参数测试。
+Swift XCTest、Release device archive、IPA gate 和原生截图 job 均由最终 CI 执行成功：Run `33982429427`，对应代码 HEAD `1b5e6fdf3b30900520f9363bb5bf233545858ca9`。其中 Swift 协议回归测试通过，包含生产模型的 workspace/flat、归档过滤、Compact 过程显示、busy Enter、Markdown inline code/link 断言及创建权限参数测试。
 
 ## 代码与分支
 
 - 当前分支：`feature/native-renderer`
-- 最终构建代码提交：`9bd1ea98b61221d902c3449e560bc27f155fe6c1`（第三轮定点修复后 Markdown link 编译验收修复）
-- 当前分支文档后继提交：`5e3dbe510d4d32dfdc2c270b895f9231ddfcba22`（仅更新本报告）
+- 最终构建代码提交：`1b5e6fdf3b30900520f9363bb5bf233545858ca9`（第三轮最终 Debug 夹具编译边界修复）
+- 当前分支文档后继提交：待本次最终证据更新后记录
 - 已推送：`origin/feature/native-renderer`
 - 未修改 `main`，未 force push
 - 工作树另有用户已有未跟踪移交/验收文档，未纳入本次代码/报告提交：`HANDOFF-*`、`REWORK-*`、`docs/native-request-acceptance-report.md`
 
 ## 最终 CI / IPA / 截图证据
 
-- Actions Run：`33981502636`，`completed / success`
-- Workflow：https://github.com/lylywayr/deepseek-harness-ios/actions/runs/33981502636
+- Actions Run：`33982429427`，`completed / success`
+- Workflow：https://github.com/lylywayr/deepseek-harness-ios/actions/runs/33982429427
 - 成功 jobs：unsigned IPA 构建与 `Native UI screenshots 390x844`；Swift XCTest、Release archive、IPA verify 全部通过。
-- 截图目录：[第三轮 Native UI 390×844 截图](minis://attachments/native-ui-390x844-33981502636-rerun/)
+- 截图目录：[第三轮 Native UI 390×844 截图](minis://attachments/native-ui-390x844-33982429427-rerun/)
 - 截图文件：`connection`、`conversation`、`sidebar`、`settings`、`directory`、`approval`、`question`、`trajectory`，共 8 张；PNG 原始尺寸均为 1206×2622（iPhone 16 Simulator，内容区域 390×844pt）。重新下载并逐项检查：connection 不再有错误文字重叠；场景按启动参数产生不同 UI。
-- IPA：[第三轮最终未签名 IPA](minis://attachments/native-rework-33981502636/DeepSeekHarness-unsigned.ipa)
-- IPA SHA-256：`209f8ad5106e4509a2c15b3db51d04115c23204c71fe116b01105efb782c4772`
+- IPA：[第三轮最终未签名 IPA](minis://attachments/native-rework-33982429427/DeepSeekHarness-unsigned.ipa)
+- IPA SHA-256：`d2a33d8544fb7c4c9e3fe7bf0426730b0eab3df419b7fcf55d1bc4018aeb7e7f`
 - 独立 `verify_ipa.py`：`bundleIdentifier=com.example.DeepSeekHarness`、`minimumOSVersion=15.0`、`arm64`、`unsigned=true`、`forbiddenMarkers=0`；扫描禁止 fixture marker 与真实内网地址均未命中。
 - IPA 中未发现 `_CodeSignature` 或 `embedded.mobileprovision`。
 
