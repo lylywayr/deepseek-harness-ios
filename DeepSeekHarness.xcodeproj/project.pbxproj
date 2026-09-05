@@ -24,6 +24,16 @@
 		A10000000000000000000014 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B10000000000000000000015 /* XCTest.framework */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		C10000000000000000000006 /* Application target proxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F10000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E10000000000000000000001;
+			remoteInfo = DeepSeekHarness;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		B10000000000000000000011 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B10000000000000000000000 /* DeepSeekHarness.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DeepSeekHarness.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -141,6 +151,7 @@
 			buildRules = (
 			);
 			dependencies = (
+				D10000000000000000000004 /* HarnessWireTests target dependency */,
 			);
 			name = HarnessWireTests;
 			productName = HarnessWireTests;
@@ -186,6 +197,14 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		D10000000000000000000004 /* HarnessWireTests target dependency */ = {
+			isa = PBXTargetDependency;
+			target = E10000000000000000000001 /* DeepSeekHarness */;
+			targetProxy = C10000000000000000000006 /* Application target proxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXSourcesBuildPhase section */
 		C10000000000000000000005 /* HarnessWireTests Sources */ = {
