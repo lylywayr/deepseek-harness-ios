@@ -32,7 +32,7 @@ for marker in (
     if marker not in haystack:
         raise SystemExit(f"FAIL: missing fixture integration marker {marker}")
 
-for marker in ("scripts/capture_native_ui.sh", "390x844", "UITestFixture", "iPhone 13"):
+for marker in ("scripts/capture_native_ui.sh", "390x844", "UITestFixture", "iPhone 16"):
     if marker not in workflow:
         raise SystemExit(f"FAIL: missing screenshot workflow marker {marker}")
 
