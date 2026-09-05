@@ -1,21 +1,5 @@
 import Foundation
 
-struct HarnessSessionSummary {
-    let id: String
-    var title: String
-    var cwd: String
-    var updatedAt: Double
-    var running: Bool
-    var blank: Bool
-    var preset: String
-    var permission: String
-    var provider: String
-    var model: String
-    var turns: Int
-    var steps: Int
-    var contextUsed: Double?
-}
-
 /// These tests exercise the same builders/parsers used by `HarnessRuntime`.
 #if canImport(XCTest)
 import XCTest
