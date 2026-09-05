@@ -12,18 +12,6 @@ struct HarnessModelOption {
     var key: String { "\(provider)/\(model)" }
 }
 
-struct HarnessConversationItem {
-    enum Kind: String { case user, assistant, tool, system }
-    let id: String
-    let kind: Kind
-    var text: String
-    var subtitle: String?
-    let seq: Int
-    let time: Double
-    var detail: String? = nil
-    var isMarkdown: Bool = false
-}
-
 struct HarnessDirectoryEntry {
     let name: String
     let path: String
