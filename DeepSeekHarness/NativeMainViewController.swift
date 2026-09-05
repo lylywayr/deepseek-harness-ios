@@ -473,7 +473,7 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
         ])
     }
 
-
+    private func renameWorkspace(_ workspace: HarnessWorkspace) {
         let alert = UIAlertController(title: "重命名工作区", message: nil, preferredStyle: .alert)
         alert.addTextField { $0.text = workspace.title }
         alert.addAction(UIAlertAction(title: "取消", style: .cancel))
