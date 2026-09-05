@@ -13,6 +13,9 @@ source = SOURCE.read_text()
 project = PROJECT.read_text()
 workflow = WORKFLOW.read_text()
 
+if "#if DEBUG" not in source or "#endif" not in source:
+    raise SystemExit("FAIL: fixture implementation is not DEBUG-only")
+
 required_screens = (
     'case "connection"', 'case "conversation"', 'case "sidebar"',
     'case "settings"', 'case "directory"', 'case "approval"',
