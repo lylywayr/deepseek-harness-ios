@@ -74,3 +74,42 @@ jobs:
           path: DeepSeekHarness-unsigned.ipa
           if-no-files-found: error
           retention-days: 14
+
+  native-ui-screenshots:
+    name: Native UI screenshots 390x844
+    runs-on: macos-14
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '16.2'
+
+      - name: Build simulator app
+        run: |
+          set -euo pipefail
+          xcodebuild build \
+            -project DeepSeekHarness.xcodeproj \
+            -scheme DeepSeekHarness \
+            -sdk iphonesimulator \
+            -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.2' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO
+
+      - name: Capture native screenshots
+        run: |
+          set -euo pipefail
+          # capture_native_ui.sh launches the app with -UITestFixture.
+          chmod +x scripts/capture_native_ui.sh
+          scripts/capture_native_ui.sh
+
+      - name: Upload native screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-ui-390x844
+          path: artifacts/native-ui-390x844
+          if-no-files-found: error
+          retention-days: 14

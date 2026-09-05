@@ -11,7 +11,14 @@ final class DeepSeekHarnessAppDelegate: UIResponder, UIApplicationDelegate {
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         let window = UIWindow(frame: UIScreen.main.bounds)
-        let root = MainViewController(appState: appState, nativeUIStore: nativeUIStore)
+        let root: UIViewController
+        if ProcessInfo.processInfo.arguments.contains("-UITestFixture") {
+            let screen = ProcessInfo.processInfo.environment["NATIVE_FIXTURE_SCREEN"] ?? "conversation"
+            root = NativeFixtureViewController(screen: screen)
+        } else {
+            let main = MainViewController(appState: appState, nativeUIStore: nativeUIStore)
+            root = main
+        }
         let navigation = UINavigationController(rootViewController: root)
         navigation.navigationBar.prefersLargeTitles = false
         navigation.navigationBar.tintColor = DHTheme.accent
