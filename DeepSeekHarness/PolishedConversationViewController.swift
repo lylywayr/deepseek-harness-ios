@@ -42,6 +42,9 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
     private var composerBottom: NSLayoutConstraint!
     private var images: [[String: Any]] = []
     private var displayedIDs: [String] = []
+    private var isNearBottom = true
+    private var isLoadingOlder = false
+    private var pendingQuestion: HarnessPendingQuestion?
 
     init(runtime: HarnessRuntime) {
         self.runtime = runtime
@@ -61,6 +64,12 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
         buildEmptyState()
         runtime.onChange = { [weak self] in self?.render() }
         runtime.onApproval = { [weak self] value in self?.showApproval(value) }
+        runtime.onQuestion = { [weak self] pending in
+            DispatchQueue.main.async {
+                self?.pendingQuestion = pending
+                self?.showQuestion(pending)
+            }
+        }
         NotificationCenter.default.addObserver(self, selector: #selector(keyboardChanged(_:)), name: UIResponder.keyboardWillChangeFrameNotification, object: nil)
         render()
     }
@@ -358,7 +367,9 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
     private func showWorkspacePicker() {
         let alert = UIAlertController(title: "选择工作区", message: nil, preferredStyle: .actionSheet)
         for workspace in runtime.workspaces {
-            alert.addAction(UIAlertAction(title: workspace.title, style: .default))
+            alert.addAction(UIAlertAction(title: workspace.title, style: .default) { [weak self] _ in
+                self?.runtime.addWorkspace(path: workspace.path)
+            })
         }
         if runtime.workspaces.isEmpty { alert.message = "正在读取工作区" }
         alert.addAction(UIAlertAction(title: "取消", style: .cancel))
@@ -383,6 +394,7 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
 
     private func render() {
         let old = displayedIDs
+        let wasNearBottom = isNearBottom || isTableNearBottom()
         displayedIDs = runtime.items.map(\.id)
         tableView.reloadData()
         emptyState.isHidden = !runtime.items.isEmpty
@@ -402,7 +414,13 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
         sendButton.configuration?.image = UIImage(systemName: runtime.isGenerating ? "stop.fill" : "arrow.up")
         sendButton.configuration?.baseBackgroundColor = runtime.isGenerating ? DHTheme.danger : DHTheme.accent
         updateSend()
-        if old != displayedIDs, !displayedIDs.isEmpty { DispatchQueue.main.async { [weak self] in self?.scrollBottom() } }
+        if old != displayedIDs, !displayedIDs.isEmpty, wasNearBottom {
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.scrollBottom()
+                self.isNearBottom = true
+            }
+        }
     }
 
     private func updateSend() {
@@ -446,7 +464,16 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
     }
 
     private func showNativeFilesNotice() {
-        showError("文件浏览页面将在下一阶段接入原生目录与文件 Remote。")
+        guard let session = runtime.sessions.first(where: { $0.id == runtime.selectedSessionID }) else {
+            showError("当前没有选中的会话。")
+            return
+        }
+        let picker = DirectoryPickerViewController(runtime: runtime, initialPath: session.cwd) { [weak self] path in
+            self?.showError("已选择目录：\(path)")
+        }
+        let navigation = UINavigationController(rootViewController: picker)
+        navigation.modalPresentationStyle = .pageSheet
+        present(navigation, animated: true)
     }
 
     private func showSessionLog() {
@@ -563,7 +590,9 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
         let request = value["request"] as? [String: Any]
         let tool = request?["toolName"] as? String ?? "未知工具"
         let reason = request?["reason"] as? String
-        let message = ["工具：\(tool)", reason.map { "原因：\($0)" }].compactMap { $0 }.joined(separator: "\n\n")
+        let callID = request?["callId"] as? String
+        let detail = request?["command"] as? String ?? request?["input"] as? String
+        let message = ["工具：\(tool)", callID.map { "调用：\($0)" }, reason.map { "原因：\($0)" }, detail.map { "详情：\($0)" }].compactMap { $0 }.joined(separator: "\n\n")
         let alert = UIAlertController(title: "允许这次工具调用？", message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "拒绝", style: .destructive) { [weak self] _ in
             self?.runtime.answerApproval(clientID: clientID, eventID: eventID, decision: "rejected")
@@ -573,8 +602,35 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
         })
         present(alert, animated: true)
     }
+
+    private func pendingQuestionView(_ pending: HarnessPendingQuestion) -> UIViewController {
+        QuestionViewController(pending: pending) { [weak self] answers in
+            self?.runtime.answerQuestion(pending, answers: answers) { [weak self] result in
+                if case let .failure(error) = result { self?.showError(error.localizedDescription) }
+                else { self?.pendingQuestion = nil; self?.dismiss(animated: true) }
+            }
+        } onCancel: { [weak self] in
+            self?.runtime.cancelQuestion(pending) { [weak self] result in
+                if case let .failure(error) = result { self?.showError(error.localizedDescription) }
+                else { self?.pendingQuestion = nil; self?.dismiss(animated: true) }
+            }
+        }
+    }
+
+    private func showQuestion(_ pending: HarnessPendingQuestion) {
+        guard presentedViewController == nil else { return }
+        let navigation = UINavigationController(rootViewController: pendingQuestionView(pending))
+        navigation.modalPresentationStyle = .pageSheet
+        present(navigation, animated: true)
+    }
+
     private func showError(_ message: String) { let a=UIAlertController(title:"提示",message:message,preferredStyle:.alert);a.addAction(UIAlertAction(title:"好",style:.default));present(a,animated:true) }
     private func presentSheet(_ alert: UIAlertController, source: UIView) { alert.popoverPresentationController?.sourceView=source;alert.popoverPresentationController?.sourceRect=source.bounds;present(alert,animated:true) }
+    private func isTableNearBottom() -> Bool {
+        let visibleBottom = tableView.contentOffset.y + tableView.bounds.height - tableView.adjustedContentInset.bottom
+        return tableView.contentSize.height <= 0 || visibleBottom >= tableView.contentSize.height - 120
+    }
+
     private func scrollBottom() { guard !runtime.items.isEmpty else{return};tableView.scrollToRow(at:IndexPath(row:runtime.items.count-1,section:0),at:.bottom,animated:false) }
 
     @objc private func keyboardChanged(_ note: Notification) { guard let f=note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect,let d=note.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double else{return};let c=view.convert(f,from:nil);composerBottom.constant = -10-max(0,view.bounds.maxY-c.minY-view.safeAreaInsets.bottom);UIView.animate(withDuration:d){self.view.layoutIfNeeded()} }
@@ -591,7 +647,26 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
         navigation.modalPresentationStyle = .pageSheet
         present(navigation,animated:true)
     }
-    func tableView(_ tableView:UITableView,willDisplay cell:UITableViewCell,forRowAt indexPath:IndexPath){if indexPath.row==0&&runtime.hasMore{runtime.loadOlder()}}
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        guard scrollView === tableView else { return }
+        isNearBottom = isTableNearBottom()
+    }
+    func tableView(_ tableView:UITableView,willDisplay cell:UITableViewCell,forRowAt indexPath:IndexPath){
+        if indexPath.row == 0 && runtime.hasMore && !isLoadingOlder {
+            isLoadingOlder = true
+            let oldOffset = tableView.contentOffset.y
+            let oldHeight = tableView.contentSize.height
+            runtime.loadOlder()
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.isLoadingOlder = false
+                self.tableView.layoutIfNeeded()
+                let delta = self.tableView.contentSize.height - oldHeight
+                if delta > 0 { self.tableView.contentOffset.y = oldOffset + delta }
+            }
+        }
+    }
+
 }
 
 final class HarnessMessageCell: UITableViewCell {
@@ -724,4 +799,78 @@ final class TrajectoryDetailViewController: UIViewController {
         ])
     }
     @objc private func close() { dismiss(animated: true) }
+}
+
+
+final class QuestionViewController: UIViewController {
+    private let pending: HarnessPendingQuestion
+    private let onAnswer: ([[String: Any]]) -> Void
+    private let onCancel: () -> Void
+    private let scroll = UIScrollView()
+    private let stack = UIStackView()
+    private var selections: [[String]]
+    private var customInputs: [UITextField?]
+
+    init(pending: HarnessPendingQuestion, onAnswer: @escaping ([[String: Any]]) -> Void, onCancel: @escaping () -> Void) {
+        self.pending = pending
+        self.onAnswer = onAnswer
+        self.onCancel = onCancel
+        self.selections = Array(repeating: [], count: pending.questions.count)
+        self.customInputs = Array(repeating: nil, count: pending.questions.count)
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    @available(*, unavailable) required init?(coder: NSCoder) { fatalError() }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        title = "需要你的回答"
+        view.backgroundColor = DHTheme.background
+        navigationItem.leftBarButtonItem = UIBarButtonItem(title: "取消", style: .plain, target: self, action: #selector(cancel))
+        navigationItem.rightBarButtonItem = UIBarButtonItem(title: "提交", style: .done, target: self, action: #selector(submit))
+        stack.axis = .vertical; stack.spacing = 18; stack.alignment = .fill; stack.translatesAutoresizingMaskIntoConstraints = false
+        scroll.translatesAutoresizingMaskIntoConstraints = false; scroll.alwaysBounceVertical = true; scroll.addSubview(stack); view.addSubview(scroll)
+        NSLayoutConstraint.activate([
+            scroll.leadingAnchor.constraint(equalTo: view.leadingAnchor), scroll.trailingAnchor.constraint(equalTo: view.trailingAnchor), scroll.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor), scroll.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            stack.leadingAnchor.constraint(equalTo: scroll.contentLayoutGuide.leadingAnchor, constant: 18), stack.trailingAnchor.constraint(equalTo: scroll.contentLayoutGuide.trailingAnchor, constant: -18), stack.topAnchor.constraint(equalTo: scroll.contentLayoutGuide.topAnchor, constant: 20), stack.bottomAnchor.constraint(equalTo: scroll.contentLayoutGuide.bottomAnchor, constant: -24), stack.widthAnchor.constraint(equalTo: scroll.frameLayoutGuide.widthAnchor, constant: -36)
+        ])
+        for (index, question) in pending.questions.enumerated() { addQuestion(question, index: index) }
+    }
+
+    private func addQuestion(_ question: HarnessQuestion, index: Int) {
+        let card = UIView(); card.dhApplyCard(backgroundColor: DHTheme.surface, cornerRadius: 16, shadow: false)
+        let content = UIStackView(); content.axis = .vertical; content.spacing = 9; content.translatesAutoresizingMaskIntoConstraints = false; card.addSubview(content)
+        NSLayoutConstraint.activate([content.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 16), content.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -16), content.topAnchor.constraint(equalTo: card.topAnchor, constant: 15), content.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -15)])
+        if let header = question.header, !header.isEmpty { let label = UILabel(); label.text = header; label.font = DHTheme.font(.caption1, weight: .semibold); label.textColor = DHTheme.accent; content.addArrangedSubview(label) }
+        let title = UILabel(); title.text = question.question; title.font = DHTheme.font(.headline, weight: .semibold); title.textColor = DHTheme.text; title.numberOfLines = 0; content.addArrangedSubview(title)
+        if let detail = question.detail { let label = UILabel(); label.text = detail; label.font = DHTheme.font(.subheadline); label.textColor = DHTheme.secondaryText; label.numberOfLines = 0; content.addArrangedSubview(label) }
+        for option in question.options {
+            let button = UIButton(type: .system); button.contentHorizontalAlignment = .left; button.titleLabel?.numberOfLines = 0; button.titleLabel?.textAlignment = .left; button.titleLabel?.font = DHTheme.font(.body); button.setTitle(option.label, for: .normal); button.setTitleColor(DHTheme.text, for: .normal); button.layer.cornerRadius = 10; button.layer.borderWidth = 1; button.layer.borderColor = DHTheme.separator.cgColor; button.contentEdgeInsets = UIEdgeInsets(top: 10, left: 12, bottom: 10, right: 12); button.accessibilityLabel = option.label; button.addAction(UIAction { [weak self, weak button] _ in self?.toggle(option: option.label, index: index, button: button) }, for: .touchUpInside); content.addArrangedSubview(button)
+            if let description = option.description, !description.isEmpty { let label = UILabel(); label.text = description; label.font = DHTheme.font(.caption1); label.textColor = DHTheme.secondaryText; label.numberOfLines = 0; content.addArrangedSubview(label) }
+        }
+        let custom = UITextField(); custom.placeholder = "或输入自定义回答"; custom.borderStyle = .roundedRect; custom.font = DHTheme.font(.body); custom.accessibilityLabel = "自定义回答"; content.addArrangedSubview(custom); customInputs[index] = custom
+        stack.addArrangedSubview(card)
+    }
+
+    private func toggle(option: String, index: Int, button: UIButton?) {
+        guard pending.questions.indices.contains(index) else { return }
+        if pending.questions[index].multiSelect {
+            if selections[index].contains(option) { selections[index].removeAll { $0 == option } } else { selections[index].append(option) }
+        } else { selections[index] = [option] }
+        let selected = selections[index].contains(option); button?.backgroundColor = selected ? DHTheme.accentSoft : DHTheme.surface; button?.layer.borderColor = (selected ? DHTheme.accent : DHTheme.separator).cgColor
+    }
+
+    @objc private func submit() {
+        let answers = pending.questions.enumerated().map { index, question -> [String: Any] in
+            let custom = customInputs[index]?.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            var value: [String: Any] = ["id": question.id, "selected": selections[index]]
+            if !custom.isEmpty { value["custom"] = custom; if !question.multiSelect { value["selected"] = [] } }
+            return value
+        }
+        onAnswer(answers)
+    }
+
+    @objc private func cancel() {
+        onCancel()
+    }
 }

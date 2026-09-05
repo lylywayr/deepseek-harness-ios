@@ -43,6 +43,8 @@ struct HarnessConversationItem {
     var subtitle: String?
     let seq: Int
     let time: Double
+    var detail: String? = nil
+    var isMarkdown: Bool = false
 }
 
 struct HarnessDirectoryEntry {
@@ -300,6 +302,7 @@ final class HarnessRuntime: NSObject {
     var onChange: (() -> Void)?
     var onNavigationChange: (() -> Void)?
     var onApproval: (([String: Any]) -> Void)?
+    var onQuestion: ((HarnessPendingQuestion) -> Void)?
 
     init(baseURL: URL) {
         self.baseURL = baseURL
@@ -314,7 +317,11 @@ final class HarnessRuntime: NSObject {
         client.invalidate()
     }
 
-    func mount(in host: UIView) { }
+    var archivedSessionIDsForPresentation: Set<String> {
+        archivedSessionIDs
+    }
+
+
 
     func start() {
         guard !isStarted else { return }
@@ -349,6 +356,39 @@ final class HarnessRuntime: NSObject {
         resetConversation()
         publish()
         openSessionStream(id)
+    }
+
+    func searchSessions(_ query: String, completion: @escaping (Result<[HarnessSearchResult], Error>) -> Void) {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { completion(.success([])); return }
+        call("session/search", args: HarnessWire.requestArguments(["query": trimmed])) { value in
+            let body = value as? [String: Any] ?? [:]
+            let results = (body["items"] as? [[String: Any]] ?? []).compactMap { row -> HarnessSearchResult? in
+                guard let id = row["sessionId"] as? String, let snippet = row["snippet"] as? String else { return nil }
+                return HarnessSearchResult(sessionID: id, snippet: snippet)
+            }
+            completion(.success(results))
+        } failure: { error in completion(.failure(error)) }
+    }
+
+    func updateSettings(namespace: String, operations: [[String: Any]], expectedRevision: Int? = nil, completion: @escaping (Result<[String: Any], Error>) -> Void) {
+        var args: [String: Any] = ["ns": namespace, "ops": operations]
+        if let expectedRevision { args["expectedRevision"] = expectedRevision }
+        call("settings/mutate", args: args) { value in
+            let temp = value as? [String: Any] ?? [:]
+            let result = temp["value"] as? [String: Any] ?? temp
+            completion(.success(result))
+        } failure: { error in completion(.failure(error)) }
+    }
+
+    func answerQuestion(_ pending: HarnessPendingQuestion, answers: [[String: Any]], completion: ((Result<Void, Error>) -> Void)? = nil) {
+        let outcome: [String: Any] = ["kind": "result", "value": ["answers": answers]]
+        call("$events/result", args: HarnessWire.eventResult(clientID: pending.clientID, eventID: pending.eventID, outcome: outcome)) { _ in completion?(.success(())) } failure: { error in completion?(.failure(error)) }
+    }
+
+    func cancelQuestion(_ pending: HarnessPendingQuestion, completion: ((Result<Void, Error>) -> Void)? = nil) {
+        let outcome: [String: Any] = ["kind": "cancel"]
+        call("$events/result", args: HarnessWire.eventResult(clientID: pending.clientID, eventID: pending.eventID, outcome: outcome)) { _ in completion?(.success(())) } failure: { error in completion?(.failure(error)) }
     }
 
     func createSession(workspaceID: String?) {
@@ -471,8 +511,8 @@ final class HarnessRuntime: NSObject {
         } failure: { _ in completion(nil) }
     }
 
-    func answerApproval(clientID _: String, eventID: String, decision: String) {
-        guard let clientID = eventClientID, !clientID.isEmpty else { return }
+    func answerApproval(clientID: String, eventID: String, decision: String) {
+        guard !clientID.isEmpty else { return }
         call("$events/result", args: HarnessWire.eventResult(clientID: clientID, eventID: eventID, outcome: ["kind": "result", "value": decision]))
     }
 
@@ -705,6 +745,18 @@ final class HarnessRuntime: NSObject {
               let eventID = object["eventId"] as? String,
               !eventID.isEmpty,
               let request = object["request"] as? [String: Any] else { return }
+        if let rawQuestions = request["questions"] as? [[String: Any]] {
+            let questions = rawQuestions.compactMap { raw -> HarnessQuestion? in
+                guard let id = raw["id"] as? String, let question = raw["question"] as? String else { return nil }
+                let options = (raw["options"] as? [[String: Any]] ?? []).compactMap { option -> (label: String, description: String?)? in
+                    guard let label = option["label"] as? String else { return nil }
+                    return (label: label, description: option["description"] as? String)
+                }
+                return HarnessQuestion(id: id, header: raw["header"] as? String, question: question, detail: raw["detail"] as? String, options: options.map { HarnessQuestionOption(label: $0.label, description: $0.description) }, multiSelect: raw["multiSelect"] as? Bool ?? false)
+            }
+            if !questions.isEmpty { onQuestion?(HarnessPendingQuestion(clientID: clientID, eventID: eventID, questions: questions)) }
+            return
+        }
         var approval = object
         approval["clientId"] = clientID
         approval["request"] = request
@@ -734,15 +786,17 @@ final class HarnessRuntime: NSObject {
         let time = (event["time"] as? NSNumber)?.doubleValue ?? 0
         switch type {
         case "user/message":
-            if let text = contentText(data["content"] ?? data["message"]), !text.isEmpty { upsert(HarnessConversationItem(id: eventID, kind: .user, text: text, subtitle: nil, seq: seq, time: time)) }
+            if let text = contentText(data["content"] ?? data["message"]), !text.isEmpty { upsert(HarnessConversationItem(id: eventID, kind: .user, text: text, subtitle: nil, seq: seq, time: time, isMarkdown: false)) }
         case "assistant/message":
             let message = data["message"] as? [String: Any] ?? data
-            if let text = contentText(message["content"]), !text.isEmpty { upsert(HarnessConversationItem(id: eventID, kind: .assistant, text: text, subtitle: nil, seq: seq, time: time)) }
+            if let text = contentText(message["content"]), !text.isEmpty { upsert(HarnessConversationItem(id: eventID, kind: .assistant, text: text, subtitle: nil, seq: seq, time: time, isMarkdown: true)) }
         case "tool/call":
-            upsert(HarnessConversationItem(id: eventID, kind: .tool, text: data["name"] as? String ?? "工具调用", subtitle: data["arguments"] as? String, seq: seq, time: time))
+            upsert(HarnessConversationItem(id: eventID, kind: .tool, text: data["name"] as? String ?? "工具调用", subtitle: "调用", seq: seq, time: time, detail: data["arguments"] as? String))
         case "tool/result":
             let message = data["message"] as? [String: Any]
-            upsert(HarnessConversationItem(id: eventID, kind: .tool, text: contentText(message?["content"]) ?? "工具结果", subtitle: "结果", seq: seq, time: time))
+            let resultText = contentText(message?["content"]) ?? "工具结果"
+            let resultKind = (message?["isError"] as? Bool == true) ? "错误" : "结果"
+            upsert(HarnessConversationItem(id: eventID, kind: .tool, text: resultText, subtitle: resultKind, seq: seq, time: time, detail: data["callId"] as? String))
         case "command/done":
             if let result = data["result"] as? [String: Any], let text = result["text"] as? String { upsert(HarnessConversationItem(id: eventID, kind: .system, text: text, subtitle: result["kind"] as? String ?? "指令结果", seq: seq, time: time)) }
         case "turn/start":
@@ -823,7 +877,9 @@ final class HarnessRuntime: NSObject {
 
     private func rebuildWorkspaces() {
         let ordered = workspaceOrder.compactMap { workspacesByID[$0] }
-        workspaces = ordered.filter { workspace in !workspace.sessionIDs.allSatisfy { archivedSessionIDs.contains($0) } }
+        // Keep every workspace in the model. Archived-session visibility is a
+        // presentation concern and must not erase an otherwise valid workspace.
+        workspaces = ordered
     }
 
     private func call(_ endpoint: String, args: [String: Any], completion: ((Any?) -> Void)? = nil, failure: ((Error) -> Void)? = nil) {

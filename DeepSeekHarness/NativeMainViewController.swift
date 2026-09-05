@@ -143,7 +143,7 @@ final class MainViewController: UIViewController {
     }
 }
 
-final class NativeHomeViewController: UIViewController {
+final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
     private let appState: AppState
     private let store: NativeUIStore
     private let transport: NativeUITransport
@@ -154,6 +154,11 @@ final class NativeHomeViewController: UIViewController {
     private let railStack = UIStackView()
     private let sidebar = UIView()
     private let sidebarContent = UIStackView()
+    private let sidebarScroll = UIScrollView()
+    private let searchBar = UISearchBar()
+    private let searchCancelButton = UIButton(type: .system)
+    private let searchEmptyLabel = UILabel()
+    private var searchQuery = ""
     private let sidebarScrim = UIControl()
     private var runtime: HarnessRuntime!
     private let connectionBadge = DHBadgeLabel(text: "在线", color: DHTheme.success)
@@ -350,6 +355,20 @@ final class NativeHomeViewController: UIViewController {
         ])
         sidebarContent.addArrangedSubview(brand)
 
+        searchBar.placeholder = "搜索会话…"
+        searchBar.delegate = self
+        searchBar.searchBarStyle = .minimal
+        searchBar.autocapitalizationType = .none
+        searchBar.accessibilityLabel = "搜索会话"
+        sidebarContent.addArrangedSubview(searchBar)
+
+        searchEmptyLabel.text = "无匹配会话"
+        searchEmptyLabel.textColor = DHTheme.secondaryText
+        searchEmptyLabel.font = DHTheme.font(.subheadline)
+        searchEmptyLabel.textAlignment = .center
+        searchEmptyLabel.isHidden = true
+        sidebarContent.addArrangedSubview(searchEmptyLabel)
+
         sidebarContent.addArrangedSubview(sidebarButton(title: "新会话", icon: "plus.message") { [weak self] in
             let workspace = self?.runtime.workspaces.first?.id
             self?.runtime.createSession(workspaceID: workspace)
@@ -366,7 +385,7 @@ final class NativeHomeViewController: UIViewController {
             sidebarContent.addArrangedSubview(sidebarButton(title: workspace.title, icon: "folder", menu: workspaceMenu(workspace)) { })
         }
 
-        for session in runtime.sessions.filter({ !$0.blank }).prefix(12) {
+        for session in displayedSessions() {
             let title = session.title.isEmpty ? "新会话" : session.title
             let selected = session.id == runtime.selectedSessionID
             sidebarContent.addArrangedSubview(sidebarButton(title: title, icon: session.running ? "circle.dotted" : "message", selected: selected, menu: sessionMenu(session)) { [weak self] in
@@ -374,11 +393,62 @@ final class NativeHomeViewController: UIViewController {
                 self?.toggleSidebar()
             })
         }
+        searchEmptyLabel.isHidden = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !displayedSessions().isEmpty
+
+        sidebarContent.addArrangedSubview(sidebarButton(title: "视图选项", icon: "slider.horizontal.3") { [weak self] in self?.showViewOptions() })
 
         let spacer = UIView()
-        spacer.setContentHuggingPriority(.defaultLow, for: .vertical)
         sidebarContent.addArrangedSubview(spacer)
         sidebarContent.addArrangedSubview(sidebarButton(title: "设置", icon: "gearshape") { [weak self] in self?.onSettings() })
+    }
+
+    private func displayedSessions() -> [HarnessSessionSummary] {
+        let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        let all = runtime.sessions.filter { !$0.blank }
+        if query.isEmpty {
+            return HarnessPresentationPolicy.ordered(all, archived: runtime.archivedSessionIDsForPresentation, preferences: appState.viewPreferences).prefix(12).map { $0 }
+        }
+        // Search is intentionally scoped to the session summaries that the
+        // official base client exposes locally; no unverified server search is
+        // used to invent or replace the visible result set.
+        return HarnessPresentationPolicy.search(query, sessions: all, archived: runtime.archivedSessionIDsForPresentation, showArchived: appState.viewPreferences.showArchived)
+    }
+
+    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
+        searchQuery = searchText
+        renderSidebar()
+    }
+
+    func searchBarCancelButtonClicked(_ searchBar: UISearchBar) {
+        searchBar.text = ""
+        searchQuery = ""
+        renderSidebar()
+        searchBar.resignFirstResponder()
+    }
+
+
+    private func showViewOptions() {
+        let alert = UIAlertController(title: "视图选项", message: nil, preferredStyle: .actionSheet)
+        let current = appState.viewPreferences
+        alert.addAction(UIAlertAction(title: "按工作区分组" + (current.groupBy == .workspace ? " ✓" : ""), style: .default) { [weak self] _ in
+            guard let self else { return }; var next = self.appState.viewPreferences; next.groupBy = .workspace; self.appState.updateViewPreferences(next); self.renderSidebar()
+        })
+        alert.addAction(UIAlertAction(title: "单列表" + (current.groupBy == .flat ? " ✓" : ""), style: .default) { [weak self] _ in
+            guard let self else { return }; var next = self.appState.viewPreferences; next.groupBy = .flat; self.appState.updateViewPreferences(next); self.renderSidebar()
+        })
+        alert.addAction(UIAlertAction(title: "最近更新" + (current.orderBy == .updated ? " ✓" : ""), style: .default) { [weak self] _ in
+            guard let self else { return }; var next = self.appState.viewPreferences; next.orderBy = .updated; self.appState.updateViewPreferences(next); self.renderSidebar()
+        })
+        alert.addAction(UIAlertAction(title: "手动排序" + (current.orderBy == .manual ? " ✓" : ""), style: .default) { [weak self] _ in
+            guard let self else { return }; var next = self.appState.viewPreferences; next.orderBy = .manual; self.appState.updateViewPreferences(next); self.renderSidebar()
+        })
+        alert.addAction(UIAlertAction(title: (current.showArchived ? "隐藏" : "显示") + "归档会话", style: .default) { [weak self] _ in
+            guard let self else { return }; var next = self.appState.viewPreferences; next.showArchived.toggle(); self.appState.updateViewPreferences(next); self.renderSidebar()
+        })
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        alert.popoverPresentationController?.sourceView = view
+        alert.popoverPresentationController?.sourceRect = view.bounds
+        present(alert, animated: true)
     }
 
     private func workspaceMenu(_ workspace: HarnessWorkspace) -> UIMenu {
@@ -390,13 +460,20 @@ final class NativeHomeViewController: UIViewController {
 
     private func sessionMenu(_ session: HarnessSessionSummary) -> UIMenu {
         UIMenu(children: [
-            UIAction(title: "重命名", image: UIImage(systemName: "pencil")) { [weak self] _ in self?.runtime.openSession(session.id); self?.renameSession(session) },
-            UIAction(title: "分叉会话", image: UIImage(systemName: "point.topleft.down.curvedto.point.bottomright.up")) { [weak self] _ in self?.runtime.forkSession(session.id) },
-            UIAction(title: "归档会话", image: UIImage(systemName: "archivebox")) { [weak self] _ in self?.runtime.archiveSession(session.id) }
+            UIAction(title: "重命名", image: UIImage(systemName: "pencil")) { [weak self] _ in
+                self?.runtime.openSession(session.id)
+                self?.renameSession(session)
+            },
+            UIAction(title: "分叉会话", image: UIImage(systemName: "point.topleft.down.curvedto.point.bottomright.up")) { [weak self] _ in
+                self?.runtime.forkSession(session.id)
+            },
+            UIAction(title: "归档会话", image: UIImage(systemName: "archivebox")) { [weak self] _ in
+                self?.runtime.archiveSession(session.id)
+            }
         ])
     }
 
-    private func renameWorkspace(_ workspace: HarnessWorkspace) {
+
         let alert = UIAlertController(title: "重命名工作区", message: nil, preferredStyle: .alert)
         alert.addTextField { $0.text = workspace.title }
         alert.addAction(UIAlertAction(title: "取消", style: .cancel))
