@@ -109,7 +109,11 @@ final class HarnessWireTests: XCTestCase {
         XCTAssertEqual(item.type, "item")
         let end = try HarnessWire.muxServerFrame(data: json(["type": "end", "streamId": "s-1"]))
         XCTAssertEqual(end.type, "end")
-        let error = try HarnessWire.muxServerFrame(data: json(["type": "error", "streamId": "s-1", "error": ["code": "gateway/internal", "message": "failed", "details": [:]]))
+        let error = try HarnessWire.muxServerFrame(data: json([
+            "type": "error",
+            "streamId": "s-1",
+            "error": ["code": "gateway/internal", "message": "failed", "details": [String: Any]()]
+        ]))
         XCTAssertEqual(error.code, "gateway/internal")
         XCTAssertThrowsError(try HarnessWire.muxServerFrame(data: json(["type": "item", "streamId": ""])))
     }
