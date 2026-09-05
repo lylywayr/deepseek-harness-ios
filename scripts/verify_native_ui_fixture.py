@@ -34,6 +34,8 @@ for marker in (
     haystack = project if marker == "NativeFixtureViewController.swift in Sources" else source
     if marker not in haystack:
         raise SystemExit(f"FAIL: missing fixture integration marker {marker}")
+if 'SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG"' not in project:
+    raise SystemExit("FAIL: Debug fixture compilation condition is missing")
 
 for marker in ("scripts/capture_native_ui.sh", "390x844", "UITestFixture", "-NativeFixtureScreen", "iPhone 16"):
     if marker not in workflow:
