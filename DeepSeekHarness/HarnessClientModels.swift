@@ -195,7 +195,7 @@ enum HarnessMarkdown {
 
     private static func inline(_ text: String, font: UIFont, codeFont: UIFont, color: UIColor) -> NSMutableAttributedString {
         let result = NSMutableAttributedString(string: text, attributes: [.font: font, .foregroundColor: color])
-        let pattern = #"`([^`]+)`|\\[([^\\]]+)\\]\\((https?://[^)\\s]+)\\)"#
+        let pattern = #"`([^`]+)`|\[([^\]]+)\]\((https?://[^)\s]+)\)"#
         guard let expression = try? NSRegularExpression(pattern: pattern) else { return result }
         let matches = expression.matches(in: text, range: NSRange(text.startIndex..., in: text)).reversed()
         for match in matches {
