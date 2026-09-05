@@ -230,7 +230,10 @@ final class NativeFixtureViewController: UIViewController {
         stack.addArrangedSubview(code)
         stack.addArrangedSubview(card("工具调用 · workspace/list", body: "结果：3 个文件\n点击消息可查看调用参数、结果和错误详情。", color: DHTheme.surfaceMuted))
         let controls = UIStackView(); controls.axis = .horizontal; controls.spacing = 8
-        controls.addArrangedSubview(row("模型", value: "DeepSeek V4")); controls.addArrangedSubview(row("权限", value: "只读"))
+        controls.addArrangedSubview(row("模型", value: "DeepSeek V4"))
+        let permissionRow = row("权限", value: "只读")
+        permissionRow.widthAnchor.constraint(equalToConstant: 132).isActive = true
+        controls.addArrangedSubview(permissionRow)
         stack.addArrangedSubview(controls)
         stack.addArrangedSubview(card("图片附件", body: "＋ image-1.png     × image-2.jpg", color: DHTheme.surfaceMuted))
         let composer = card("描述你想要构建的内容…", body: "＋ 添加图片                         ↑ 发送")
