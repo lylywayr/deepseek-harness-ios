@@ -18,6 +18,7 @@
 		A1000000000000000000000D /* PolishedConversationViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000E /* PolishedConversationViewController.swift */; };
 		A1000000000000000000000E /* HarnessRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000F /* HarnessRuntime.swift */; };
 		A1000000000000000000000F /* HarnessSettingsCenterViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000010 /* HarnessSettingsCenterViewController.swift */; };
+		A10000000000000000000011 /* HarnessWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000012 /* HarnessWire.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -35,6 +36,7 @@
 		B1000000000000000000000E /* PolishedConversationViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PolishedConversationViewController.swift; sourceTree = "<group>"; };
 		B1000000000000000000000F /* HarnessRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessRuntime.swift; sourceTree = "<group>"; };
 		B10000000000000000000010 /* HarnessSettingsCenterViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessSettingsCenterViewController.swift; sourceTree = "<group>"; };
+		B10000000000000000000012 /* HarnessWire.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessWire.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -71,6 +73,7 @@
 				B1000000000000000000000E /* PolishedConversationViewController.swift */,
 				B1000000000000000000000F /* HarnessRuntime.swift */,
 				B10000000000000000000010 /* HarnessSettingsCenterViewController.swift */,
+				B10000000000000000000012 /* HarnessWire.swift */,
 				B10000000000000000000011 /* Assets.xcassets */,
 			);
 			path = DeepSeekHarness;
@@ -158,6 +161,7 @@
 				A1000000000000000000000D /* PolishedConversationViewController.swift in Sources */,
 				A1000000000000000000000E /* HarnessRuntime.swift in Sources */,
 				A1000000000000000000000F /* HarnessSettingsCenterViewController.swift in Sources */,
+				A10000000000000000000011 /* HarnessWire.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

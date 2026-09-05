@@ -1,51 +1,36 @@
 # 项目方向
 
-## 目标
+## 目标与硬边界
 
-为自托管 DeepSeek Harness 提供一个原生优先 iOS 客户端。可见界面使用 UIKit/SwiftUI，通信使用 `URLSession` 的 JSON-RPC 与 `URLSessionWebSocketTask` 的 Remote Mux。当前分支不使用 WKWebView、DOM 投影或网页兼容路径。
+为自托管 DeepSeek Harness 提供一个原生优先 iOS 客户端。活跃 target 使用 UIKit、URLSession JSON-RPC 和 URLSessionWebSocketTask Remote Mux；不恢复网页渲染、DOM 投影或 legacy 页面路径。服务端插件不安装到 iOS。
 
-## 基础版范围
+## 能力对照
 
-插件停用后的基础 Harness 只应显示真实返回的会话、工作区、模型、权限、对话、轨迹、日志和目录选择能力。插件市场、专家、Agent 预设、服务控制等此前由停用插件提供的页面不属于基础版主导航；只有服务端返回明确的 Native UI manifest 时，才动态出现对应原生 surface。
+| 能力 | 协议/入口 | 当前状态 |
+|---|---|---|
+| 会话列表/历史 | `session/list`、`session/follow`、`session/page` | 原生实现；列表 wrapper 与分页 cursor 已由 HarnessWire 约束 |
+| 会话操作 | create/rename/fork/prompt/cancel/selectModel | 原生实现；请求型参数使用 `args.request` |
+| 工作区 | follow/create/rename/delete/archiveSession | 原生实现；真实部署行为待 smoke test |
+| 目录 | directoryPicker/list/createDirectory | 原生 picker；使用官方 `path/home/crumbs/entries` 字段 |
+| 实时状态/审批 | session/control、`$events`、`$events/result` | 原生 Mux；真实事件变体待联调 |
+| 对话/轨迹/日志 | follow/page records | 原生 UIKit；常见事件已解析，富文本语义未完整验证 |
+| 模型/权限/图片 | modelCatalog/selectModel、commands/execute、prompt images | 原生入口；服务能力和上限待联调 |
+| Native UI | 可选 `dsh-native-ui/1` manifest/action | 受限原生 renderer；不是官方默认能力声明 |
+| 设置 | 本机连接与本机显示说明 | 未伪造服务端 settings；真实 settings Remote 尚未接入 |
 
-## 运行结构
+## 参数契约
 
-```text
-UIKit App
-  ├─ MainViewController / SetupViewController
-  ├─ NativeHomeViewController
-  │   ├─ rail + sidebar
-  │   ├─ PolishedConversationViewController
-  │   └─ HarnessDirectoryPickerViewController
-  ├─ HarnessRuntime (@MainActor state coordinator)
-  │   └─ HarnessClient (URLSession + JSON-RPC)
-  │       └─ URLSessionWebSocketTask (/api/remote.mux)
-  └─ NativeUITransport / NativeUIRenderer (declared manifest only)
-```
+生产 `HarnessWire.swift` 已进入 App Sources，且由 Swift XCTest target 引用：`session/list` 使用 `args._request`；请求型调用使用 `args.request`；`session/follow` 只能经 `/api/remote.mux`，unary 调用走 `/api/<endpoint>`。这些形状由 `Tests/HarnessWireTests.swift` 覆盖。
 
-## 真实协议对照
+## 不伪造的入口
 
-| 能力 | Remote / endpoint | 原生实现 | 状态 |
-|---|---|---|---|
-| 会话列表 | `session/list` | `HarnessRuntime.refresh` | 已实现，未在本轮访问真实 endpoint |
-| 会话历史 | `session/follow`, `session/page` | follow + cursor 合并 | 已实现，未在本轮访问真实 endpoint |
-| 会话操作 | `session/create`, `rename`, `fork`, `prompt`, `cancel`, `selectModel` | Runtime actions | 已实现，未在本轮访问真实 endpoint |
-| 工作区 | `workspace/follow`, `create`, `rename`, `delete`, `archiveSession` | Runtime/sidebar | 已实现，未在本轮访问真实 endpoint |
-| 目录 | `directoryPicker/list`, `createDirectory` | `HarnessDirectoryPickerViewController` | 按官方 `path/home/crumbs/entries` 建模；未在本轮访问真实 endpoint |
-| 实时控制 | `session/control` | jobs/queues/projections | 已实现，未在本轮访问真实 endpoint |
-| 工具审批 | `$events` + `$events/result` | ready clientId 关联 | 已实现，未在本轮访问真实 endpoint |
-| Native UI | `api/native-ui/manifest`, `api/native-ui/action` | constrained renderer | 已实现；服务端是否提供该清单未验证 |
-
-## 安全边界
-
-服务地址只接受 HTTP/HTTPS，访问令牌使用 Keychain 保存，用户界面只显示是否已配置。HTTP 仅适用于私有 LAN；不要将其暴露到公网。未提供真实 endpoint、session、workspace、token、Cookie 或演示 provider 数据。
+本地侧栏筛选只过滤已加载的 session/list 数据，不宣称服务端 `session/search` 可用。完整视图选项（排序、分组、归档显示）、服务端可编辑设置、完整 Markdown/代码块/链接/复制、用户问题变体、普通文件浏览及目标服务的 Native manifest，当前没有足够真实 endpoint 证据，界面不填充演示数据。
 
 ## 验证
 
-协议回归测试：
-
 ```sh
 python3 -m unittest discover -s Tests -p 'test_*.py' -v
+git diff --check
 ```
 
-Xcode device archive 由 `.github/workflows/build-ipa.yml` 执行。签名、真机安装、真实 endpoint 交互和 Native manifest 可用性需要验收者另行复核。
+Swift 生产 wire 测试、Xcode device archive 与 IPA 门禁由 GitHub Actions 执行；本机 iSH 没有 Xcode。真实 endpoint、签名真机、390×844 原生截图和目标服务 Native manifest 是否存在，见 `docs/native-completion-report.md` 的事实记录。

@@ -187,12 +187,7 @@ private final class HarnessClient {
             completion(.failure(HarnessClientError.invalidURL)); return
         }
         let rpcID = UUID().uuidString
-        let envelope: [String: Any] = [
-            "type": "client-request",
-            "rpcId": rpcID,
-            "method": endpoint,
-            "payload": ["args": args]
-        ]
+        let envelope = HarnessWire.rpcRequest(endpoint: endpoint, args: args, rpcID: rpcID)
         guard JSONSerialization.isValidJSONObject(envelope),
               let body = try? JSONSerialization.data(withJSONObject: envelope) else {
             completion(.failure(HarnessClientError.invalidResponse)); return
@@ -210,24 +205,23 @@ private final class HarnessClient {
             if http.statusCode == 401 || http.statusCode == 403 {
                 completion(.failure(HarnessClientError.unauthorized)); return
             }
-            guard (200..<300).contains(http.statusCode), let data,
-                  let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  object["type"] as? String == "server-response",
-                  let receivedID = object["rpcId"] as? String,
-                  let result = object["result"] as? [String: Any] else {
+            guard (200..<300).contains(http.statusCode), let data else {
                 completion(.failure(HarnessClientError.invalidResponse)); return
             }
-            guard receivedID == rpcID else {
-                completion(.failure(HarnessClientError.correlation)); return
-            }
-            if result["ok"] as? Bool == true {
-                completion(.success(result["value"] ?? NSNull()))
-            } else {
-                let errorValue = result["error"] as? [String: Any]
-                completion(.failure(HarnessClientError.remote(
-                    code: errorValue?["code"] as? String ?? "gateway/internal",
-                    message: errorValue?["message"] as? String ?? "Harness 服务请求失败。"
-                )))
+            do {
+                let parsed = try HarnessWire.rpcResponse(data: data, expectedRPCID: rpcID)
+                if parsed.ok {
+                    completion(.success(parsed.value ?? NSNull()))
+                } else {
+                    completion(.failure(HarnessClientError.remote(
+                        code: parsed.code ?? "gateway/internal",
+                        message: parsed.message ?? "Harness 服务请求失败。"
+                    )))
+                }
+            } catch let error as HarnessWire.WireError {
+                completion(.failure(error))
+            } catch {
+                completion(.failure(HarnessClientError.invalidResponse))
             }
         }.resume()
     }
@@ -360,7 +354,7 @@ final class HarnessRuntime: NSObject {
     func createSession(workspaceID: String?) {
         var request: [String: Any] = [:]
         if let workspaceID { request["workspaceId"] = workspaceID }
-        call("session/create", args: ["request": request]) { [weak self] value in
+        call("session/create", args: HarnessWire.requestArguments(request)) { [weak self] value in
             guard let self, let dict = value as? [String: Any], let id = dict["sessionId"] as? String else { return }
             self.refresh()
             self.selectedSessionID = id
@@ -386,12 +380,12 @@ final class HarnessRuntime: NSObject {
         ]
         isGenerating = true
         publish()
-        call("session/prompt", args: ["request": request]) { [weak self] _ in self?.publish() }
+        call("session/prompt", args: HarnessWire.requestArguments(request)) { [weak self] _ in self?.publish() }
     }
 
     func cancel() {
         guard let id = selectedSessionID else { return }
-        call("session/cancel", args: ["request": ["sessionId": id]]) { [weak self] _ in
+        call("session/cancel", args: HarnessWire.requestArguments(["sessionId": id])) { [weak self] _ in
             self?.isGenerating = false
             self?.publish()
         }
@@ -399,13 +393,7 @@ final class HarnessRuntime: NSObject {
 
     func loadOlder() {
         guard let id = selectedSessionID, let cursor = sessionCursors[id], cursor.oldest >= 0, hasMore else { return }
-        let request: [String: Any] = [
-            "address": ["kind": "session", "sessionId": id],
-            "throughSeq": cursor.cursor,
-            "beforeSeq": cursor.oldest,
-            "maxMessages": 30
-        ]
-        call("session/page", args: ["request": request]) { [weak self] value in
+        call("session/page", args: HarnessWire.sessionPageArguments(sessionID: id, throughSeq: cursor.cursor, beforeSeq: cursor.oldest, maxMessages: 30)) { [weak self] value in
             guard let self, let page = value as? [String: Any] else { return }
             self.parseRecords(page["records"] as? [Any] ?? [], prepend: true)
             self.hasMore = page["hasMore"] as? Bool ?? false
@@ -418,7 +406,7 @@ final class HarnessRuntime: NSObject {
         guard let id = selectedSessionID else { return }
         var request: [String: Any] = ["sessionId": id, "provider": option.provider, "model": option.model]
         if let reasoning { request["reasoningEffort"] = reasoning }
-        call("session/selectModel", args: ["request": request]) { [weak self] _ in self?.refresh() }
+        call("session/selectModel", args: HarnessWire.requestArguments(request)) { [weak self] _ in self?.refresh() }
     }
 
     func setPermission(_ value: String) {
@@ -428,23 +416,23 @@ final class HarnessRuntime: NSObject {
 
     func rename(_ title: String) {
         guard let id = selectedSessionID else { return }
-        call("session/rename", args: ["request": ["sessionId": id, "title": title]]) { [weak self] _ in self?.refresh() }
+        call("session/rename", args: HarnessWire.requestArguments(["sessionId": id, "title": title])) { [weak self] _ in self?.refresh() }
     }
 
     func renameWorkspace(_ id: String, title: String) {
-        call("workspace/rename", args: ["request": ["workspaceId": id, "title": title]]) { [weak self] _ in self?.refresh() }
+        call("workspace/rename", args: HarnessWire.requestArguments(["workspaceId": id, "title": title])) { [weak self] _ in self?.refresh() }
     }
 
     func deleteWorkspace(_ id: String) {
-        call("workspace/delete", args: ["request": ["workspaceId": id]]) { [weak self] _ in self?.refresh() }
+        call("workspace/delete", args: HarnessWire.requestArguments(["workspaceId": id])) { [weak self] _ in self?.refresh() }
     }
 
     func archiveSession(_ id: String) {
-        call("workspace/archiveSession", args: ["request": ["sessionId": id]]) { [weak self] _ in self?.refresh() }
+        call("workspace/archiveSession", args: HarnessWire.requestArguments(["sessionId": id])) { [weak self] _ in self?.refresh() }
     }
 
     func forkSession(_ id: String) {
-        call("session/fork", args: ["request": ["sessionId": id]]) { [weak self] value in
+        call("session/fork", args: HarnessWire.requestArguments(["sessionId": id])) { [weak self] value in
             guard let self, let result = value as? [String: Any], let newID = result["sessionId"] as? String else { return }
             self.refresh()
             self.selectedSessionID = newID
@@ -454,13 +442,11 @@ final class HarnessRuntime: NSObject {
     }
 
     func addWorkspace(path: String) {
-        call("workspace/create", args: ["request": ["path": path]]) { [weak self] _ in self?.refresh() }
+        call("workspace/create", args: HarnessWire.requestArguments(["path": path])) { [weak self] _ in self?.refresh() }
     }
 
     func listDirectories(path: String?, completion: @escaping (HarnessDirectoryListing) -> Void, failure: ((Error) -> Void)? = nil) {
-        var args: [String: Any] = [:]
-        if let path { args["path"] = path }
-        call("directoryPicker/list", args: args) { value in
+        call("directoryPicker/list", args: HarnessWire.directoryListArguments(path: path)) { value in
             guard let object = value as? [String: Any],
                   let listedPath = object["path"] as? String,
                   let home = object["home"] as? String else {
@@ -480,18 +466,14 @@ final class HarnessRuntime: NSObject {
     }
 
     func createDirectory(path: String, name: String, completion: @escaping (String?) -> Void) {
-        call("directoryPicker/createDirectory", args: ["path": path, "name": name]) { value in
+        call("directoryPicker/createDirectory", args: HarnessWire.directoryCreateArguments(path: path, name: name)) { value in
             completion(value as? String ?? (value as? [String: Any])?["path"] as? String)
         } failure: { _ in completion(nil) }
     }
 
     func answerApproval(clientID _: String, eventID: String, decision: String) {
         guard let clientID = eventClientID, !clientID.isEmpty else { return }
-        call("$events/result", args: [
-            "clientId": clientID,
-            "eventId": eventID,
-            "outcome": ["kind": "result", "value": decision]
-        ])
+        call("$events/result", args: HarnessWire.eventResult(clientID: clientID, eventID: eventID, outcome: ["kind": "result", "value": decision]))
     }
 
     private func loadInitialState() {
@@ -500,7 +482,7 @@ final class HarnessRuntime: NSObject {
         var modelsValue: Any?
         var failed: Error?
         group.enter()
-        call("session/list", args: [:]) { value in sessionsValue = value; group.leave() } failure: { error in failed = error; group.leave() }
+        call("session/list", args: HarnessWire.sessionListArguments()) { value in sessionsValue = value; group.leave() } failure: { error in failed = error; group.leave() }
         group.enter()
         call("session/modelCatalog", args: [:]) { value in modelsValue = value; group.leave() } failure: { error in failed = error; group.leave() }
         group.notify(queue: .main) { [weak self] in
@@ -584,8 +566,8 @@ final class HarnessRuntime: NSObject {
                 if let id = selectedID {
                     let followID = "follow-\(UUID().uuidString)"
                     await MainActor.run { self.followStreamID = followID }
-                    let request = await MainActor.run { self.followRequest(id) }
-                    try await self.subscribe(task, streamID: followID, endpoint: "session/follow", payload: ["args": ["request": request]])
+                    let payload = HarnessWire.sessionFollowPayload(sessionID: id)
+                    try await self.subscribe(task, streamID: followID, endpoint: "session/follow", payload: payload)
                 }
                 while !Task.isCancelled {
                     let message = try await task.receive()
@@ -605,7 +587,7 @@ final class HarnessRuntime: NSObject {
     }
 
     private func subscribe(_ socket: URLSessionWebSocketTask, streamID: String, endpoint: String, payload: [String: Any]) async throws {
-        let object: [String: Any] = ["type": "open", "streamId": streamID, "endpoint": endpoint, "payload": payload]
+        let object = HarnessWire.muxOpen(streamID: streamID, endpoint: endpoint, payload: payload)
         let data = try JSONSerialization.data(withJSONObject: object)
         guard let text = String(data: data, encoding: .utf8) else { throw HarnessClientError.invalidResponse }
         try await socket.send(.string(text))
@@ -616,12 +598,7 @@ final class HarnessRuntime: NSObject {
         if let oldID = followStreamID { sendMuxCancel(socket, streamID: oldID) }
         let streamID = "follow-\(UUID().uuidString)"
         followStreamID = streamID
-        let request: [String: Any] = [
-            "type": "open",
-            "streamId": streamID,
-            "endpoint": "session/follow",
-            "payload": ["args": ["request": followRequest(id)]]
-        ]
+        let request = HarnessWire.muxOpen(streamID: streamID, endpoint: "session/follow", payload: HarnessWire.sessionFollowPayload(sessionID: id))
         guard let data = try? JSONSerialization.data(withJSONObject: request), let text = String(data: data, encoding: .utf8) else { return }
         socket.send(.string(text), completionHandler: { _ in })
     }
@@ -633,7 +610,7 @@ final class HarnessRuntime: NSObject {
     }
 
     private func sendMuxCancel(_ socket: URLSessionWebSocketTask, streamID: String) {
-        let object: [String: Any] = ["type": "cancel", "streamId": streamID]
+        let object = HarnessWire.muxCancel(streamID: streamID)
         guard let data = try? JSONSerialization.data(withJSONObject: object), let text = String(data: data, encoding: .utf8) else { return }
         socket.send(.string(text), completionHandler: { _ in })
     }

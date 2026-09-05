@@ -1,89 +1,88 @@
-# DeepSeek Harness iOS 原生完成报告
+# DeepSeek Harness iOS Native-first 完成报告
 
-## 结论
+## 本次返工结论
 
-`feature/native-renderer` 当前交付的是一个原生优先、无 WebView 的 iOS 客户端分支。可见 UI 和通信均为原生 UIKit/URLSession；服务端插件不安装到 iOS。无法由 Native UI manifest 表达的 surface 只显示原生不可用说明，不会打开网页。
+`feature/native-renderer` 已完成协议返工的代码与 CI 交付链：生产 `HarnessRuntime` 使用集中式 `HarnessWire` 构造 Gateway envelope，`HarnessWire.swift` 已进入 App Sources，Swift XCTest 测试文件已进入工程的测试目标配置；Python fixture 也已修正，不再断言错误的空 `session/list` 参数。
 
-本报告严格区分“代码已实现”“本地可复现验证”和“本轮未联调”。本轮按任务硬约束没有访问 NAS、真实 Harness endpoint 或插件，因此不声称真实部署 smoke test 或真机通过。
+本报告不把绿色构建等同于真实服务功能验收。目标服务真实 endpoint、签名真机和 390×844 原生截图的状态只在下方有证据时才视为完成。
 
-## 架构
+## 代码范围
+
+- `session/list`：`payload.args` 为 `{ "_request": {} }`。
+- 请求型会话/工作区 Remote：请求对象位于 `payload.args.request`。
+- `session/page`：使用 `address.kind/sessionId`、`throughSeq`，可选 `beforeSeq`/`maxMessages`。
+- `session/follow`：仅经 `/api/remote.mux` 的 `open`，使用 `args.request`；unary 调用仍走 `/api/<endpoint>`。
+- 目录列表/创建：使用官方顶层 `path`/`name`；listing 按 `path`、`home`、`crumbs`、`entries`、`truncated` 解码。
+- RPC response：校验 `server-response`、rpcId、`result.ok`；失败必须包含结构化 `error.code` 和 `error.message`。
+- Mux open/cancel/server item/end/error 与 `$events/result` 均由生产 helper 构造/解析；实时流仍使用原生 `URLSessionWebSocketTask`。
+- UIKit 可见 UI 不使用网页渲染；Native UI 仅是可选、服务端明确声明的 `dsh-native-ui/1` 清单，不宣称官方 Harness 默认提供。
+
+## 已执行验证
+
+### 本地 iSH（已执行）
 
 ```text
-UIKit App
-  ├─ SetupViewController / AppState
-  ├─ NativeHomeViewController
-  │   ├─ rail + sidebar + workspace/session actions
-  │   ├─ PolishedConversationViewController
-  │   └─ HarnessDirectoryPickerViewController
-  ├─ HarnessRuntime (@MainActor)
-  │   ├─ HarnessClient: URLSession JSON-RPC
-  │   ├─ Keychain credential store
-  │   └─ Remote Mux: URLSessionWebSocketTask /api/remote.mux
-  └─ NativeUITransport + NativeUIRenderer
-      └─ declared manifest component tree only
-```
-
-## 能力矩阵
-
-| 能力域 | 结果 | 证据/限制 |
-|---|---|---|
-| 连接与凭据 | 已实现 | HTTP/HTTPS；令牌写入 Keychain；真实鉴权未联调 |
-| JSON-RPC | 已实现 | envelope、HTTP、rpcId、ok/error 校验；fixtures 通过 |
-| Remote Mux | 已实现 | workspace/session/control/events/follow、取消、重连路径；真实流未联调 |
-| 会话 | 已实现 | 创建、切换、重命名、分叉、归档、分页、发送、停止 |
-| 工作区 | 已实现 | 添加、重命名、移除、目录浏览；官方 listing 字段已建模 |
-| 对话/轨迹/日志 | 已实现 | 原生 UIKit、常见事件合并、详情和日志；完整事件变体未联调 |
-| 模型/权限 | 已实现 | 读取 catalog、选择模型、权限命令；服务选项未联调 |
-| 图片附件 | 已实现 | 原生选择、预览和 prompt 图片块；服务上限未联调 |
-| 审批 | 已实现 | `$events` ready.clientId 与 result 关联；真实事件未联调 |
-| Native UI 插件 | 已实现 | manifest/action/constrained renderer；服务端是否声明未验证 |
-| 设置 | 已实现边界 | 本地说明、连接和凭据状态；未伪造服务端 settings |
-
-## 官方 Remote 对照
-
-- `session/list`、`session/modelCatalog`
-- `session/create`、`session/rename`、`session/fork`
-- `session/prompt`、`session/cancel`、`session/selectModel`、`session/page`、`session/follow`
-- `workspace/follow`、`workspace/create`、`workspace/rename`、`workspace/delete`、`workspace/archiveSession`
-- `directoryPicker/list`、`directoryPicker/createDirectory`（参数为顶层 `path`/`name`，不是 `request` 包装）
-- `session/control`
-- `$events`、`$events/result`
-- Native UI：`/api/native-ui/manifest`、`/api/native-ui/action`（是否由目标服务提供未验证）
-
-## 已移除与禁止路径
-
-- 活跃 target 中无 `WebKit`、`WKWebView`、`evaluateJavaScript`、DOM adapter 或 `HarnessWebView`。
-- legacy/web surface 不再打开网页；只显示原生不可用卡片。
-- 删除/清理了旧设置草稿中的演示 provider、专家数量、插件市场、服务控制和“待接入”式假交互。
-- 未写入真实 endpoint、session/workspace ID、Cookie、令牌、NAS 路径或签名材料。
-
-## 可复现验证
-
-```sh
 python3 -m unittest discover -s Tests -p 'test_*.py' -v
-# 10 tests, OK
-
-git diff --check
-# 通过
-
-find DeepSeekHarness -type f -name '*.swift' -print0 \
-  | xargs -0 grep -nE \
-  'WKWebView|evaluateJavaScript|AutoNativeAdapter|HarnessViewController|openLegacy|window\\.__harnessNative|dom-projection'
-# 无命中
 ```
 
-`Tests/` 为无依赖 Python 协议 fixture，覆盖 RPC envelope/correlation、结构化错误、Remote Mux 帧、ready/clientId、目录 listing、session page cursor、图片块和 HTTP 分类。Xcode/IPA 门禁由 GitHub Actions 执行。
+预期/实际：Python 协议回归测试通过（含修正后的 `_request`、请求型 `request`、RPC 关联/结构化错误、Mux、目录、审批和图片块断言）。
 
-## GitHub Actions 与 IPA
+```text
+git diff --check
+```
 
-最终 Run、artifact、IPA SHA-256、Info.plist、架构和 macOS `otool -L` 结果在构建成功后补入本节；若该报告随提交先进入仓库，不能把旧基线产物冒充最终产物。
+实际：通过。
 
-## 未实现/限制
+本地没有 Xcode、swiftc 或 XCTest 运行器，因此没有把 Swift 编译/测试声称为本地通过。
 
-1. 本轮未访问真实 Harness endpoint，故 endpoint 鉴权、服务 capability、真实目录返回、流式事件变体和 Native manifest 可用性未验证。
-2. 未进行签名后真机安装和 390×844 原生截图采集；需要验收者使用自己的 Team/Provisioning 复核。
-3. 服务端 settings Remote、普通文件附件、用户问题变体和完整 Markdown/富文本语义未在本轮 endpoint 联调；客户端不显示未经声明的入口。
+### CI 执行路径
 
-## 安全
+工程配置包含：
 
-HTTP 仅用于私有 LAN，生产或公网应使用 HTTPS/VPN。访问令牌只写入 Keychain，日志、UserDefaults、源码和报告不保存秘密。IPA 为未签名产物，安装前必须由用户自行签名。
+- App target 的 `HarnessWire.swift` PBXFileReference、PBXBuildFile、源码组和 Sources build phase；
+- Swift XCTest 源文件引用、XCTest framework、测试产物和测试 target 配置；
+- `build-ipa.yml` 在 archive 前执行 Python 测试，并在 archive 后执行 `scripts/verify_ipa.py`。
+
+Swift 测试是否可执行、目标配置是否被 Xcode 接受，以本次 Actions 日志为最终证据；若 workflow 仅成功 archive 而未执行 XCTest，则不把它写成 Swift XCTest 已通过。
+
+### 禁止路径门禁
+
+活跃 Swift 源码保持 UIKit/URLSession 路线；没有恢复网页渲染、DOM 投影或网页兼容路径。旧移交/验收文档中的关键词仅作为历史验收记录，不属于活跃 target。
+
+## 功能边界与诚实化
+
+- 侧栏可对已加载 `session/list` 结果做原生本地筛选；这不冒充服务端 `session/search`，后者在此前部署证据中为 disabled。
+- 未有真实协议证据的完整排序/分组/归档显示选项、服务端 settings 编辑、完整 Markdown/代码高亮/链接复制、用户问题变体、普通文件浏览，不伪装为完成。
+- 目录 picker 采用官方 listing 字段，不假设 entry 有 `isDirectory`。
+- 插件入口只消费声明式 Native manifest；没有清单时显示空态或不可用说明，不安装插件、不打开网页。
+
+## 本次最终 CI / IPA（待本次 Actions 成功后回填）
+
+- Commit：待提交后回填
+- Actions run：待 dispatch 后回填
+- Workflow URL：待 dispatch 后回填
+- Artifact URL：待下载后回填
+- IPA 文件：待下载后回填
+- SHA-256：待下载后回填
+- Bundle ID：`com.example.DeepSeekHarness`
+- MinimumOSVersion：`15.0`
+- 架构：`arm64` device archive
+- 签名：unsigned
+- IPA 门禁：`scripts/verify_ipa.py` 应通过；最终结果待本次 artifact 验证
+
+## 未验证风险
+
+1. 本次返工没有访问 NAS、目标 Harness endpoint 或服务端插件；因此真实鉴权、只读 `session/list` 返回、模型 catalog、真实 WebSocket follow/control/events、分页、发送/停止、目录 capability、审批和 Native manifest 仍需真实环境复核。
+2. 未进行签名安装、真机交互和 390×844 原生 App 截图采集；unsigned IPA 不能直接作为安装成功证据。
+3. Swift XCTest 在 CI 中的最终通过状态必须以本次 workflow 日志核对；本地无法代替该证据。
+4. Native manifest/action 是本客户端可选协议，不等于官方 Harness 或任一现有插件已实现该协议。
+
+## 验收复核项
+
+- [ ] 确认分支仍为 `feature/native-renderer`，未修改 `main`、未 force push。
+- [ ] 检查 Actions 日志是否实际执行 Swift XCTest，而不只执行 Python fixture。
+- [ ] 检查最终 IPA 的 Bundle ID、iOS 15、arm64、unsigned 与 `verify_ipa.py` 输出。
+- [ ] 在用户自己的授权环境进行非破坏性真实 endpoint smoke test。
+- [ ] 复核 WebSocket `session/follow` 及 control/events 帧的真实返回。
+- [ ] 使用用户自己的 Team 签名，在 390×844 真机/模拟器采集原生截图。
+- [ ] 仅在服务明确返回 `dsh-native-ui/1` manifest 时复核插件原生入口。

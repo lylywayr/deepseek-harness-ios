@@ -25,6 +25,16 @@ jobs:
       - name: Verify protocol fixtures
         run: python3 -m unittest discover -s Tests -p 'test_*.py' -v
 
+      - name: Run Swift protocol regression tests
+        run: |
+          set -euo pipefail
+          xcodebuild test \
+            -project DeepSeekHarness.xcodeproj \
+            -scheme DeepSeekHarness \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO
+
       - name: Build unsigned device archive
         run: |
           set -euo pipefail

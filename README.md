@@ -22,9 +22,13 @@ The client does not install plugins on iOS. A server may expose versioned `dsh-n
 
 ## What is deliberately not claimed
 
-The current repository is not a substitute for a signed-device acceptance run. The real Harness endpoint was not contacted during this close-out, per the task boundary. Endpoint-specific authentication, server capability availability, native manifest availability, user-question variants, and behavior on a signed physical device remain acceptance items. The app only exposes capabilities actually returned by the service; it does not fabricate plugin, expert, market, service-control, or settings pages.
+The current repository is not a substitute for a signed-device acceptance run. The real Harness endpoint was not contacted during this close-out, per the task boundary. Endpoint-specific authentication, server capability availability, native manifest availability, user-question variants, and behavior on a signed physical device remain acceptance items. The app only exposes capabilities actually returned by the service; it does not fabricate plugin, expert, market, service-control, or settings pages. A local sidebar filter may narrow the already loaded session list, but it is not a claim that the server-side search Remote is available.
 
-## Build
+## Verification boundary
+
+Production `HarnessWire.swift` is part of the app Sources build phase and is also compiled into the Swift XCTest target. The tests cover the reserved `session/list` request wrapper, request-bearing Remotes, session paging/follow, RPC correlation and structured errors, Remote Mux frames, and event results. Python fixtures remain dependency-free for Alpine smoke checks. Xcode/Swift execution and the unsigned device archive are evidenced only by the relevant GitHub Actions run; iSH has no Xcode.
+
+The repository does not claim a real endpoint smoke test, signed-device installation, 390×844 native screenshot, or server-provided Native UI manifest unless the completion report records such evidence. See [native completion report](docs/native-completion-report.md).
 
 Open `DeepSeekHarness.xcodeproj` in Xcode, or run **Actions → Build unsigned IPA → Run workflow**. The artifact is intentionally unsigned and must be re-signed with the user's own Apple account and provisioning setup before installation. See [self-signing notes](docs/self-signing.md).
 

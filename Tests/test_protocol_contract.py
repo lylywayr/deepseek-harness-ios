@@ -27,12 +27,16 @@ from protocol_contract import (  # noqa: E402
 
 
 class ProtocolContractTests(unittest.TestCase):
-    def test_json_rpc_envelope_and_empty_session_list_args(self) -> None:
-        request = rpc_envelope("session/list", {}, "rpc-list-1")
+    def test_json_rpc_envelope_uses_session_list_request_wrapper(self) -> None:
+        request = rpc_envelope("session/list", {"_request": {}}, "rpc-list-1")
         self.assertEqual(request["type"], "client-request")
         self.assertEqual(request["rpcId"], "rpc-list-1")
         self.assertEqual(request["method"], "session/list")
-        self.assertEqual(request["payload"], {"args": {}})
+        self.assertEqual(request["payload"], {"args": {"_request": {}}})
+
+    def test_request_bearing_remotes_use_request_wrapper(self) -> None:
+        request = rpc_envelope("session/cancel", {"request": {"sessionId": "session-1"}}, "rpc-cancel-1")
+        self.assertEqual(request["payload"]["args"], {"request": {"sessionId": "session-1"}})
 
     def test_json_rpc_correlation_is_required(self) -> None:
         response = {
