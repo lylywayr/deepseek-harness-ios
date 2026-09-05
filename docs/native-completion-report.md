@@ -57,7 +57,7 @@ Swift XCTest、Release device archive、IPA gate 和原生截图 job 均由最�
 
 - 当前分支：`feature/native-renderer`
 - 最终构建代码提交：`1b5e6fdf3b30900520f9363bb5bf233545858ca9`（第三轮最终 Debug 夹具编译边界修复）
-- 当前分支文档后继提交：待本次最终证据更新后记录
+- 当前分支文档后继提交：`ea81347813cf2945010b7ffe4e486703e1f4b8e6`（仅更新本报告）
 - 已推送：`origin/feature/native-renderer`
 - 未修改 `main`，未 force push
 - 工作树另有用户已有未跟踪移交/验收文档，未纳入本次代码/报告提交：`HANDOFF-*`、`REWORK-*`、`docs/native-request-acceptance-report.md`
