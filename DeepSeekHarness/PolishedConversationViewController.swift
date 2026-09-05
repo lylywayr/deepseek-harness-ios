@@ -771,6 +771,7 @@ final class HarnessMessageCell: UITableViewCell, UITextViewDelegate {
 }
 
 final class SessionLogViewController: UIViewController {
+    private let text: String
     private let settings: HarnessClientSettings
     init(text: String, settings: HarnessClientSettings = .defaults) { self.text = text; self.settings = settings; super.init(nibName: nil, bundle: nil) }
     @available(*, unavailable) required init?(coder: NSCoder) { fatalError() }

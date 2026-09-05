@@ -103,6 +103,9 @@ struct HarnessViewPreferences: Equatable {
 }
 
 enum HarnessPresentationPolicy {
+    static func updatedDescending(_ lhs: HarnessSessionSummary, _ rhs: HarnessSessionSummary) -> Bool {
+        lhs.updatedAt == rhs.updatedAt ? lhs.id < rhs.id : lhs.updatedAt > rhs.updatedAt
+    }
     static func search(_ query: String, sessions: [HarnessSessionSummary], archived: Set<String>, showArchived: Bool) -> [HarnessSessionSummary] {
         let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !needle.isEmpty else { return [] }
