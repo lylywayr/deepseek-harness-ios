@@ -50,26 +50,26 @@ python3 scripts/verify_native_ui_fixture.py 全部 ok
 ## 代码与分支
 
 - 当前分支：`feature/native-renderer`
-- 最新代码提交：`0a3c88e2265b0d4ac9a7f31903f79dcf41c7863d`（截图脚本等待修复）
+- 最新代码提交：`b07d000b2b32e4502e110d28067a846fc7ed5f20`（截图设备固定为可用 iPhone 16 Simulator）
 - 已推送：`origin/feature/native-renderer`
 - 未修改 `main`，未 force push
 - 工作树另有用户已有未跟踪移交/验收文档，未纳入代码提交：`HANDOFF-*`、`REWORK-*`、`docs/native-request-acceptance-report.md`
 
 ## 最终 CI / IPA / 截图证据
 
-- Actions Run：`33973270705`，`completed / success`
-- Workflow：`https://github.com/lylywayr/deepseek-harness-ios/actions/runs/33973270705`
-- 成功 job：unsigned IPA 构建与 `Native UI screenshots 390x844`
-- 截图目录：[Native UI 390×844 截图](minis://attachments/native-ui-390x844-33973270705/)
-- 截图文件：`connection`、`conversation`、`sidebar`、`settings`、`directory`、`approval`、`question`、`trajectory`，共 8 张；PNG 原始尺寸为 1179×2556（@3x，对应 393×852 像素级截图，夹具内容区域固定为 390×844pt）。
-- IPA：[最终未签名 IPA](minis://attachments/native-rework-33973270705/DeepSeekHarness-unsigned.ipa)
+- Actions Run：`33974097686`，`completed / success`
+- Workflow：`https://github.com/lylywayr/deepseek-harness-ios/actions/runs/33974097686`
+- 成功 jobs：unsigned IPA 构建与 `Native UI screenshots 390x844`
+- 截图目录：[Native UI 390×844 截图](minis://attachments/native-ui-390x844-33974097686/)
+- 截图文件：`connection`、`conversation`、`sidebar`、`settings`、`directory`、`approval`、`question`、`trajectory`，共 8 张；PNG 原始尺寸为 1206×2622（iPhone 16 Simulator 截图，夹具内容区域固定为 390×844pt）。
+- IPA：[最终未签名 IPA](minis://attachments/native-rework-33974097686/DeepSeekHarness-unsigned.ipa)
 - IPA SHA-256：`b618544f1fd554dbad057c8f39430a53669d68cf84cdfa9862c3c50b30ffa0fe`
 - `verify_ipa.py`：`bundleIdentifier=com.example.DeepSeekHarness`、`minimumOSVersion=15.0`、`unsigned=true`、`forbiddenMarkers=0`
 - Mach-O：`arm64`；IPA 中未发现 `_CodeSignature` 或 `embedded.mobileprovision`
 
 ## 仍需明确的门禁
 
-- 截图 job 已提供真实 Simulator 产物，但未做完整视觉基准审查；截图夹具是确定性原生 UI evidence，不等于所有真实服务数据态都已逐项复现。
+- 当前 8 张截图是确定性 Native-only fixture 的 Simulator 产物；已检查截图非空白且场景之间存在可见差异，但它不等于所有真实服务数据态都已逐项复现。
 - 未完成签名真机安装；需要用户 Team 签名后才能验证真机行为。
 - prompt、真实审批/用户问题事件、图片发送、分页 UI、原生设置页面和目录页面尚未在真实服务上逐项走通；代码、模拟器截图和结构测试不替代真实事件联调。
 - Native manifest/action 是可选声明式协议，不代表官方 Harness 或现有插件已实现。
