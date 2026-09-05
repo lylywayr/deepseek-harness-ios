@@ -779,7 +779,7 @@ final class TrajectoryDetailViewController: UIViewController {
     @available(*, unavailable) required init?(coder:NSCoder){fatalError()}
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "调用详情"
+        title = item.subtitle == "错误" ? "错误详情" : "调用详情"
         view.backgroundColor = DHTheme.background
         navigationItem.rightBarButtonItem = UIBarButtonItem(barButtonSystemItem: .done, target: self, action: #selector(close))
         let text = UITextView()
@@ -788,7 +788,7 @@ final class TrajectoryDetailViewController: UIViewController {
         text.textColor = DHTheme.text
         text.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
         text.textContainerInset = UIEdgeInsets(top: 20, left: 16, bottom: 20, right: 16)
-        text.text = "类型：\(item.kind)\n\n\(item.text)\n\n\(item.subtitle ?? "")"
+        text.text = "类型：\(item.kind.rawValue)\n\n\(item.text)\n\n\(item.subtitle ?? "")\n\(item.detail ?? "")"
         text.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(text)
         NSLayoutConstraint.activate([
