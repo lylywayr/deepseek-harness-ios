@@ -2,7 +2,7 @@
 
 ## 结论
 
-第二轮代码已在 `feature/native-renderer` 完成并推送。生产 App 保持 UIKit + URLSession JSON-RPC/WebSocket Mux 的 Native-first 路线；没有恢复 WebKit、WKWebView、DOM 或 legacy 网页路径。
+第三轮定点修复已在 `feature/native-renderer` 完成并推送。生产 App 保持 UIKit + URLSession JSON-RPC/WebSocket Mux 的 Native-first 路线；没有恢复 WebKit、WKWebView、DOM 或 legacy 网页路径。
 
 ## 本轮实现
 
@@ -13,7 +13,13 @@
 - 目录：面包屑、home/根路径、隐藏目录切换、新建文件夹、选择与失败提示。
 - 原生截图夹具：提供 8 个 Native-only 场景，仅由 `-UITestFixture -NativeFixtureScreen <scene>` 启动参数进入，不影响正常生产入口。
 
-## 真实 Harness Gate 1 脱敏证据
+## 本轮第三轮定点修复
+
+- 设置接线：对话控制器持有 `AppState`，字号传入消息 Markdown/正文和 Session 日志；`transcriptView` 通过生产展示策略即时过滤过程行；`busyEnter` 计算 queue/steer，并保留 Cmd/Ctrl+Enter 反向语义；新会话创建成功后通过官方 `commands/execute` 权限命令应用 `defaultPermission`。
+- 视图选项：`HarnessPresentationPolicy.sections` 按全部 workspace 的 `sessionIDs` 分组，flat 为单列表，未归属会话进入“其他会话”；归档仅作展示过滤，updated/manual 均尊重数据顺序。
+- Markdown：补齐行内代码样式、HTTP/HTTPS `.link` attribute；消息使用可选择复制的原生 `UITextView`，仅安全打开 HTTP/HTTPS 链接。
+- 截图夹具：入口和实现均置于 `#if DEBUG`；Release IPA 门禁禁止 fixture marker 与真实内网地址；fixture 使用虚构示例地址；连接错误文案拆成独立行，消除重叠。
+
 
 目标服务仅用于只读与一次性临时对象联调；没有记录 token、Cookie 或消息正文。
 
@@ -35,7 +41,7 @@ prompt skipped=cost-unconfirmed
 
 ## 测试与 CI
 
-本地 iSH：
+本地 iSH（静态/协议辅助测试，Linux 无 Xcode）:
 
 ```text
 python3 -m unittest discover -s Tests -p 'test_*.py' -v
@@ -45,27 +51,27 @@ python3 scripts/verify_native_rework.py 全部 ok
 python3 scripts/verify_native_ui_fixture.py 全部 ok
 ```
 
-本地没有 Xcode/swiftc，未声称本地 Swift 编译通过。最终 CI Run `33974638916` 成功执行 Swift XCTest、Release device archive、IPA verify 和 artifact upload；同一 Run 的 `native-ui-screenshots` job 成功生成并上传 8 张原生截图。
+Swift XCTest、Release device archive、IPA gate 和原生截图 job 均由最终 CI 执行成功：Run `33981502636`，对应代码 HEAD `9bd1ea98b61221d902c3449e560bc27f155fe6c1`。其中 Swift 协议回归测试通过，包含生产模型的 workspace/flat、归档过滤、Compact 过程显示、busy Enter、Markdown inline code/link 断言及创建权限参数测试。
 
 ## 代码与分支
 
 - 当前分支：`feature/native-renderer`
-- 最新代码提交：`102956489ab2e518d0c05187b1650990d881c37f`（截图场景改用启动参数传递）
+- 最新代码提交：`9bd1ea98b61221d902c3449e560bc27f155fe6c1`（第三轮定点修复后 Markdown link 编译验收修复）
 - 已推送：`origin/feature/native-renderer`
 - 未修改 `main`，未 force push
-- 工作树另有用户已有未跟踪移交/验收文档，未纳入代码提交：`HANDOFF-*`、`REWORK-*`、`docs/native-request-acceptance-report.md`
+- 工作树另有用户已有未跟踪移交/验收文档，未纳入本次代码/报告提交：`HANDOFF-*`、`REWORK-*`、`docs/native-request-acceptance-report.md`
 
 ## 最终 CI / IPA / 截图证据
 
-- Actions Run：`33974638916`，`completed / success`
-- Workflow：`https://github.com/lylywayr/deepseek-harness-ios/actions/runs/33974638916`
-- 成功 jobs：unsigned IPA 构建与 `Native UI screenshots 390x844`
-- 截图目录：[Native UI 390×844 截图](minis://attachments/native-ui-390x844-33974638916/)
-- 截图文件：`connection`、`conversation`、`sidebar`、`settings`、`directory`、`approval`、`question`、`trajectory`，共 8 张；PNG 原始尺寸为 1206×2622（iPhone 16 Simulator 截图，夹具内容区域固定为 390×844pt）。
-- IPA：[最终未签名 IPA](minis://attachments/native-rework-33974638916/DeepSeekHarness-unsigned.ipa)
-- IPA SHA-256：`b618544f1fd554dbad057c8f39430a53669d68cf84cdfa9862c3c50b30ffa0fe`
-- `verify_ipa.py`：`bundleIdentifier=com.example.DeepSeekHarness`、`minimumOSVersion=15.0`、`unsigned=true`、`forbiddenMarkers=0`
-- Mach-O：`arm64`；IPA 中未发现 `_CodeSignature` 或 `embedded.mobileprovision`
+- Actions Run：`33981502636`，`completed / success`
+- Workflow：https://github.com/lylywayr/deepseek-harness-ios/actions/runs/33981502636
+- 成功 jobs：unsigned IPA 构建与 `Native UI screenshots 390x844`；Swift XCTest、Release archive、IPA verify 全部通过。
+- 截图目录：[第三轮 Native UI 390×844 截图](minis://attachments/native-ui-390x844-33981502636-rerun/)
+- 截图文件：`connection`、`conversation`、`sidebar`、`settings`、`directory`、`approval`、`question`、`trajectory`，共 8 张；PNG 原始尺寸均为 1206×2622（iPhone 16 Simulator，内容区域 390×844pt）。重新下载并逐项检查：connection 不再有错误文字重叠；场景按启动参数产生不同 UI。
+- IPA：[第三轮最终未签名 IPA](minis://attachments/native-rework-33981502636/DeepSeekHarness-unsigned.ipa)
+- IPA SHA-256：`209f8ad5106e4509a2c15b3db51d04115c23204c71fe116b01105efb782c4772`
+- 独立 `verify_ipa.py`：`bundleIdentifier=com.example.DeepSeekHarness`、`minimumOSVersion=15.0`、`arm64`、`unsigned=true`、`forbiddenMarkers=0`；扫描禁止 fixture marker 与真实内网地址均未命中。
+- IPA 中未发现 `_CodeSignature` 或 `embedded.mobileprovision`。
 
 ## 仍需明确的门禁
 
