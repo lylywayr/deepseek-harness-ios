@@ -159,11 +159,39 @@ final class NativeFixtureViewController: UIViewController {
         let stack = UIStackView()
         install(stack)
         stack.addArrangedSubview(heading("连接 Harness", subtitle: "原生连接状态 · 390×844 fixture"))
-        let connection = card("Harness 服务", body: "服务地址和访问令牌仅保存在本机。")
-        let content = UIStackView(); content.axis = .vertical; content.spacing = 10; content.translatesAutoresizingMaskIntoConstraints = false
+
+        let connection = UIView()
+        connection.dhApplyCard(backgroundColor: DHTheme.surface, cornerRadius: 16, borderColor: DHTheme.separator.withAlphaComponent(0.28))
+        let content = UIStackView()
+        content.axis = .vertical
+        content.spacing = 10
+        content.translatesAutoresizingMaskIntoConstraints = false
         connection.addSubview(content)
-        let address = UITextField(); address.text = "https://harness.example.com"; address.font = DHTheme.font(.body); address.textColor = DHTheme.text; address.backgroundColor = DHTheme.surfaceMuted; address.layer.cornerRadius = 10; address.setLeftPadding(12); address.heightAnchor.constraint(equalToConstant: 44).isActive = true
-        let token = UITextField(); token.placeholder = "访问令牌（可选）"; token.isSecureTextEntry = true; token.backgroundColor = DHTheme.surfaceMuted; token.layer.cornerRadius = 10; token.setLeftPadding(12); token.heightAnchor.constraint(equalToConstant: 44).isActive = true
+
+        let title = UILabel()
+        title.text = "Harness 服务"
+        title.font = DHTheme.font(.headline, weight: .semibold)
+        title.textColor = DHTheme.text
+        let detail = UILabel()
+        detail.text = "服务地址和访问令牌仅保存在本机。"
+        detail.font = DHTheme.font(.subheadline)
+        detail.textColor = DHTheme.secondaryText
+        detail.numberOfLines = 0
+        let address = UITextField()
+        address.text = "https://harness.example.com"
+        address.font = DHTheme.font(.body)
+        address.textColor = DHTheme.text
+        address.backgroundColor = DHTheme.surfaceMuted
+        address.layer.cornerRadius = 10
+        address.setLeftPadding(12)
+        address.heightAnchor.constraint(equalToConstant: 44).isActive = true
+        let token = UITextField()
+        token.placeholder = "访问令牌（可选）"
+        token.isSecureTextEntry = true
+        token.backgroundColor = DHTheme.surfaceMuted
+        token.layer.cornerRadius = 10
+        token.setLeftPadding(12)
+        token.heightAnchor.constraint(equalToConstant: 44).isActive = true
         let error = UILabel()
         error.text = "● 连接失败"
         error.textColor = DHTheme.danger
@@ -174,8 +202,18 @@ final class NativeFixtureViewController: UIViewController {
         errorDetail.textColor = DHTheme.secondaryText
         errorDetail.font = DHTheme.font(.subheadline)
         errorDetail.numberOfLines = 0
-        content.addArrangedSubview(address); content.addArrangedSubview(token); content.addArrangedSubview(error); content.addArrangedSubview(errorDetail)
-        NSLayoutConstraint.activate([content.leadingAnchor.constraint(equalTo: connection.leadingAnchor, constant: 16), content.trailingAnchor.constraint(equalTo: connection.trailingAnchor, constant: -16), content.topAnchor.constraint(equalTo: connection.topAnchor, constant: 58), content.bottomAnchor.constraint(equalTo: connection.bottomAnchor, constant: -16)])
+        content.addArrangedSubview(title)
+        content.addArrangedSubview(detail)
+        content.addArrangedSubview(address)
+        content.addArrangedSubview(token)
+        content.addArrangedSubview(error)
+        content.addArrangedSubview(errorDetail)
+        NSLayoutConstraint.activate([
+            content.leadingAnchor.constraint(equalTo: connection.leadingAnchor, constant: 16),
+            content.trailingAnchor.constraint(equalTo: connection.trailingAnchor, constant: -16),
+            content.topAnchor.constraint(equalTo: connection.topAnchor, constant: 15),
+            content.bottomAnchor.constraint(equalTo: connection.bottomAnchor, constant: -15)
+        ])
         stack.addArrangedSubview(connection)
         stack.addArrangedSubview(actionButton("重试连接", filled: true))
         stack.addArrangedSubview(actionButton("编辑连接"))
