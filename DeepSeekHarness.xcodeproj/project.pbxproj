@@ -25,7 +25,6 @@
 		A10000000000000000000012 /* HarnessWireTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000013 /* HarnessWireTests.swift */; };
 		A10000000000000000000017 /* HarnessClientModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000017 /* HarnessClientModelsTests.swift */; };
 		A10000000000000000000013 /* HarnessWire.swift in Tests */ = {isa = PBXBuildFile; fileRef = B10000000000000000000012 /* HarnessWire.swift */; };
-		A10000000000000000000019 /* HarnessClientModels.swift in Tests */ = {isa = PBXBuildFile; fileRef = B10000000000000000000016 /* HarnessClientModels.swift */; };
 		A10000000000000000000014 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B10000000000000000000015 /* XCTest.framework */; };
 /* End PBXBuildFile section */
 
