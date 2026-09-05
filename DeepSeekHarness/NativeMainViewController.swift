@@ -13,7 +13,11 @@ final class DeepSeekHarnessAppDelegate: UIResponder, UIApplicationDelegate {
         let window = UIWindow(frame: UIScreen.main.bounds)
         let root: UIViewController
         if ProcessInfo.processInfo.arguments.contains("-UITestFixture") {
-            let screen = ProcessInfo.processInfo.environment["NATIVE_FIXTURE_SCREEN"] ?? "conversation"
+            let arguments = ProcessInfo.processInfo.arguments
+            let screenArgument = arguments.firstIndex(of: "-NativeFixtureScreen").flatMap { index in
+                arguments.indices.contains(index + 1) ? arguments[index + 1] : nil
+            }
+            let screen = screenArgument ?? ProcessInfo.processInfo.environment["NATIVE_FIXTURE_SCREEN"] ?? "conversation"
             root = NativeFixtureViewController(screen: screen)
         } else {
             let main = MainViewController(appState: appState, nativeUIStore: nativeUIStore)

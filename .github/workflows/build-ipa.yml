@@ -102,7 +102,7 @@ jobs:
       - name: Capture native screenshots
         run: |
           set -euo pipefail
-          # capture_native_ui.sh launches the app with -UITestFixture.
+          # capture_native_ui.sh launches the app with -UITestFixture and -NativeFixtureScreen.
           chmod +x scripts/capture_native_ui.sh
           scripts/capture_native_ui.sh
 
