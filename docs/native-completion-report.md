@@ -56,7 +56,8 @@ Swift XCTest、Release device archive、IPA gate 和原生截图 job 均由最�
 ## 代码与分支
 
 - 当前分支：`feature/native-renderer`
-- 最新代码提交：`9bd1ea98b61221d902c3449e560bc27f155fe6c1`（第三轮定点修复后 Markdown link 编译验收修复）
+- 最终构建代码提交：`9bd1ea98b61221d902c3449e560bc27f155fe6c1`（第三轮定点修复后 Markdown link 编译验收修复）
+- 当前分支文档后继提交：`5e3dbe510d4d32dfdc2c270b895f9231ddfcba22`（仅更新本报告）
 - 已推送：`origin/feature/native-renderer`
 - 未修改 `main`，未 force push
 - 工作树另有用户已有未跟踪移交/验收文档，未纳入本次代码/报告提交：`HANDOFF-*`、`REWORK-*`、`docs/native-request-acceptance-report.md`
