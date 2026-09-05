@@ -31,7 +31,8 @@ jobs:
           xcodebuild test \
             -project DeepSeekHarness.xcodeproj \
             -scheme DeepSeekHarness \
-            -destination 'generic/platform=iOS' \
+            -sdk iphonesimulator \
+            -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.2' \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO
 
