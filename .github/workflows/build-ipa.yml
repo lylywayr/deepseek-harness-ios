@@ -94,7 +94,7 @@ jobs:
             -project DeepSeekHarness.xcodeproj \
             -scheme DeepSeekHarness \
             -sdk iphonesimulator \
-            -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.2' \
+            -destination 'platform=iOS Simulator,name=iPhone 13,OS=18.2' \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO
