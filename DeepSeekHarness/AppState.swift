@@ -2,6 +2,10 @@ import Foundation
 import Combine
 import UIKit
 
+extension Notification.Name {
+    static let harnessClientSettingsDidChange = Notification.Name("HarnessClientSettingsDidChange")
+}
+
 @MainActor
 final class AppState: ObservableObject {
     private enum Keys {
@@ -88,6 +92,7 @@ final class AppState: ObservableObject {
         defaults.set(value.busyEnter.rawValue, forKey: Keys.busyEnter)
         defaults.set(value.defaultPermission, forKey: Keys.defaultPermission)
         applyAppearance(value.theme)
+        NotificationCenter.default.post(name: .harnessClientSettingsDidChange, object: self)
     }
 
     func updateViewPreferences(_ value: HarnessViewPreferences) {

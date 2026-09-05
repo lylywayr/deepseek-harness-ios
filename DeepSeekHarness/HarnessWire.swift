@@ -49,6 +49,16 @@ enum HarnessWire {
         ["request": request]
     }
 
+    static func sessionCreateArguments(workspaceID: String?) -> [String: Any] {
+        var request: [String: Any] = [:]
+        if let workspaceID { request["workspaceId"] = workspaceID }
+        return requestArguments(request)
+    }
+
+    static func permissionCommandArguments(sessionID: String, value: String) -> [String: Any] {
+        ["agentId": sessionID, "line": "/permission \(value)", "images": []]
+    }
+
     static func sessionPageArguments(
         sessionID: String,
         throughSeq: Int,

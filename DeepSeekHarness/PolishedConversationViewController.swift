@@ -3,6 +3,7 @@ import PhotosUI
 import UniformTypeIdentifiers
 
 final class PolishedConversationViewController: UIViewController, UITableViewDataSource, UITableViewDelegate, UITextViewDelegate, UISearchBarDelegate, PHPickerViewControllerDelegate, UIDocumentPickerDelegate {
+    private let appState: AppState
     private let runtime: HarnessRuntime
     private let tableView = UITableView(frame: .zero, style: .plain)
     private let sessionHeader = UIView()
@@ -45,9 +46,11 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
     private var isNearBottom = true
     private var isLoadingOlder = false
     private var pendingQuestion: HarnessPendingQuestion?
+    private var activeSendMode: String { HarnessBusyEnterBehavior.sendMode(for: appState.settings.busyEnter, isGenerating: runtime.isGenerating, commandModified: false) }
 
-    init(runtime: HarnessRuntime) {
+    init(runtime: HarnessRuntime, appState: AppState) {
         self.runtime = runtime
+        self.appState = appState
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -63,6 +66,7 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
         buildComposer()
         buildEmptyState()
         runtime.onChange = { [weak self] in self?.render() }
+        NotificationCenter.default.addObserver(self, selector: #selector(settingsDidChange), name: .harnessClientSettingsDidChange, object: appState)
         runtime.onApproval = { [weak self] value in self?.showApproval(value) }
         runtime.onQuestion = { [weak self] pending in
             DispatchQueue.main.async {
@@ -75,6 +79,13 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
     }
 
     deinit { NotificationCenter.default.removeObserver(self) }
+
+    @objc private func settingsDidChange() {
+        input.font = .systemFont(ofSize: CGFloat(appState.settings.fontSize))
+        placeholder.font = .systemFont(ofSize: CGFloat(appState.settings.fontSize))
+        tableView.reloadData()
+        view.setNeedsLayout()
+    }
 
     private func buildSessionHeader() {
         sessionHeader.backgroundColor = DHTheme.surface
@@ -240,7 +251,7 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
         statusLabel.translatesAutoresizingMaskIntoConstraints = false
         composer.addSubview(statusLabel)
 
-        input.font = DHTheme.font(.body)
+        input.font = .systemFont(ofSize: CGFloat(appState.settings.fontSize))
         input.textColor = DHTheme.text
         input.backgroundColor = .clear
         input.textContainerInset = UIEdgeInsets(top: 9, left: 10, bottom: 7, right: 10)
@@ -395,7 +406,7 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
     private func render() {
         let old = displayedIDs
         let wasNearBottom = isNearBottom || isTableNearBottom()
-        displayedIDs = runtime.items.map(\.id)
+        displayedIDs = visibleItems.map(\.id)
         tableView.reloadData()
         emptyState.isHidden = !runtime.items.isEmpty
         statusLabel.isHidden = runtime.items.isEmpty && runtime.lastError == nil
@@ -478,7 +489,7 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
 
     private func showSessionLog() {
         let text = runtime.items.map { "[\($0.kind.rawValue)] \($0.text)" }.joined(separator: "\n\n")
-        let controller = SessionLogViewController(text: text.isEmpty ? "当前会话暂无日志" : text)
+        let controller = SessionLogViewController(text: text.isEmpty ? "当前会话暂无日志" : text, settings: appState.settings)
         let navigation = UINavigationController(rootViewController: controller)
         navigation.modalPresentationStyle = .pageSheet
         present(navigation, animated: true)
@@ -519,10 +530,20 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
     }
 
     @objc private func send() {
-        if runtime.isGenerating { runtime.cancel(); return }
+        if runtime.isGenerating {
+            let text = input.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !text.isEmpty || !images.isEmpty else { runtime.cancel(); return }
+            sendCurrentInput(commandModified: false)
+            return
+        }
+        sendCurrentInput(commandModified: false)
+    }
+
+    private func sendCurrentInput(commandModified: Bool) {
         let text = input.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty || !images.isEmpty else { return }
-        runtime.send(text, images: images)
+        guard !text.isEmpty || !images.isEmpty else { if runtime.isGenerating { runtime.cancel() }; return }
+        let mode = HarnessBusyEnterBehavior.sendMode(for: appState.settings.busyEnter, isGenerating: runtime.isGenerating, commandModified: commandModified)
+        runtime.send(text, mode: mode, images: images)
         input.text = ""; images.removeAll(); renderAttachments(); textViewDidChange(input)
     }
 
@@ -631,18 +652,31 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
         return tableView.contentSize.height <= 0 || visibleBottom >= tableView.contentSize.height - 120
     }
 
-    private func scrollBottom() { guard !runtime.items.isEmpty else{return};tableView.scrollToRow(at:IndexPath(row:runtime.items.count-1,section:0),at:.bottom,animated:false) }
+    private func scrollBottom() {
+        let lastRow = visibleItems.count - 1
+        guard lastRow >= 0 else { return }
+        tableView.scrollToRow(at: IndexPath(row: lastRow, section: 0), at: .bottom, animated: false)
+    }
 
     @objc private func keyboardChanged(_ note: Notification) { guard let f=note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect,let d=note.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double else{return};let c=view.convert(f,from:nil);composerBottom.constant = -10-max(0,view.bounds.maxY-c.minY-view.safeAreaInsets.bottom);UIView.animate(withDuration:d){self.view.layoutIfNeeded()} }
     func textViewDidChange(_ textView: UITextView) { inputHeight.constant=min(max(textView.contentSize.height,46),130);updateSend();view.layoutIfNeeded() }
-    private var visibleItems: [HarnessConversationItem] { showingTrajectory ? trajectoryItems() : runtime.items }
+    func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
+        guard text == "\n" else { return true }
+        let modifiers = textView.keyCommands?.first?.modifierFlags ?? []
+        sendCurrentInput(commandModified: modifiers.contains(.command) || modifiers.contains(.control))
+        return false
+    }
+    private var visibleItems: [HarnessConversationItem] {
+        let source = showingTrajectory ? trajectoryItems() : runtime.items
+        return HarnessPresentationPolicy.transcriptVisibleItems(source, view: appState.settings.transcriptView)
+    }
     func tableView(_ tableView:UITableView,numberOfRowsInSection section:Int)->Int{visibleItems.count}
-    func tableView(_ tableView:UITableView,cellForRowAt indexPath:IndexPath)->UITableViewCell{let c=tableView.dequeueReusableCell(withIdentifier:"message",for:indexPath) as! HarnessMessageCell;c.configure(visibleItems[indexPath.row]);return c}
+    func tableView(_ tableView:UITableView,cellForRowAt indexPath:IndexPath)->UITableViewCell{let c=tableView.dequeueReusableCell(withIdentifier:"message",for:indexPath) as! HarnessMessageCell;c.configure(visibleItems[indexPath.row], settings: appState.settings);return c}
     func tableView(_ tableView:UITableView,didSelectRowAt indexPath:IndexPath){
         tableView.deselectRow(at:indexPath,animated:true)
         guard showingTrajectory, visibleItems.indices.contains(indexPath.row) else{return}
         let item=visibleItems[indexPath.row]
-        let detail=TrajectoryDetailViewController(item:item)
+        let detail=TrajectoryDetailViewController(item:item, fontSize: CGFloat(appState.settings.fontSize))
         let navigation=UINavigationController(rootViewController:detail)
         navigation.modalPresentationStyle = .pageSheet
         present(navigation,animated:true)
@@ -652,7 +686,7 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
         isNearBottom = isTableNearBottom()
     }
     func tableView(_ tableView:UITableView,willDisplay cell:UITableViewCell,forRowAt indexPath:IndexPath){
-        if indexPath.row == 0 && runtime.hasMore && !isLoadingOlder {
+        if indexPath.row == 0 && runtime.hasMore && !isLoadingOlder && appState.settings.transcriptView == .normal {
             isLoadingOlder = true
             let oldOffset = tableView.contentOffset.y
             let oldHeight = tableView.contentSize.height
@@ -669,10 +703,10 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
 
 }
 
-final class HarnessMessageCell: UITableViewCell {
+final class HarnessMessageCell: UITableViewCell, UITextViewDelegate {
     private let card = UIView()
     private let title = UILabel()
-    private let body = UILabel()
+    private let body = UITextView()
     private let meta = UILabel()
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
@@ -687,8 +721,13 @@ final class HarnessMessageCell: UITableViewCell {
             card.addSubview($0)
         }
         title.font = DHTheme.font(.caption1, weight: .semibold)
-        body.font = DHTheme.font(.body)
-        body.numberOfLines = 0
+        body.isEditable = false
+        body.isSelectable = true
+        body.isScrollEnabled = false
+        body.delegate = self
+        body.backgroundColor = .clear
+        body.textContainerInset = .zero
+        body.textContainer.lineFragmentPadding = 0
         meta.font = DHTheme.font(.caption2)
         meta.textColor = DHTheme.tertiaryText
         NSLayoutConstraint.activate([
@@ -712,18 +751,28 @@ final class HarnessMessageCell: UITableViewCell {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
-    func configure(_ item: HarnessConversationItem) {
+    func configure(_ item: HarnessConversationItem, settings: HarnessClientSettings = .defaults) {
         title.text = item.kind == .user ? "你" : item.kind == .assistant ? "Harness" : item.kind == .tool ? "工具" : "系统"
-        body.text = item.text
+        body.attributedText = item.isMarkdown ? HarnessMarkdown.attributed(item.text, fontSize: CGFloat(settings.fontSize), color: DHTheme.text) : NSAttributedString(string: item.text, attributes: [.font: UIFont.systemFont(ofSize: CGFloat(settings.fontSize)), .foregroundColor: DHTheme.text])
         meta.text = item.subtitle
+        meta.font = UIFont.systemFont(ofSize: max(10, CGFloat(settings.fontSize - 4)))
         card.backgroundColor = item.kind == .user ? DHTheme.accentSoft : item.kind == .tool ? DHTheme.surfaceMuted : DHTheme.surface
         title.textColor = item.kind == .user ? DHTheme.accent : DHTheme.secondaryText
+        let compact = settings.transcriptView == .compact
+        body.isHidden = compact && item.kind == .system && item.subtitle != "错误"
+        meta.isHidden = compact && item.kind == .system && item.subtitle != "错误"
+    }
+
+    func textView(_ textView: UITextView, shouldInteractWith URL: URL, in characterRange: NSRange, interaction: UITextItemInteraction) -> Bool {
+        guard ["http", "https"].contains(URL.scheme?.lowercased()) else { return false }
+        UIApplication.shared.open(URL)
+        return false
     }
 }
 
 final class SessionLogViewController: UIViewController {
-    private let text: String
-    init(text: String) { self.text = text; super.init(nibName: nil, bundle: nil) }
+    private let settings: HarnessClientSettings
+    init(text: String, settings: HarnessClientSettings = .defaults) { self.text = text; self.settings = settings; super.init(nibName: nil, bundle: nil) }
     @available(*, unavailable) required init?(coder: NSCoder) { fatalError() }
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -735,7 +784,7 @@ final class SessionLogViewController: UIViewController {
         textView.isEditable = false
         textView.backgroundColor = .clear
         textView.textColor = DHTheme.text
-        textView.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
+        textView.font = .monospacedSystemFont(ofSize: CGFloat(settings.fontSize), weight: .regular)
         textView.textContainerInset = UIEdgeInsets(top: 18, left: 14, bottom: 18, right: 14)
         textView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(textView)
@@ -775,8 +824,9 @@ final class TrajectoryTimelineView: UIView {
 
 final class TrajectoryDetailViewController: UIViewController {
     private let item: HarnessConversationItem
-    init(item: HarnessConversationItem){self.item=item;super.init(nibName:nil,bundle:nil)}
-    @available(*, unavailable) required init?(coder:NSCoder){fatalError()}
+    private let fontSize: CGFloat
+    init(item: HarnessConversationItem, fontSize: CGFloat = 14) { self.item = item; self.fontSize = fontSize; super.init(nibName: nil, bundle: nil) }
+    @available(*, unavailable) required init?(coder: NSCoder) { fatalError() }
     override func viewDidLoad() {
         super.viewDidLoad()
         title = item.subtitle == "错误" ? "错误详情" : "调用详情"
@@ -784,9 +834,10 @@ final class TrajectoryDetailViewController: UIViewController {
         navigationItem.rightBarButtonItem = UIBarButtonItem(barButtonSystemItem: .done, target: self, action: #selector(close))
         let text = UITextView()
         text.isEditable = false
+        text.isSelectable = true
         text.backgroundColor = .clear
         text.textColor = DHTheme.text
-        text.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
+        text.font = .monospacedSystemFont(ofSize: max(12, fontSize - 1), weight: .regular)
         text.textContainerInset = UIEdgeInsets(top: 20, left: 16, bottom: 20, right: 16)
         text.text = "类型：\(item.kind.rawValue)\n\n\(item.text)\n\n\(item.subtitle ?? "")\n\(item.detail ?? "")"
         text.translatesAutoresizingMaskIntoConstraints = false

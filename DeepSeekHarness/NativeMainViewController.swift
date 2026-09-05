@@ -12,6 +12,7 @@ final class DeepSeekHarnessAppDelegate: UIResponder, UIApplicationDelegate {
     ) -> Bool {
         let window = UIWindow(frame: UIScreen.main.bounds)
         let root: UIViewController
+        #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("-UITestFixture") {
             let arguments = ProcessInfo.processInfo.arguments
             let screenArgument = arguments.firstIndex(of: "-NativeFixtureScreen").flatMap { index in
@@ -23,6 +24,9 @@ final class DeepSeekHarnessAppDelegate: UIResponder, UIApplicationDelegate {
             let main = MainViewController(appState: appState, nativeUIStore: nativeUIStore)
             root = main
         }
+        #else
+        root = MainViewController(appState: appState, nativeUIStore: nativeUIStore)
+        #endif
         let navigation = UINavigationController(rootViewController: root)
         navigation.navigationBar.prefersLargeTitles = false
         navigation.navigationBar.tintColor = DHTheme.accent
@@ -241,7 +245,8 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
         fishButton.heightAnchor.constraint(equalToConstant: 42).isActive = true
         railStack.addArrangedSubview(fishButton)
         railStack.addArrangedSubview(railButton(icon: "plus.message", label: "新建会话") { [weak self] in
-            self?.runtime.createSession(workspaceID: self?.runtime.workspaces.first?.id)
+            guard let self else { return }
+            self.runtime.createSession(workspaceID: self.runtime.workspaces.first?.id, defaultPermission: self.appState.settings.defaultPermission)
         })
         railStack.addArrangedSubview(railButton(icon: "folder.badge.plus", label: "添加工作区") { [weak self] in self?.showDirectoryPicker() })
         railStack.addArrangedSubview(railButton(icon: "magnifyingglass", label: "搜索会话") { [weak self] in self?.toggleSidebar() })
@@ -274,7 +279,7 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
         ])
 
         runtime = HarnessRuntime(baseURL: appState.endpointURL!)
-        let conversation = PolishedConversationViewController(runtime: runtime)
+        let conversation = PolishedConversationViewController(runtime: runtime, appState: appState)
         addChild(conversation)
         conversation.view.translatesAutoresizingMaskIntoConstraints = false
         conversationContainer.addSubview(conversation.view)
@@ -381,28 +386,34 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
         sidebarContent.addArrangedSubview(searchEmptyLabel)
 
         sidebarContent.addArrangedSubview(sidebarButton(title: "新会话", icon: "plus.message") { [weak self] in
-            let workspace = self?.runtime.workspaces.first?.id
-            self?.runtime.createSession(workspaceID: workspace)
-            self?.toggleSidebar()
+            guard let self else { return }
+            self.runtime.createSession(workspaceID: self.runtime.workspaces.first?.id, defaultPermission: self.appState.settings.defaultPermission)
+            self.toggleSidebar()
         })
 
-        let workspaceTitle = UILabel()
-        workspaceTitle.text = "工作区"
-        workspaceTitle.font = DHTheme.font(.subheadline, weight: .medium)
-        workspaceTitle.textColor = DHTheme.secondaryText
-        sidebarContent.addArrangedSubview(workspaceTitle)
-
-        if let workspace = runtime.workspaces.first {
-            sidebarContent.addArrangedSubview(sidebarButton(title: workspace.title, icon: "folder", menu: workspaceMenu(workspace)) { })
-        }
-
-        for session in displayedSessions() {
-            let title = session.title.isEmpty ? "新会话" : session.title
-            let selected = session.id == runtime.selectedSessionID
-            sidebarContent.addArrangedSubview(sidebarButton(title: title, icon: session.running ? "circle.dotted" : "message", selected: selected, menu: sessionMenu(session)) { [weak self] in
-                self?.runtime.openSession(session.id)
-                self?.toggleSidebar()
-            })
+        let sections = HarnessPresentationPolicy.sections(
+            sessions: runtime.sessions,
+            workspaces: runtime.workspaces,
+            archived: runtime.archivedSessionIDsForPresentation,
+            preferences: appState.viewPreferences
+        )
+        for section in sections {
+            let sectionLabel = UILabel()
+            sectionLabel.text = section.title
+            sectionLabel.font = DHTheme.font(.subheadline, weight: .semibold)
+            sectionLabel.textColor = DHTheme.secondaryText
+            sectionLabel.accessibilityLabel = "工作区分组：\(section.title)"
+            sidebarContent.addArrangedSubview(sectionLabel)
+            for session in section.sessions.prefix(12) {
+                let title = session.title.isEmpty ? "新会话" : session.title
+                let archived = runtime.archivedSessionIDsForPresentation.contains(session.id)
+                let selected = session.id == runtime.selectedSessionID
+                let suffix = archived ? " · 已归档" : ""
+                sidebarContent.addArrangedSubview(sidebarButton(title: title + suffix, icon: archived ? "archivebox" : (session.running ? "circle.dotted" : "message"), selected: selected, menu: sessionMenu(session)) { [weak self] in
+                    self?.runtime.openSession(session.id)
+                    self?.toggleSidebar()
+                })
+            }
         }
         searchEmptyLabel.isHidden = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !displayedSessions().isEmpty
 

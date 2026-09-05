@@ -24,6 +24,16 @@ final class HarnessWireTests: XCTestCase {
         XCTAssertEqual(request["sessionId"] as? String, "session-1")
     }
 
+    func testRequestArgumentsForSessionCreationAndPermissionStayOfficial() throws {
+        let create = HarnessWire.sessionCreateArguments(workspaceID: "workspace-1")
+        let createRequest = try XCTUnwrap(create["request"] as? [String: Any])
+        XCTAssertEqual(createRequest["workspaceId"] as? String, "workspace-1")
+        let permission = HarnessWire.permissionCommandArguments(sessionID: "session-1", value: "workspace-write")
+        XCTAssertEqual(permission["agentId"] as? String, "session-1")
+        XCTAssertEqual(permission["line"] as? String, "/permission workspace-write")
+        XCTAssertTrue(permission["images"] is [Any])
+    }
+
     func testPageKeepsOfficialAddressAndCursorFields() throws {
         let args = HarnessWire.sessionPageArguments(
             sessionID: "session-1",

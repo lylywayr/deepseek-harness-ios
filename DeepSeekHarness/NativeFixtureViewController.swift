@@ -1,5 +1,6 @@
 import UIKit
 
+#if DEBUG
 /// Deterministic native-only launch fixture used by CI screenshots.
 /// It is reachable only through -UITestFixture and never through the normal app path.
 final class NativeFixtureViewController: UIViewController {
@@ -163,8 +164,17 @@ final class NativeFixtureViewController: UIViewController {
         connection.addSubview(content)
         let address = UITextField(); address.text = "https://harness.example.com"; address.font = DHTheme.font(.body); address.textColor = DHTheme.text; address.backgroundColor = DHTheme.surfaceMuted; address.layer.cornerRadius = 10; address.setLeftPadding(12); address.heightAnchor.constraint(equalToConstant: 44).isActive = true
         let token = UITextField(); token.placeholder = "访问令牌（可选）"; token.isSecureTextEntry = true; token.backgroundColor = DHTheme.surfaceMuted; token.layer.cornerRadius = 10; token.setLeftPadding(12); token.heightAnchor.constraint(equalToConstant: 44).isActive = true
-        let error = UILabel(); error.text = "● 连接失败\n请检查服务地址或访问令牌。"; error.textColor = DHTheme.danger; error.font = DHTheme.font(.subheadline, weight: .medium); error.numberOfLines = 0
-        content.addArrangedSubview(address); content.addArrangedSubview(token); content.addArrangedSubview(error)
+        let error = UILabel()
+        error.text = "● 连接失败"
+        error.textColor = DHTheme.danger
+        error.font = DHTheme.font(.subheadline, weight: .medium)
+        error.numberOfLines = 1
+        let errorDetail = UILabel()
+        errorDetail.text = "请检查服务地址或访问令牌。"
+        errorDetail.textColor = DHTheme.secondaryText
+        errorDetail.font = DHTheme.font(.subheadline)
+        errorDetail.numberOfLines = 0
+        content.addArrangedSubview(address); content.addArrangedSubview(token); content.addArrangedSubview(error); content.addArrangedSubview(errorDetail)
         NSLayoutConstraint.activate([content.leadingAnchor.constraint(equalTo: connection.leadingAnchor, constant: 16), content.trailingAnchor.constraint(equalTo: connection.trailingAnchor, constant: -16), content.topAnchor.constraint(equalTo: connection.topAnchor, constant: 58), content.bottomAnchor.constraint(equalTo: connection.bottomAnchor, constant: -16)])
         stack.addArrangedSubview(connection)
         stack.addArrangedSubview(actionButton("重试连接", filled: true))
@@ -175,7 +185,7 @@ final class NativeFixtureViewController: UIViewController {
         let stack = UIStackView(); install(stack)
         stack.addArrangedSubview(heading("新会话", subtitle: "在线 · 标准模式"))
         stack.addArrangedSubview(card("你", body: "请帮我检查这个项目的构建状态。", color: DHTheme.accentSoft))
-        let assistant = card("Harness", body: "我会先检查工作区，然后汇总可验证的结果。\n\n标题、列表和引用都在原生消息单元中显示。")
+        let assistant = card("Harness", body: "我会先检查工作区，然后汇总可验证的结果。\n\n标题、列表和引用都在原生消息单元中显示。\n行内 `code` 与 [文档链接](https://harness.example.com/docs) 可复制或点击。")
         stack.addArrangedSubview(assistant)
         let code = card("代码块", body: "let result = await harness.check()\nprint(result.status)")
         if let body = code.subviews.compactMap({ $0 as? UIStackView }).first?.arrangedSubviews.last as? UILabel { body.font = .monospacedSystemFont(ofSize: 13, weight: .regular); body.textColor = DHTheme.text }
@@ -204,19 +214,21 @@ final class NativeFixtureViewController: UIViewController {
         stack.addArrangedSubview(heading("Harness", subtitle: "会话与工作区"))
         let search = UISearchBar(); search.placeholder = "搜索会话…"; search.searchBarStyle = .minimal; stack.addArrangedSubview(search)
         stack.addArrangedSubview(card("没有匹配的会话", body: "尝试其他关键词，或清空搜索。", color: DHTheme.surfaceMuted))
-        stack.addArrangedSubview(card("视图选项", body: "按工作区分组   ·   按更新时间排序\n显示归档会话：关闭"))
+        if screen == "sidebar" {
+            stack.addArrangedSubview(card("视图选项 · 单列表", body: "Build Status  ·  Protocol Review\n最近更新时间排序\n归档会话：已显示", color: DHTheme.surfaceMuted))
+        }
         stack.addArrangedSubview(row("插件", value: "原生入口"))
     }
 
     private func renderSettings() {
         let stack = UIStackView(); install(stack)
         stack.addArrangedSubview(heading("设置", subtitle: "本机显示偏好 · 可编辑"))
-        stack.addArrangedSubview(card("连接", body: "192.168.31.2:8888\n令牌已保存"))
+        stack.addArrangedSubview(card("连接", body: "https://harness.example.com\n令牌已保存"))
         stack.addArrangedSubview(row("外观", value: "跟随系统", icon: "paintbrush"))
-        stack.addArrangedSubview(row("会话字号", value: "14 pt", icon: "textformat.size"))
-        stack.addArrangedSubview(row("对话显示", value: "Compact", icon: "text.alignleft"))
-        stack.addArrangedSubview(row("繁忙时 Enter", value: "排队发送", icon: "return"))
-        stack.addArrangedSubview(row("新会话默认权限", value: "只读", icon: "shield"))
+        stack.addArrangedSubview(row("会话字号", value: "16 pt", icon: "textformat.size"))
+        stack.addArrangedSubview(row("对话显示", value: "Normal", icon: "text.alignleft"))
+        stack.addArrangedSubview(row("繁忙时 Enter", value: "插话发送", icon: "return"))
+        stack.addArrangedSubview(row("新会话默认权限", value: "工作区可写", icon: "shield"))
         stack.addArrangedSubview(card("语言", body: "当前版本跟随 App 语言；未提供未实现的切换项。", color: DHTheme.surfaceMuted))
     }
 
@@ -259,6 +271,6 @@ final class NativeFixtureViewController: UIViewController {
         stack.addArrangedSubview(row("模型推理", value: "1.8 s", icon: "sparkles"))
         stack.addArrangedSubview(row("工具调用", value: "成功", icon: "wrench.and.screwdriver"))
         stack.addArrangedSubview(card("Session 日志", body: "[system] connected\n[tool] workspace/list → ok\n[assistant] 完成检查。"))
-        stack.addArrangedSubview(actionButton("打开调用详情"))
     }
 }
+#endif

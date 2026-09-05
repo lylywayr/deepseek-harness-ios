@@ -19,6 +19,8 @@ from pathlib import Path
 FORBIDDEN = (
     b"WebKit", b"WKWebView", b"evaluateJavaScript", b"AutoNativeAdapter",
     b"HarnessWebView", b"window.__harnessNative", b"dom-projection",
+    b"192.168.31.2", b"NativeFixtureViewController", b"UITestFixture",
+    b"NativeFixtureScreen",
 )
 
 

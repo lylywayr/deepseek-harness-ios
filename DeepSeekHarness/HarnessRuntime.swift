@@ -3,13 +3,6 @@ import Network
 import Security
 import UIKit
 
-struct HarnessWorkspace {
-    let id: String
-    let title: String
-    let path: String
-    let sessionIDs: [String]
-}
-
 struct HarnessModelOption {
     let provider: String
     let providerName: String
@@ -375,20 +368,35 @@ final class HarnessRuntime: NSObject {
         call("$events/result", args: HarnessWire.eventResult(clientID: pending.clientID, eventID: pending.eventID, outcome: outcome)) { _ in completion?(.success(())) } failure: { error in completion?(.failure(error)) }
     }
 
-    func createSession(workspaceID: String?) {
+    func createSession(workspaceID: String?, defaultPermission: String? = nil, completion: ((Result<String, Error>) -> Void)? = nil) {
         var request: [String: Any] = [:]
         if let workspaceID { request["workspaceId"] = workspaceID }
-        call("session/create", args: HarnessWire.requestArguments(request)) { [weak self] value in
-            guard let self, let dict = value as? [String: Any], let id = dict["sessionId"] as? String else { return }
+        let createArgs = HarnessWire.requestArguments(request)
+        call("session/create", args: createArgs) { [weak self] value in
+            guard let self, let dict = value as? [String: Any], let id = dict["sessionId"] as? String else {
+                completion?(.failure(HarnessClientError.invalidResponse)); return
+            }
             self.refresh()
             self.selectedSessionID = id
             self.resetConversation()
             self.openSessionStream(id)
-        }
+            if let defaultPermission, !defaultPermission.isEmpty {
+                self.setPermission(defaultPermission, sessionID: id) { result in
+                    switch result {
+                    case .success:
+                        completion?(.success(id))
+                    case let .failure(error):
+                        completion?(.failure(error))
+                    }
+                }
+            } else {
+                completion?(.success(id))
+            }
+        } failure: { error in completion?(.failure(error)) }
     }
 
-    func send(_ text: String, mode: String = "queue", images: [[String: Any]] = []) {
-        guard let sessionID = selectedSessionID else { return }
+    func send(_ text: String, mode: String = "queue", images: [[String: Any]] = [], completion: ((Result<Void, Error>) -> Void)? = nil) {
+        guard let sessionID = selectedSessionID else { completion?(.failure(HarnessClientError.invalidResponse)); return }
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !images.isEmpty else { return }
         var content: [[String: Any]] = []
         if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -404,7 +412,11 @@ final class HarnessRuntime: NSObject {
         ]
         isGenerating = true
         publish()
-        call("session/prompt", args: HarnessWire.requestArguments(request)) { [weak self] _ in self?.publish() }
+        call("session/prompt", args: HarnessWire.requestArguments(request)) { [weak self] _ in
+            completion?(.success(())); self?.publish()
+        } failure: { [weak self] error in
+            completion?(.failure(error)); self?.isGenerating = false; self?.publish()
+        }
     }
 
     func cancel() {
@@ -433,9 +445,11 @@ final class HarnessRuntime: NSObject {
         call("session/selectModel", args: HarnessWire.requestArguments(request)) { [weak self] _ in self?.refresh() }
     }
 
-    func setPermission(_ value: String) {
-        guard let id = selectedSessionID else { return }
-        call("commands/execute", args: ["agentId": id, "line": "/permission \(value)", "images": []]) { [weak self] _ in self?.refresh() }
+    func setPermission(_ value: String, sessionID: String? = nil, completion: ((Result<Void, Error>) -> Void)? = nil) {
+        guard let id = sessionID ?? selectedSessionID else { completion?(.failure(HarnessClientError.invalidResponse)); return }
+        call("commands/execute", args: HarnessWire.permissionCommandArguments(sessionID: id, value: value)) { [weak self] _ in
+            completion?(.success(())); self?.refresh()
+        } failure: { error in completion?(.failure(error)) }
     }
 
     func rename(_ title: String) {
