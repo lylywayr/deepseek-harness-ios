@@ -18,7 +18,7 @@
 - 设置接线：对话控制器持有 `AppState`，字号传入消息 Markdown/正文和 Session 日志；`transcriptView` 通过生产展示策略即时过滤过程行；`busyEnter` 计算 queue/steer，并保留 Cmd/Ctrl+Enter 反向语义；新会话创建成功后通过官方 `commands/execute` 权限命令应用 `defaultPermission`。
 - 视图选项：`HarnessPresentationPolicy.sections` 按全部 workspace 的 `sessionIDs` 分组，flat 为单列表，未归属会话进入“其他会话”；归档仅作展示过滤，updated/manual 均尊重数据顺序。
 - Markdown：补齐行内代码样式、HTTP/HTTPS `.link` attribute；消息使用可选择复制的原生 `UITextView`，仅安全打开 HTTP/HTTPS 链接。
-- 截图夹具：入口和实现均置于 `#if DEBUG`；Release IPA 门禁禁止 fixture marker 与真实内网地址；fixture 使用虚构示例地址；连接错误文案拆成独立行，消除重叠。
+- 截图夹具收尾：入口和实现均置于 `#if DEBUG`；移除会让滚动内容撑满视口并拉伸 arranged subviews 的高度下限；连接场景改为单一垂直内容栈；对话场景的权限控件设置独立宽度；Release IPA 门禁禁止 fixture marker 与真实内网地址；fixture 使用虚构示例地址，最终 8 个场景无纵向拉伸、重叠或裁切。
 
 
 目标服务仅用于只读与一次性临时对象联调；没有记录 token、Cookie 或消息正文。
@@ -51,26 +51,27 @@ python3 scripts/verify_native_rework.py 全部 ok
 python3 scripts/verify_native_ui_fixture.py 全部 ok
 ```
 
-Swift XCTest、Release device archive、IPA gate 和原生截图 job 均由最终 CI 执行成功：Run `33982429427`，对应代码 HEAD `1b5e6fdf3b30900520f9363bb5bf233545858ca9`。其中 Swift 协议回归测试通过，包含生产模型的 workspace/flat、归档过滤、Compact 过程显示、busy Enter、Markdown inline code/link 断言及创建权限参数测试。
+Swift XCTest、Release device archive、IPA gate 和原生截图 job 均由最终 CI 执行成功：Run `33986018201`，对应代码 HEAD `57ac816c172b7ad2f285ffbd6aac0b6d082d04ff`。其中 Swift 协议回归测试通过，包含生产模型的 workspace/flat、归档过滤、Compact 过程显示、busy Enter、Markdown inline code/link 断言及创建权限参数测试。
 
 ## 代码与分支
 
 - 当前分支：`feature/native-renderer`
-- 最终构建代码提交：`1b5e6fdf3b30900520f9363bb5bf233545858ca9`（第三轮最终 Debug 夹具编译边界修复）
-- 当前分支文档后继提交：本次报告更新后记录于最新提交
+- 最终构建代码提交：`57ac816c172b7ad2f285ffbd6aac0b6d082d04ff`（仅 Debug 截图夹具布局收尾）
+- 报告提交位于构建代码之后；报告提交只更新本报告证据，不改变构建代码。最终文档 HEAD 以推送后的提交为准。
 - 已推送：`origin/feature/native-renderer`
 - 未修改 `main`，未 force push
 - 工作树另有用户已有未跟踪移交/验收文档，未纳入本次代码/报告提交：`HANDOFF-*`、`REWORK-*`、`docs/native-request-acceptance-report.md`
 
 ## 最终 CI / IPA / 截图证据
 
-- Actions Run：`33982429427`，`completed / success`
-- Workflow：https://github.com/lylywayr/deepseek-harness-ios/actions/runs/33982429427
+- Actions Run：`33986018201`，`completed / success`
+- Workflow：https://github.com/lylywayr/deepseek-harness-ios/actions/runs/33986018201
 - 成功 jobs：unsigned IPA 构建与 `Native UI screenshots 390x844`；Swift XCTest、Release archive、IPA verify 全部通过。
-- 截图目录：[第三轮 Native UI 390×844 截图](minis://attachments/native-ui-390x844-33982429427-rerun/)
-- 截图文件：`connection`、`conversation`、`sidebar`、`settings`、`directory`、`approval`、`question`、`trajectory`，共 8 张；PNG 原始尺寸均为 1206×2622（iPhone 16 Simulator，内容区域 390×844pt）。重新下载并逐项检查：connection 不再有错误文字重叠；场景按启动参数产生不同 UI。
-- IPA：[第三轮最终未签名 IPA](minis://attachments/native-rework-33982429427/DeepSeekHarness-unsigned.ipa)
-- IPA SHA-256：`d2a33d8544fb7c4c9e3fe7bf0426730b0eab3df419b7fcf55d1bc4018aeb7e7f`
+- 截图目录：[最终 Native UI 390×844 截图](minis://attachments/native-ui-390x844-33986018201/)
+- 截图文件：`connection`、`conversation`、`sidebar`、`settings`、`directory`、`approval`、`question`、`trajectory`，共 8 张；PNG 原始尺寸均为 1206×2622（iPhone 16 Simulator，内容区域 390×844pt）。逐张视觉检查确认：夹具卡片/按钮不再纵向拉伸，connection 无文字重叠，conversation 的模型/权限控件无重叠，8 个场景均无裁切或异常遮挡。
+- IPA：[最终未签名 IPA](minis://attachments/native-rework-33986018201/DeepSeekHarness-unsigned.ipa)
+- IPA 文件大小：304145 bytes
+- IPA SHA-256：`4e3bbef3c23b6ed0f10d5af20f3f1adaf0e0a8c5aa67cc92f9297a4a4727cce4`
 - 独立 `verify_ipa.py`：`bundleIdentifier=com.example.DeepSeekHarness`、`minimumOSVersion=15.0`、`arm64`、`unsigned=true`、`forbiddenMarkers=0`；扫描禁止 fixture marker 与真实内网地址均未命中。
 - IPA 中未发现 `_CodeSignature` 或 `embedded.mobileprovision`。
 
