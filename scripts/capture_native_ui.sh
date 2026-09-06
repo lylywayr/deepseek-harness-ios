@@ -18,7 +18,11 @@ capture() {
   local dir="$OUT/$size/$appearance"
   mkdir -p "$dir"
   xcrun simctl terminate "$UDID" com.example.DeepSeekHarness >/dev/null 2>&1 || true
-  xcrun simctl launch "$UDID" com.example.DeepSeekHarness -UITestFixture -NativeFixtureScreen "$scene" $args >/tmp/pocket-fixture-launch.log
+  if !xcrun simctl launch "$UDID" com.example.DeepSeekHarness -UITestFixture -NativeFixtureScreen "$scene" $args >/tmp/pocket-fixture-launch.log 2>&1; then
+    cat /tmp/pocket-fixture-launch.log >&2
+    echo "Pocket fixture launch failed: $scene" >&2
+    exit 1
+  fi
   sleep 2
   xcrun simctl io "$UDID" screenshot "$dir/$scene-$size-$appearance.png"
   xcrun simctl terminate "$UDID" com.example.DeepSeekHarness >/dev/null 2>&1 || true
