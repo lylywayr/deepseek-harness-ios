@@ -147,7 +147,7 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
     }
 
     private func makeIconButton(_ icon: String, label: String) -> UIButton {
-        var c = UIButton.Configuration.plain(); c.image = UIImage(systemName: icon); c.baseForegroundColor = DHTheme.text; c.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 8, bottom: 10, trailing: 8); let b = UIButton(configuration: c); b.accessibilityLabel = label; b.widthAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true; b.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true; return b
+        var c = UIButton.Configuration.plain(); c.image = UIImage(systemName: icon); c.baseForegroundColor = DHTheme.text; c.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 8, bottom: 10, trailing: 8); let b = UIButton(configuration: c); b.accessibilityLabel = label; b.accessibilityTraits = .button; b.widthAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true; b.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true; return b
     }
 
     private func installCard(_ view: UIView, title: String, subtitle: String, icon: String, color: UIColor = DHTheme.surface) {
