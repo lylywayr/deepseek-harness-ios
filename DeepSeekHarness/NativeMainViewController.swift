@@ -84,7 +84,7 @@ final class MainViewController: UIViewController {
             appState: appState,
             nativeUIStore: nativeUIStore,
             transport: transport,
-            onSettings: { [weak self] in self?.openSettings() }
+            onSettings: { [weak self] runtime in self?.openSettings(runtime: runtime) }
         )
         addChildController(home)
         navigationController?.setNavigationBarHidden(true, animated: false)
@@ -116,11 +116,15 @@ final class MainViewController: UIViewController {
     }
 
     @objc private func openSettings() {
+        openSettings(runtime: nil)
+    }
+
+    private func openSettings(runtime: HarnessRuntime?) {
         guard let endpoint = appState.endpointURL else {
             openConnectionSettings()
             return
         }
-        let center = HarnessSettingsCenterViewController(appState: appState) { [weak self] in
+        let center = HarnessSettingsCenterViewController(appState: appState, runtime: runtime) { [weak self] in
             self?.dismiss(animated: true) { self?.openConnectionSettings() }
         }
         let navigation = UINavigationController(rootViewController: center)

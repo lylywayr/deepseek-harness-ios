@@ -31,6 +31,7 @@
 		A10000000000000000000019 /* HarnessClientModels.swift in Tests */ = {isa = PBXBuildFile; fileRef = B10000000000000000000016 /* HarnessClientModels.swift */; };
 		A10000000000000000000012 /* HarnessWireTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000013 /* HarnessWireTests.swift */; };
 		A10000000000000000000017 /* HarnessClientModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000017 /* HarnessClientModelsTests.swift */; };
+		A10000000000000000000021 /* PocketV2Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000021 /* PocketV2Tests.swift */; };
 		A10000000000000000000013 /* HarnessWire.swift in Tests */ = {isa = PBXBuildFile; fileRef = B10000000000000000000012 /* HarnessWire.swift */; };
 		A10000000000000000000014 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B10000000000000000000015 /* XCTest.framework */; };
 /* End PBXBuildFile section */
@@ -69,6 +70,7 @@
 		B10000000000000000000020 /* PocketActivityViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PocketActivityViewController.swift; sourceTree = "<group>"; };
 		B10000000000000000000013 /* HarnessWireTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessWireTests.swift; sourceTree = "<group>"; };
 		B10000000000000000000017 /* HarnessClientModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessClientModelsTests.swift; sourceTree = "<group>"; };
+		B10000000000000000000021 /* PocketV2Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PocketV2Tests.swift; sourceTree = "<group>"; };
 		B10000000000000000000014 /* HarnessWireTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HarnessWireTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B10000000000000000000015 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
@@ -142,6 +144,7 @@
 			children = (
 				B10000000000000000000013 /* HarnessWireTests.swift */,
 				B10000000000000000000017 /* HarnessClientModelsTests.swift */,
+				B10000000000000000000021 /* PocketV2Tests.swift */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -238,6 +241,7 @@
 			files = (
 				A10000000000000000000012 /* HarnessWireTests.swift in Sources */,
 				A10000000000000000000017 /* HarnessClientModelsTests.swift in Sources */,
+				A10000000000000000000021 /* PocketV2Tests.swift in Sources */,
 				A10000000000000000000013 /* HarnessWire.swift in Tests */,
 				A1000000000000000000001B /* HarnessEndpoint.swift in Tests */,
 				A1000000000000000000001C /* AppState.swift in Tests */,
@@ -325,6 +329,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.example.DeepSeekHarness;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -357,6 +362,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.example.DeepSeekHarness.HarnessWireTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/DeepSeekHarness.app/DeepSeekHarness";

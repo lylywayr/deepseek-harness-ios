@@ -1,27 +1,48 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
-# Native-only screenshot smoke test. The fixture is never the production path.
 ROOT="${GITHUB_WORKSPACE:-$(pwd)}"
 DEVICE="iPhone 16"
 RUNTIME="18.2"
 UDID="$(xcrun simctl list devices available | awk -F '[()]' -v d="$DEVICE" '$0 ~ d {print $2; exit}')"
-if [[ -z "$UDID" ]]; then
-  UDID="$(xcrun simctl create "NativeFixture" com.apple.CoreSimulator.SimDeviceType.iPhone-16 com.apple.CoreSimulator.SimRuntime.iOS-18-2)"
-fi
+if [[ -z "$UDID" ]]; then UDID="$(xcrun simctl create "PocketV2Fixture" com.apple.CoreSimulator.SimDeviceType.iPhone-16 com.apple.CoreSimulator.SimRuntime.iOS-18-2)"; fi
 xcrun simctl boot "$UDID" 2>/dev/null || true
 xcrun simctl bootstatus "$UDID" -b
 APP_PATH="$ROOT/build/Build/Products/Debug-iphonesimulator/DeepSeekHarness.app"
 xcrun simctl install "$UDID" "$APP_PATH"
-OUT="$ROOT/artifacts/native-ui-390x844"
+OUT="$ROOT/artifacts/pocket-v2-ui-matrix"
 rm -rf "$OUT"
 mkdir -p "$OUT"
-for screen in connection conversation sidebar settings directory approval question trajectory; do
+
+capture() {
+  local scene="$1" size="$2" appearance="$3" args="$4"
+  local dir="$OUT/$size/$appearance"
+  mkdir -p "$dir"
   xcrun simctl terminate "$UDID" com.example.DeepSeekHarness >/dev/null 2>&1 || true
-  xcrun simctl launch "$UDID" com.example.DeepSeekHarness -UITestFixture -NativeFixtureScreen "$screen" >/tmp/native-fixture-launch.log
+  xcrun simctl launch "$UDID" com.example.DeepSeekHarness -UITestFixture -NativeFixtureScreen "$scene" $args >/tmp/pocket-fixture-launch.log
   sleep 2
-  xcrun simctl io "$UDID" screenshot "$OUT/$screen-390x844.png"
-  xcrun simctl terminate "$UDID" com.example.DeepSeekHarness || true
-done
-printf 'native fixture screenshots: %s\n' "$OUT"
+  xcrun simctl io "$UDID" screenshot "$dir/$scene-$size-$appearance.png"
+  xcrun simctl terminate "$UDID" com.example.DeepSeekHarness >/dev/null 2>&1 || true
+}
+
+# iPhone 16 is the 390x844 evidence target. 430x932 is produced with a
+# second simulator when the runtime is available; all scenes remain real Pocket.
+for scene in workspace drawer conversation process artifacts activity settings; do capture "$scene" "390x844" "light" ""; done
+capture keyboard "390x844" "light" ""
+capture workspace "390x844" "dark" "-PocketDark"
+
+UDID430="$(xcrun simctl list devices available | awk -F '[()]' '$0 ~ /iPhone 15 Pro Max/ {print $2; exit}')"
+if [[ -z "$UDID430" ]]; then
+  UDID430="$(xcrun simctl create "PocketV2Fixture430" com.apple.CoreSimulator.SimDeviceType.iPhone-15-Pro-Max com.apple.CoreSimulator.SimRuntime.iOS-18-2 2>/dev/null || true)"
+fi
+if [[ -n "$UDID430" ]]; then
+  xcrun simctl boot "$UDID430" 2>/dev/null || true
+  xcrun simctl bootstatus "$UDID430" -b
+  xcrun simctl install "$UDID430" "$APP_PATH"
+  UDID="$UDID430"
+    for scene in workspace drawer conversation process artifacts activity settings keyboard; do capture "$scene" "430x932" "light" ""; done
+    capture workspace "430x932" "dark" "-PocketDark"
+else
+  printf '430x932 simulator unavailable; 390x844 evidence retained\n'
+fi
+printf 'Pocket V2 screenshot matrix: %s\n' "$OUT"
 find "$OUT" -type f -name '*.png' | sort

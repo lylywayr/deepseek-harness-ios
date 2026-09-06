@@ -44,6 +44,7 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
     private var composerBottom: NSLayoutConstraint!
     private var images: [[String: Any]] = []
     private var displayedIDs: [String] = []
+    private var stopObserving: (() -> Void)?
     private var isNearBottom = true
     private var isLoadingOlder = false
     private var pendingQuestion: HarnessPendingQuestion?
@@ -67,7 +68,7 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
         buildTable()
         buildComposer()
         buildEmptyState()
-        runtime.onChange = { [weak self] in self?.render() }
+        stopObserving = runtime.observeChanges { [weak self] in self?.render() }
         NotificationCenter.default.addObserver(self, selector: #selector(settingsDidChange), name: .harnessClientSettingsDidChange, object: appState)
         runtime.onApproval = { [weak self] value in self?.showApproval(value) }
         runtime.onQuestion = { [weak self] pending in
@@ -80,7 +81,7 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
         render()
     }
 
-    deinit { NotificationCenter.default.removeObserver(self) }
+    deinit { stopObserving?(); NotificationCenter.default.removeObserver(self); runtime.onApproval = nil; runtime.onQuestion = nil }
 
     @objc private func settingsDidChange() {
         input.font = .systemFont(ofSize: CGFloat(appState.settings.fontSize))

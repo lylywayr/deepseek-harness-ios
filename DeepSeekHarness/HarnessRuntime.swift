@@ -280,8 +280,8 @@ final class HarnessRuntime: NSObject {
     private(set) var artifacts: [HarnessArtifact] = []
     private(set) var contextDirectory: String?
     private(set) var reasoningEffort: String?
-    var onChange: (() -> Void)?
-    var onNavigationChange: (() -> Void)?
+    private var changeObservers: [UUID: () -> Void] = [:]
+    private var navigationObservers: [UUID: () -> Void] = [:]
     var onApproval: (([String: Any]) -> Void)?
     var onQuestion: ((HarnessPendingQuestion) -> Void)?
 
@@ -299,14 +299,69 @@ final class HarnessRuntime: NSObject {
         client.invalidate()
     }
 
+    func observeChanges(_ observer: @escaping () -> Void) -> () -> Void {
+        let id = UUID()
+        changeObservers[id] = observer
+        return { [weak self] in self?.changeObservers.removeValue(forKey: id) }
+    }
+
+    func observeNavigation(_ observer: @escaping () -> Void) -> () -> Void {
+        let id = UUID()
+        navigationObservers[id] = observer
+        return { [weak self] in self?.navigationObservers.removeValue(forKey: id) }
+    }
+
+    @discardableResult
+    func addChangeObserver(_ observer: @escaping () -> Void) -> UUID {
+        let id = UUID(); changeObservers[id] = observer; return id
+    }
+
+    @discardableResult
+    func addNavigationObserver(_ observer: @escaping () -> Void) -> UUID {
+        let id = UUID(); navigationObservers[id] = observer; return id
+    }
+
     var archivedSessionIDsForPresentation: Set<String> {
         archivedSessionIDs
     }
 
+    #if DEBUG
+    static func fixture(scene: String = "workspace") -> HarnessRuntime {
+        let runtime = HarnessRuntime(baseURL: URL(string: "http://fixture.invalid")!)
+        let workspace = HarnessWorkspace(id: "workspace-project", title: "Pocket 项目", path: "/Users/demo/Pocket", sessionIDs: ["session-active", "session-research"])
+        let active = HarnessSessionSummary(id: "session-active", title: "原生工作台 V2", cwd: "/Users/demo/Pocket", updatedAt: 200, running: scene == "workspace" || scene == "conversation" || scene == "process", blank: false, preset: "standard", permission: "workspace-write", provider: "deepseek", model: "DeepSeek V4", turns: 4, steps: 12, contextUsed: 0.42, status: "running", stage: "工具调用")
+        let research = HarnessSessionSummary(id: "session-research", title: "验收与交付", cwd: "/Users/demo/Pocket/docs", updatedAt: 100, running: false, blank: false, preset: "standard", permission: "read-only", provider: "deepseek", model: "DeepSeek V4", turns: 2, steps: 6, contextUsed: 0.18)
+        runtime.connected = true
+        runtime.isLoading = false
+        runtime.statusText = "已连接"
+        runtime.currentStage = scene == "artifacts" ? "已完成" : "工具调用"
+        runtime.contextDirectory = "/Users/demo/Pocket"
+        runtime.sessions = [active, research]
+        runtime.workspaces = [workspace]
+        runtime.selectedSessionID = "session-active"
+        runtime.isGenerating = scene == "workspace" || scene == "conversation" || scene == "process" || scene == "keyboard"
+        runtime.reasoningEffort = "balanced"
+        runtime.models = [HarnessModelOption(provider: "deepseek", providerName: "DeepSeek", model: "deepseek-v4", modelName: "DeepSeek V4", reasoning: [["id": "balanced", "name": "均衡"], ["id": "deep", "name": "深入"]])]
+        runtime.items = [
+            HarnessConversationItem(id: "u1", kind: .user, text: "请继续检查这个 Pocket 工作区。", subtitle: "刚刚", seq: 1, time: 1),
+            HarnessConversationItem(id: "a1", kind: .assistant, text: "我会先读取工作区状态，再汇总可以验证的结果。", subtitle: "回答", seq: 2, time: 2, isMarkdown: true),
+            HarnessConversationItem(id: "t1", kind: .tool, text: "workspace/list", subtitle: "工具", seq: 3, time: 3, detail: "返回 2 个工作区条目"),
+            HarnessConversationItem(id: "r1", kind: .system, text: "分析上下文与执行阶段", subtitle: "轮次", seq: 4, time: 4, detail: "耗时 1.8 s"),
+            HarnessConversationItem(id: "e1", kind: .system, text: "本轮完成，产物已由服务端确认。", subtitle: "完成", seq: 5, time: 5)
+        ]
+        runtime.artifacts = [HarnessArtifact(id: "artifact-1", name: "acceptance-report.md", path: "/Users/demo/Pocket/docs/acceptance-report.md", kind: "file", detail: "服务端确认的交付报告")]
+        runtime.pendingApprovals = [HarnessApprovalRequest(clientID: "fixture-client", eventID: "fixture-approval", sessionID: active.id, toolName: "workspace/write", risk: "normal", reason: "更新交付报告", target: "acceptance-report.md", detail: "写入报告内容", arguments: nil)]
+        runtime.pendingQuestions = [HarnessPendingQuestion(clientID: "fixture-client", eventID: "fixture-question", questions: [HarnessQuestion(id: "fixture-q", header: "需要确认", question: "是否继续执行下一步？", detail: "这是 Debug-only Pocket UI 夹具状态。", options: [HarnessQuestionOption(label: "继续", description: "继续当前任务"), HarnessQuestionOption(label: "暂停", description: "保留当前状态")], multiSelect: false)])]
+        return runtime
+    }
 
+    #if DEBUG
+    func emitFixtureUpdateForTesting() {
+        publish()
+    }
+    #endif
 
     func start() {
-        guard !isStarted else { return }
         isStarted = true
         refresh()
     }
@@ -970,8 +1025,10 @@ final class HarnessRuntime: NSObject {
 
     private func publish() {
         artifacts = Array(artifactsByID.values).sorted { $0.id < $1.id }
-        onChange?()
-        onNavigationChange?()
+        let changes = Array(changeObservers.values)
+        let navigation = Array(navigationObservers.values)
+        changes.forEach { $0() }
+        navigation.forEach { $0() }
     }
 
     private func socketLost(generation: Int, message: String) {

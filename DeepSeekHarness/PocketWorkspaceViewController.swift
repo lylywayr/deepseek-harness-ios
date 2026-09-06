@@ -7,9 +7,10 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
     private let appState: AppState
     private let store: NativeUIStore
     private let transport: NativeUITransport
-    private let onSettings: () -> Void
+    private let onSettings: (HarnessRuntime) -> Void
+    private let runtimeOverride: HarnessRuntime?
     private var runtime: HarnessRuntime!
-    private var conversation: UIViewController!
+    private var conversation: PocketConversationViewController!
     private var stopObserving: (() -> Void)?
     private var isDrawerVisible = false
     private var drawerWidth: NSLayoutConstraint!
@@ -32,11 +33,13 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
     private let recentSection = UIStackView()
     private let workspacesSection = UIStackView()
     private let emptyLabel = UILabel()
+    private var artifactSection: UIView?
 
-    init(appState: AppState, nativeUIStore: NativeUIStore, transport: NativeUITransport, onSettings: @escaping () -> Void) {
+    init(appState: AppState, nativeUIStore: NativeUIStore, transport: NativeUITransport, runtime: HarnessRuntime? = nil, onSettings: @escaping (HarnessRuntime) -> Void) {
         self.appState = appState
         store = nativeUIStore
         self.transport = transport
+        runtimeOverride = runtime
         self.onSettings = onSettings
         super.init(nibName: nil, bundle: nil)
     }
@@ -49,8 +52,8 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
         view.backgroundColor = DHTheme.background
         buildRoot()
         buildDrawer()
-        runtime = HarnessRuntime(baseURL: appState.endpointURL!)
-        conversation = PocketConversationViewController(runtime: runtime, appState: appState, onOpenContext: { [weak self] in self?.toggleDrawer() })
+        runtime = runtimeOverride ?? HarnessRuntime(baseURL: appState.endpointURL!)
+        conversation = PocketConversationViewController(runtime: runtime, appState: appState, onOpenContext: { [weak self] in self?.toggleDrawer() }, onBack: { [weak self] in self?.showWorkspace() }, onSettings: { [weak self] in guard let self else { return }; self.onSettings(self.runtime) })
         addChild(conversation)
         conversation.view.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(conversation.view)
@@ -61,15 +64,42 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
             conversation.view.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
         conversation.didMove(toParent: self)
-        runtime.onNavigationChange = { [weak self] in
+        conversation.view.isHidden = true
+        stopObserving = runtime.observeNavigation { [weak self] in
             DispatchQueue.main.async { self?.renderAll() }
         }
-        runtime.start()
-        loadNativeManifest()
+        if runtimeOverride == nil {
+            runtime.start()
+        } else {
+            renderAll()
+            #if DEBUG
+            runtime.emitFixtureUpdateForTesting()
+            #endif
+        }
+        if runtimeOverride == nil { loadNativeManifest() }
         installGestures()
     }
 
-    deinit { stopObserving?() }
+    deinit { stopObserving?(); runtime.onApproval = nil; runtime.onQuestion = nil }
+
+    #if DEBUG
+    private static func makeFixture(scene: String, appState: AppState) -> NativeHomeViewController {
+        let runtime = HarnessRuntime.fixture(scene: scene)
+        let transport = NativeUITransport(baseURL: URL(string: "http://fixture.invalid")!)
+        return NativeHomeViewController(appState: appState, nativeUIStore: NativeUIStore(), transport: transport, runtime: runtime, onSettings: { _ in })
+    }
+    #endif
+    #if DEBUG
+    func fixtureOpenDrawer() { if !isDrawerVisible { toggleDrawer() } }
+    func fixtureOpenConversation() { showConversation() }
+    func fixtureSelectMode(_ index: Int) { fixtureOpenConversation(); conversation.fixtureSelectMode(index) }
+    func fixtureFocusComposer() { fixtureOpenConversation(); conversation.fixtureFocusComposer() }
+    func fixtureShowActivity() { showActivityCenter() }
+    func fixtureShowSettings() {
+        let center = HarnessSettingsCenterViewController(appState: appState, runtime: runtime) { }
+        present(UINavigationController(rootViewController: center), animated: false)
+    }
+    #endif
 
     private func buildRoot() {
         rootScroll.translatesAutoresizingMaskIntoConstraints = false
@@ -209,9 +239,9 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
         runtime.workspaces.prefix(5).forEach { workspace in
             let row = dhButton(title: workspace.title, systemName: "folder", filled: false) { [weak self] in self?.openWorkspace(workspace) }; row.contentHorizontalAlignment = .leading; row.accessibilityLabel = "工作区：\(workspace.title)，路径 \(workspace.path)"; workspacesSection.addArrangedSubview(row)
         }
-        let artifactSection = installedArtifactSection()
-        content.addArrangedSubview(artifactSection)
-        artifactSection.isHidden = runtime.artifacts.isEmpty
+        if let artifactSection { artifactSection.removeFromSuperview() }
+        artifactSection = installedArtifactSection()
+        if let artifactSection { content.addArrangedSubview(artifactSection); artifactSection.isHidden = runtime.artifacts.isEmpty }
         emptyLabel.isHidden = runtime.connected || !runtime.sessions.isEmpty || !runtime.workspaces.isEmpty
         renderDrawer()
     }
@@ -239,28 +269,49 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
         guard drawerContent != nil else { return }; clearStack(drawerContent)
         let host = UILabel(); host.text = runtime.connected ? "主机 · 已连接" : "主机 · \(runtime.statusText)"; host.font = DHTheme.font(.headline, weight: .semibold); host.textColor = DHTheme.text; drawerContent.addArrangedSubview(host)
         let create = dhButton(title: "开始新任务", systemName: "plus", filled: true) { [weak self] in self?.createSession(); self?.toggleDrawer() }; drawerContent.addArrangedSubview(create)
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let sessions = runtime.sessions.filter { !$0.blank && (query.isEmpty || $0.title.lowercased().contains(query) || $0.cwd.lowercased().contains(query)) }
-        for workspace in runtime.workspaces {
-            let rows = sessions.filter { workspace.sessionIDs.contains($0.id) }; if rows.isEmpty && !query.isEmpty { continue }
-            let title = UILabel(); title.text = "▾  \(workspace.title)"; title.font = DHTheme.font(.subheadline, weight: .semibold); title.textColor = DHTheme.secondaryText; drawerContent.addArrangedSubview(title)
-            rows.forEach { session in let button = dhButton(title: (session.running ? "● " : "○ ") + (session.title.isEmpty ? "新会话" : session.title), systemName: session.running ? "bolt.fill" : "message", filled: false) { [weak self] in self?.runtime.openSession(session.id); self?.showConversation(); self?.toggleDrawer() }; button.contentHorizontalAlignment = .leading; drawerContent.addArrangedSubview(button) }
+        let source = runtime.sessions.filter { !$0.blank && (searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || $0.title.localizedCaseInsensitiveContains(searchText) || $0.cwd.localizedCaseInsensitiveContains(searchText)) }
+        let visible = HarnessPresentationPolicy.sections(sessions: source, workspaces: runtime.workspaces, archived: runtime.archivedSessionIDsForPresentation, preferences: appState.viewPreferences)
+        for section in visible {
+            let title = UILabel(); title.text = "▾  \(section.title)"; title.font = DHTheme.font(.subheadline, weight: .semibold); title.textColor = DHTheme.secondaryText; drawerContent.addArrangedSubview(title)
+            section.sessions.forEach { session in
+                let button = dhButton(title: (session.running ? "● " : "○ ") + (session.title.isEmpty ? "新会话" : session.title), systemName: session.running ? "bolt.fill" : "message", filled: false) { [weak self] in self?.runtime.openSession(session.id); self?.showConversation(); self?.toggleDrawer() }
+                button.contentHorizontalAlignment = .leading; button.accessibilityLabel = "会话：\(session.title)，\(metadata(session))"; drawerContent.addArrangedSubview(button)
+            }
         }
-        let ungrouped = sessions.filter { session in !runtime.workspaces.contains { $0.sessionIDs.contains(session.id) } }
-        if !ungrouped.isEmpty { let label = UILabel(); label.text = "其他会话"; label.font = DHTheme.font(.subheadline, weight: .semibold); label.textColor = DHTheme.secondaryText; drawerContent.addArrangedSubview(label); ungrouped.forEach { addSession($0, to: drawerContent, icon: "message", tint: DHTheme.secondaryText) } }
         drawerContent.addArrangedSubview(dhButton(title: "添加工作区", systemName: "folder.badge.plus", filled: false) { [weak self] in self?.showDirectoryPicker() })
         drawerContent.addArrangedSubview(dhButton(title: "视图选项", systemName: "slider.horizontal.3", filled: false) { [weak self] in self?.showViewOptions() })
         drawerContent.addArrangedSubview(dhButton(title: "活动中心", systemName: "bell", filled: false) { [weak self] in self?.showActivityCenter() })
-        drawerContent.addArrangedSubview(dhButton(title: "设置", systemName: "gearshape", filled: false) { [weak self] in self?.onSettings() })
+        drawerContent.addArrangedSubview(dhButton(title: "设置", systemName: "gearshape", filled: false) { [weak self] in guard let self else { return }; self.onSettings(self.runtime) })
     }
 
     private func showConversation() { rootScroll.isHidden = true; conversation.view.isHidden = false }
+    private func showWorkspace() { conversation.view.isHidden = true; rootScroll.isHidden = false; renderAll() }
     private func openWorkspace(_ workspace: HarnessWorkspace) { if let session = runtime.sessions.first(where: { workspace.sessionIDs.contains($0.id) }) { runtime.openSession(session.id); showConversation() } else { showDirectoryPicker() } }
-    private func createSession() { runtime.createSession(workspaceID: appState.settings.defaultWorkspaceID.isEmpty ? runtime.workspaces.first?.id : appState.settings.defaultWorkspaceID, defaultPermission: appState.settings.defaultPermission) }
+    private func createSession() {
+        let requested = appState.settings.defaultWorkspaceID
+        let workspaceID = runtime.workspaces.contains(where: { $0.id == requested }) ? requested : runtime.workspaces.first?.id
+        runtime.createSession(workspaceID: workspaceID, defaultPermission: appState.settings.defaultPermission) { [weak self] result in
+            if case let .failure(error) = result { self?.showError(error.localizedDescription) }
+            else { self?.showConversation() }
+        }
+    }
+    private func showError(_ message: String) { let alert = UIAlertController(title: "提示", message: message, preferredStyle: .alert); alert.addAction(UIAlertAction(title: "知道了", style: .default)); present(alert, animated: true) }
     private func showDirectoryPicker() { let picker = HarnessDirectoryPickerViewController(runtime: runtime) { [weak self] path in self?.runtime.addWorkspace(path: path) }; present(UINavigationController(rootViewController: picker), animated: true) }
-    private func showViewOptions() { let a = UIAlertController(title: "视图选项", message: "会话显示方式", preferredStyle: .actionSheet); a.addAction(UIAlertAction(title: "按工作区分组", style: .default) { [weak self] _ in var p = self?.appState.viewPreferences ?? HarnessViewPreferences(); p.groupBy = .workspace; self?.appState.updateViewPreferences(p); self?.renderAll() }); a.addAction(UIAlertAction(title: "单列表", style: .default) { [weak self] _ in var p = self?.appState.viewPreferences ?? HarnessViewPreferences(); p.groupBy = .flat; self?.appState.updateViewPreferences(p); self?.renderAll() }); a.addAction(UIAlertAction(title: "显示/隐藏归档", style: .default) { [weak self] _ in var p = self?.appState.viewPreferences ?? HarnessViewPreferences(); p.showArchived.toggle(); self?.appState.updateViewPreferences(p); self?.renderAll() }); a.addAction(UIAlertAction(title: "取消", style: .cancel)); present(a, animated: true) }
+    private func showViewOptions() {
+        let p = appState.viewPreferences
+        let a = UIAlertController(title: "视图选项", message: "当前：\(p.groupBy == .workspace ? "按工作区" : "单列表") · \(p.orderBy == .updated ? "最近更新" : "手动顺序") · 归档\(p.showArchived ? "已显示" : "已隐藏")", preferredStyle: .actionSheet)
+        a.addAction(UIAlertAction(title: p.groupBy == .workspace ? "✓ 按工作区分组" : "按工作区分组", style: .default) { [weak self] _ in var next = self?.appState.viewPreferences ?? HarnessViewPreferences(); next.groupBy = .workspace; self?.appState.updateViewPreferences(next); self?.renderAll() })
+        a.addAction(UIAlertAction(title: p.groupBy == .flat ? "✓ 单列表" : "单列表", style: .default) { [weak self] _ in var next = self?.appState.viewPreferences ?? HarnessViewPreferences(); next.groupBy = .flat; self?.appState.updateViewPreferences(next); self?.renderAll() })
+        a.addAction(UIAlertAction(title: p.orderBy == .updated ? "✓ 按最近更新" : "按最近更新", style: .default) { [weak self] _ in var next = self?.appState.viewPreferences ?? HarnessViewPreferences(); next.orderBy = .updated; self?.appState.updateViewPreferences(next); self?.renderAll() })
+        a.addAction(UIAlertAction(title: p.orderBy == .manual ? "✓ 按手动顺序" : "按手动顺序", style: .default) { [weak self] _ in var next = self?.appState.viewPreferences ?? HarnessViewPreferences(); next.orderBy = .manual; self?.appState.updateViewPreferences(next); self?.renderAll() })
+        a.addAction(UIAlertAction(title: p.showArchived ? "隐藏归档会话" : "显示归档会话", style: .default) { [weak self] _ in var next = self?.appState.viewPreferences ?? HarnessViewPreferences(); next.showArchived.toggle(); self?.appState.updateViewPreferences(next); self?.renderAll() })
+        a.addAction(UIAlertAction(title: "取消", style: .cancel)); present(a, animated: true)
+    }
     private func showConnectionDetails() { let a = UIAlertController(title: "Harness 连接", message: appState.endpointString + (runtime.lastError.map { "\n\($0)" } ?? ""), preferredStyle: .alert); a.addAction(UIAlertAction(title: "刷新", style: .default) { [weak self] _ in self?.runtime.refresh() }); a.addAction(UIAlertAction(title: "关闭", style: .cancel)); present(a, animated: true) }
-    private func showActivityCenter() { let c = HarnessActivityCenterViewController(runtime: runtime); present(UINavigationController(rootViewController: c), animated: true) }
+    private func showActivityCenter() {
+        let c = HarnessActivityCenterViewController(runtime: runtime)
+        present(UINavigationController(rootViewController: c), animated: true)
+    }
     private func loadNativeManifest() { transport.loadManifest { [weak self] result in if case let .success(m) = result { self?.store.replace(m) } } }
     private func installGestures() { let edge = UIScreenEdgePanGestureRecognizer(target: self, action: #selector(edgeDrawer(_:))); edge.edges = .left; view.addGestureRecognizer(edge) }
     @objc private func edgeDrawer(_ gesture: UIScreenEdgePanGestureRecognizer) { if gesture.state == .ended { toggleDrawer() } }

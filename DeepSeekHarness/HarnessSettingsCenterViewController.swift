@@ -5,6 +5,7 @@ import UIKit
 /// explicitly provides it; this screen never invents service settings.
 final class HarnessSettingsCenterViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
     private let appState: AppState
+    private let runtime: HarnessRuntime?
     private let onConnectionSettings: () -> Void
     private let table = UITableView(frame: .zero, style: .insetGrouped)
     private var rows: [(String, [SettingRow])] = []
@@ -16,8 +17,9 @@ final class HarnessSettingsCenterViewController: UIViewController, UITableViewDa
         let action: (() -> Void)?
     }
 
-    init(appState: AppState, onConnectionSettings: @escaping () -> Void) {
+    init(appState: AppState, runtime: HarnessRuntime? = nil, onConnectionSettings: @escaping () -> Void) {
         self.appState = appState
+        self.runtime = runtime
         self.onConnectionSettings = onConnectionSettings
         super.init(nibName: nil, bundle: nil)
         modalPresentationStyle = .pageSheet
@@ -56,7 +58,7 @@ final class HarnessSettingsCenterViewController: UIViewController, UITableViewDa
         ]
         let agent = [
             SettingRow(title: "新会话默认权限", subtitle: "仅影响随后创建的会话；当前会话在任务控制台切换。", value: permissionName(s.defaultPermission), action: { [weak self] in self?.choosePermission() }),
-            SettingRow(title: "默认工作区", subtitle: "创建任务时使用；只接受服务端返回的工作区 ID。", value: s.defaultWorkspaceID.isEmpty ? "未指定" : s.defaultWorkspaceID, action: nil),
+            SettingRow(title: "默认工作区", subtitle: runtime == nil ? "连接到 Harness 后可选择名称" : "新建任务时使用；来自当前 Harness 工作区", value: defaultWorkspaceName, action: { [weak self] in self?.chooseWorkspace() }),
             SettingRow(title: "繁忙时 Enter", subtitle: "运行中可排队或插话；Cmd/Ctrl+Enter 使用另一行为。", value: s.busyEnter == .queue ? "排队发送" : "插话发送", action: { [weak self] in self?.chooseBusyEnter() })
         ]
         let notifications = SettingRow(title: "通知", subtitle: "任务完成、审批、用户问题分别控制；系统通知能力未配置时不伪造。", value: notificationSummary(s), action: { [weak self] in self?.chooseNotifications() })
@@ -73,6 +75,21 @@ final class HarnessSettingsCenterViewController: UIViewController, UITableViewDa
     func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? { rows[section].0 }
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell { let cell = tableView.dequeueReusableCell(withIdentifier: "row", for: indexPath) as! SettingsRowCell; cell.configure(rows[indexPath.section].1[indexPath.row]); return cell }
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) { tableView.deselectRow(at: indexPath, animated: true); rows[indexPath.section].1[indexPath.row].action?() }
+
+    private var defaultWorkspaceName: String {
+        guard let runtime else { return appState.settings.defaultWorkspaceID.isEmpty ? "未指定" : "已保存" }
+        return runtime.workspaces.first(where: { $0.id == appState.settings.defaultWorkspaceID })?.title ?? "未指定"
+    }
+    private func chooseWorkspace() {
+        guard let runtime else { return }
+        let alert = UIAlertController(title: "默认工作区", message: "新任务将使用所选真实工作区。", preferredStyle: .actionSheet)
+        alert.addAction(UIAlertAction(title: appState.settings.defaultWorkspaceID.isEmpty ? "未指定 ✓" : "清除默认工作区", style: .default) { [weak self] _ in self?.update { $0.defaultWorkspaceID = "" } })
+        runtime.workspaces.forEach { workspace in
+            alert.addAction(UIAlertAction(title: workspace.title + (workspace.id == appState.settings.defaultWorkspaceID ? " ✓" : ""), style: .default) { [weak self] _ in self?.update { $0.defaultWorkspaceID = workspace.id } })
+        }
+        if runtime.workspaces.isEmpty { alert.message = "当前没有服务端返回的工作区。" }
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel)); presentSheet(alert)
+    }
 
     private func themeName(_ value: HarnessThemePreference) -> String { value == .system ? "系统" : value == .light ? "浅色" : "深色" }
     private func permissionName(_ value: String) -> String { ["read-only": "只读", "workspace-write": "工作区可写", "danger-full-access": "完全权限"][value] ?? value }
