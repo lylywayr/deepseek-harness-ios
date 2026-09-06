@@ -1,90 +1,94 @@
-# DeepSeek Harness iOS Native-first 完成报告
+# DeepSeek Harness iOS · Harness Pocket Workspace V2 完成报告
 
 ## 结论
 
-第三轮定点修复已在 `feature/native-renderer` 完成并推送。生产 App 保持 UIKit + URLSession JSON-RPC/WebSocket Mux 的 Native-first 路线；没有恢复 WebKit、WKWebView、DOM 或 legacy 网页路径。
+已在 `feature/native-renderer` 接管并完成 Harness Pocket Workspace 的第一阶段原生 UI/UX 重构。生产路径保持 UIKit、URLSession JSON-RPC、URLSessionWebSocketTask Remote Mux 与共用 `HarnessEndpointCanonicalizer`；没有恢复 WebKit、DOM、legacy 页面路径，也没有修改 `main`、force push、SSH/NAS、插件或服务配置，没有发送付费 prompt。
 
-## 本轮实现
+本轮交付的是原生可编译、可运行、可审计版本；真实 Runtime 不支持的内容没有用演示数据冒充。产物模式仅消费 Runtime 已确认的 artifact/file/attachment 事件；没有扩展成工作区全量文件管理器。
 
-- 真实 Harness 连接：bootstrap Cookie 复用、`session/list`、model catalog、workspace/control/follow、session follow/page，以及会话/工作区操作。
-- 原生会话侧栏：搜索输入、即时标题/目录过滤、空态、取消/清空、选择打开；视图选项持久化（分组、排序、归档显示）。
-- 原生设置：外观、字号、对话显示、繁忙时 Enter、默认权限和连接入口；客户端设置写入 UserDefaults，语言项未伪造。
-- 对话：流式消息、工具调用/结果/错误详情、审批确认、用户问题单选/多选/自由输入、历史分页滚动保持、图片选择/预览条/删除/发送。
-- 目录：面包屑、home/根路径、隐藏目录切换、新建文件夹、选择与失败提示。
-- 原生截图夹具：提供 8 个 Native-only 场景，仅由 `-UITestFixture -NativeFixtureScreen <scene>` 启动参数进入，不影响正常生产入口。
+## 实现范围
 
-## 本轮第三轮定点修复
-
-- 设置接线：对话控制器持有 `AppState`，字号传入消息 Markdown/正文和 Session 日志；`transcriptView` 通过生产展示策略即时过滤过程行；`busyEnter` 计算 queue/steer，并保留 Cmd/Ctrl+Enter 反向语义；新会话创建成功后通过官方 `commands/execute` 权限命令应用 `defaultPermission`。
-- 视图选项：`HarnessPresentationPolicy.sections` 按全部 workspace 的 `sessionIDs` 分组，flat 为单列表，未归属会话进入“其他会话”；归档仅作展示过滤，updated/manual 均尊重数据顺序。
-- Markdown：补齐行内代码样式、HTTP/HTTPS `.link` attribute；消息使用可选择复制的原生 `UITextView`，仅安全打开 HTTP/HTTPS 链接。
-- P0 端点修复：新增生产共用 `HarnessEndpointCanonicalizer`，对 `http/https` endpoint 去除 token、清空 query 时写入 `queryItems = nil` 并清除空 query，保留其他 query，清除无意义 fragment；`AppState` 启动时自动迁移旧值并回写，保存时提取 URL token 到 Keychain。`HarnessClient`、`HarnessRuntime`、Keychain account、bootstrap 临时 token、HTTP API 和 WebSocket 均以同一 canonical base URL 为基准；连接页和设置页的等价 Debug fixture 使用动态端口示例且不显示裸问号。
-
-
-目标服务仅用于只读与一次性临时对象联调；没有记录 token、Cookie 或消息正文。
-
-```text
-bootstrap http=200 cookies=1
-session/list http=200 ok=true keys=items items=8
-session/modelCatalog http=200 ok=true keys=default,failures,groups,routableProviders
-mux workspace frames=1 types=item/baseline
-mux control frames=1 types=item/baseline
-mux events frames=1 types=item/ready
-mux follow frames=1 types=item/snapshot
-session/create http=200 ok=true keys=agentPreset,sessionId
-session/cancel http=200 ok=true
-workspace/archiveSession http=200 ok=true
-prompt skipped=cost-unconfirmed
-```
-
-临时对象名称带 `ios-native-acceptance-20260905-183628`；创建、重命名、取消和归档请求均返回成功。服务列表回读仍出现 `temporary_session_matches=1`，因此不能把清理声明为已证实完成；未触碰既有用户对象。由于 prompt 成本无法安全确认，未发送 prompt，这是人工门禁。
-
-## 测试与 CI
-
-本地 iSH（静态/协议辅助测试，Linux 无 Xcode）:
-
-```text
-python3 -m unittest discover -s Tests -p 'test_*.py' -v
-Ran 16 tests ... OK
-git diff --check 通过
-python3 scripts/verify_native_rework.py 全部 ok
-python3 scripts/verify_native_ui_fixture.py 全部 ok
-```
-
-Swift XCTest、Release device archive、IPA gate 和原生截图 job 均由 P0 修复后的最终 CI 执行成功：Run `34004545196`，对应代码 HEAD `8dfa386ec2c0291adb7052c89a0630ba7eb961c0`。Swift XCTest 共 26 项全部通过（HarnessClientModelsTests 9、HarnessWireTests 17），新增端点 canonicalization、任意端口、token 提取/非 token query 保留、旧值迁移、Runtime/Keychain/API/WebSocket 一致性断言。
+| 设计规格能力 | 实现/证据 | 状态 |
+|---|---|---|
+| 自适应 Harness 工作台 | `NativeHomeViewController`：继续工作、连接状态、待处理、运行中、最近工作、最近工作区、新任务；按 Runtime 状态显隐 | 已实现 |
+| 层级上下文抽屉 | 约 88% 屏宽覆盖抽屉；主机状态、搜索、工作区→会话层级、归档/视图选项、添加工作区；边缘手势和 VoiceOver 按钮 | 已实现 |
+| 对话/过程/产物 | `PocketConversationViewController` 三段原生 Segment；对话/工具过程过滤；产物只显示 Runtime 确认事件 | 已实现，真实产物事件需服务端联调 |
+| 任务控制台 | 多行输入、发送/停止、运行状态、当前阶段、上下文目录；使用 `keyboardLayoutGuide` 保持键盘态可达 | 已实现；附件入口沿用既有真实 PHPicker/文档 picker 接线 |
+| 模型/权限/附件 | 既有会话控制器保持真实 model catalog、权限和图片/文件 picker；Pocket 会话页接入 Runtime；默认权限持久化 | 已实现/沿用，需真实逐项联调 |
+| 审批 | Runtime 解析待审批队列；按风险显示高风险/普通；单次结果写回 `$events/result`；高风险全屏、普通 Sheet | 已实现，真实事件未发送 |
+| 用户问题 | Runtime 保存待回答队列；既有单选/多选/自由输入原生问题页；答案/取消真实回写 `$events/result` | 已实现，真实事件未发送 |
+| 活动中心 | 待审批、待回答、运行中、完成/失败/取消的原生活动列表入口；从工作台进入 | 已实现，真实完成事件需联调 |
+| 工作区/目录 | Runtime 工作区列表、层级选择；既有官方字段 `path/home/crumbs/entries` 目录 picker 和新建文件夹接线 | 已实现，真实服务字段需联调 |
+| 设置重构 | 外观、正文字号、代码字号、Compact/Normal、Busy Enter、减少动态效果、默认权限/工作区、通知、诊断/凭据不回显 | 已实现；通知仅保存本机偏好，未伪造系统通知 |
+| 深浅色/Dynamic Type/VoiceOver | Dynamic UIColor、动态字体辅助、可访问标签/提示、44pt 控件、减少动态效果；原生 UIKit | 已实现，需真机/辅助功能逐项复核 |
+| URL/鉴权安全 | 未改现有 canonicalizer、Keychain、bootstrap/API/WebSocket URL 一致性和空 query 修复 | 保持 |
+| WebKit/DOM/legacy | 活跃生产源码未引入禁用路径；IPA gate `forbiddenMarkers=0` | 通过 |
 
 ## 代码与分支
 
-- 当前分支：`feature/native-renderer`
-- 最终构建代码提交：`8dfa386ec2c0291adb7052c89a0630ba7eb961c0`（P0 服务地址 canonicalization 及必要 Swift XCTest）
-- 报告提交位于构建代码之后；报告提交只更新本报告证据，不改变构建代码。最终文档 HEAD 以推送后的提交为准。
-- 已推送：`origin/feature/native-renderer`
-- 未修改 `main`，未 force push
-- 工作树另有用户已有未跟踪移交/验收文档，未纳入本次代码/报告提交：`HANDOFF-*`、`REWORK-*`、`docs/native-request-acceptance-report.md`
+- 工程：`/var/minis/shared/deepseek-harness-ios-native`
+- 分支：`feature/native-renderer`
+- 最终代码 SHA：`a9290fa25896668d44e40b185d28efce5b4ae31c`
+- 远端：`origin/feature/native-renderer` 与本地一致
+- 文档 HEAD：本报告将在代码构建证据对齐后单独提交；该提交只更新报告，不改变 IPA 构建代码
+- `main` 未修改；未 force push
+- 用户已有未跟踪移交/验收文档未纳入本轮报告提交：`HANDOFF-*`、`REWORK-*` 及既有验收文档
 
-## 最终 CI / IPA / 截图证据
+## 验证证据
 
-- Actions Run：`34004545196`，`completed / success`
-- Workflow：https://github.com/lylywayr/deepseek-harness-ios/actions/runs/34004545196
-- 成功 jobs：unsigned IPA 构建与 `Native UI screenshots 390x844`；Swift XCTest、Release archive、IPA verify 全部通过。
-- 截图目录：[P0 修复后 Native UI 390×844 截图](minis://attachments/native-ui-390x844-34004545196/)
-- 截图文件：`connection`、`conversation`、`sidebar`、`settings`、`directory`、`approval`、`question`、`trajectory`，共 8 张；PNG 原始尺寸均为 1206×2622（iPhone 16 Simulator，内容区域 390×844pt）。已逐张视觉检查；connection 与 settings 中动态端口 endpoint 均无尾随 `?`，8 个场景均无纵向拉伸、文字重叠、裁切或异常遮挡。
-- IPA：[P0 修复后最终未签名 IPA](minis://attachments/native-rework-34004545196/DeepSeekHarness-unsigned.ipa)
-- IPA 文件大小：305244 bytes
-- IPA SHA-256：`8e8e3f5c10c047f5eaa39a716c65a0bd36b452363d51c295747797230a65af0d`
-- 独立 `verify_ipa.py`：`bundleIdentifier=com.example.DeepSeekHarness`、`minimumOSVersion=15.0`、`arm64`、`unsigned=true`、`forbiddenMarkers=0`；扫描禁止 fixture marker、真实内网地址、WebKit/legacy marker 均未命中。
-- IPA 中未发现 `_CodeSignature` 或 `embedded.mobileprovision`。
+### 本地 iSH
 
-## 本次 P0 缺陷结论
+```text
+python3 -m unittest discover -s Tests -p 'test_*.py' -q
+Ran 16 tests ... OK
+python3 scripts/verify_native_rework.py
+全部 ok
+python3 scripts/verify_native_ui_fixture.py
+全部 ok
+git diff --check
+通过
+```
 
-真机发现的服务地址尾随裸问号问题已完成定点修复。`http://host:任意端口`、裸 `?`、带 token、带其他 query 的 URL 均由同一生产 canonicalizer 处理；空 query 不再序列化为 `?`，旧值在启动时自动迁移回写，token 不进入持久化 endpoint。真实签名真机安装与服务端鉴权的最终人工门禁仍需在用户设备上复验；本轮未发送付费 prompt，也未修改 NAS、插件或服务。
+### GitHub Actions
 
+- Actions Run：`34010483300`
+- 状态：`completed / success`
+- Workflow：https://github.com/lylywayr/deepseek-harness-ios/actions/runs/34010483300
+- 成功 Job：`Build iOS device IPA`、`Native UI screenshots 390x844`
+- 成功包含生产 Swift XCTest、Release device archive、IPA verify、原生截图 job
+- Swift/Xcode 构建在 macOS Xcode 16.2 完成；iSH 本机没有 Xcode，未伪称本地执行 archive
 
-- 当前 8 张截图是确定性 Native-only fixture 的 Simulator 产物；已检查截图非空白且场景之间存在可见差异，但它不等于所有真实服务数据态都已逐项复现。
-- 未完成签名真机安装；需要用户 Team 签名后才能验证真机行为。
-- prompt、真实审批/用户问题事件、图片发送、分页 UI、原生设置页面和目录页面尚未在真实服务上逐项走通；代码、模拟器截图和结构测试不替代真实事件联调。
-- Native manifest/action 是可选声明式协议，不代表官方 Harness 或现有插件已实现。
+### IPA 独立验证
 
-## 关键限制
+- IPA：[Harness Pocket Workspace 最终未签名 IPA](minis://attachments/pocket-run-34010483300/ipa/DeepSeekHarness-unsigned.ipa)
+- 路径：`/var/minis/attachments/pocket-run-34010483300/ipa/DeepSeekHarness-unsigned.ipa`
+- SHA-256：`8dbaa767161eeaab4f63c4fc9eb2bd5bbdd9f7304f7a5ae606866f3539bb7ac5`
+- `verify_ipa.py`：`bundleIdentifier=com.example.DeepSeekHarness`、`minimumOSVersion=15.0`、`arm64`、`unsigned=true`、`forbiddenMarkers=0`
+- IPA 未发现 `_CodeSignature` 或 `embedded.mobileprovision`
+- IPA 不含 Release fixture marker；DEBUG-only 夹具通过 `#if DEBUG` 和 Debug compilation condition 接入
 
-本报告不把代码提交、静态检查、绿色构建或确定性截图夹具等同于 Gate 1–5 全部完成。当前已具备可审计的代码/测试/CI/IPA/Simulator screenshot 证据，但签名真机和若干真实业务事件仍是明确遗留项。
+### 截图证据
+
+本次成功 Run 已下载并独立检查 8 张 Native-only 场景截图：
+
+- 目录：`/var/minis/attachments/pocket-run-34010483300/screens/`
+- 链接：[390×844 Native UI 截图证据目录](minis://attachments/pocket-run-34010483300/screens/)
+- 文件：`connection`、`conversation`、`sidebar`、`settings`、`directory`、`approval`、`question`、`trajectory`
+- 全部 PNG 原始尺寸：`1206×2622`（iPhone 16 Simulator，内容区域 390×844pt）
+- 已视觉检查：设置、目录、问题等场景无拉伸/重叠/异常裁切；截图脚本逐场景重启 App，使用 `-UITestFixture -NativeFixtureScreen <scene>`，避免场景状态串线
+
+## 真实未验证项与诚实边界
+
+1. **430×932、键盘态、深色模式截图本轮未生成**：当前 CI 仍只运行 390×844 的 8 场景；这是设计规格验收矩阵的剩余证据缺口，不能用 390 截图替代。
+2. **签名真机未验证**：IPA 是 unsigned；真实 safe-area、Dynamic Type、VoiceOver、硬件键盘、触感和深色主题仍需用户 Team 签名安装后复验。
+3. **真实业务事件未发送**：为遵守不发送付费 prompt 门禁，本轮没有发送 prompt，也没有主动触发真实审批/用户问题/产物事件。因此 Runtime 解析和回写代码有静态/编译证据，但没有真实事件闭环证据。
+4. **模型、权限、附件、目录、分页 UI 未逐项真实服务走通**：生产入口和既有协议接线保留，不能把 fixture 或静态测试宣称为端到端业务验证。
+5. **通知**：设置只保存通知偏好；服务端/系统通知能力未被伪造，当前不宣称后台通知已完成。
+6. **多主机**：数据结构仍是单主机 Runtime；没有伪装并发多主机能力。
+7. **Native manifest**：继续按可选真实声明消费；没有把声明式协议当成官方服务能力。
+
+## 安全与回滚
+
+- 所有改动集中在 `feature/native-renderer`，未触碰 `main`；回滚可直接回到基线 `7e954ae3f440589697610e92ae8c970337e2bd59`，或在该分支 revert 本轮提交。
+- 未读取、记录或输出 token/Cookie；设置和诊断只显示是否保存，不回显凭据。
+- 未访问 NAS、插件或服务；未做生产配置变更。
