@@ -80,8 +80,7 @@ final class PocketV2Tests: XCTestCase {
         XCTAssertEqual(HarnessTranscriptView.allCases, [.compact, .normal])
         XCTAssertEqual(HarnessBusyEnterBehavior.sendMode(for: .queue, isGenerating: false, commandModified: true), "queue")
     }
-
-
+    func testPocketProcessAndArtifactPoliciesRemainSeparate() {
         let runtime = HarnessRuntime.fixture(scene: "artifacts")
         let process = runtime.items.filter { $0.kind == .system || $0.kind == .tool }
         XCTAssertTrue(process.contains { $0.subtitle == "轮次" })
