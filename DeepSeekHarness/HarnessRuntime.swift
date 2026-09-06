@@ -919,6 +919,7 @@ final class HarnessRuntime: NSObject {
         workspaces = ordered
     }
 
+    private func applyRuntimeProjection(_ id: String, key: String, value: Any?) {
         guard id == selectedSessionID else { return }
         switch key {
         case "currentStage", "stage", "phase": currentStage = value as? String ?? currentStage
