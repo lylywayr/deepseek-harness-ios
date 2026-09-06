@@ -1,6 +1,7 @@
 import XCTest
 import Foundation
 
+@MainActor
 final class PocketV2Tests: XCTestCase {
     func testPocketRuntimeUsesIndependentObservers() {
         let runtime = HarnessRuntime(baseURL: URL(string: "http://fixture.invalid")!)
