@@ -18,12 +18,20 @@ capture() {
   local dir="$OUT/$size/$appearance"
   mkdir -p "$dir"
   xcrun simctl terminate "$UDID" com.example.DeepSeekHarness >/dev/null 2>&1 || true
-  if !xcrun simctl launch "$UDID" com.example.DeepSeekHarness -UITestFixture -NativeFixtureScreen "$scene" $args >/tmp/pocket-fixture-launch.log 2>&1; then
+  if ! xcrun simctl launch "$UDID" com.example.DeepSeekHarness -UITestFixture -NativeFixtureScreen "$scene" $args >/tmp/pocket-fixture-launch.log 2>&1; then
     cat /tmp/pocket-fixture-launch.log >&2
     echo "Pocket fixture launch failed: $scene" >&2
     exit 1
   fi
   sleep 2
+  SIM_UID="$(xcrun simctl spawn "$UDID" id -u | tr -d '\r')"
+  if ! xcrun simctl spawn "$UDID" launchctl print "gui/$SIM_UID" 2>/tmp/pocket-fixture-launchctl.log | grep -q "com.example.DeepSeekHarness"; then
+    echo "Pocket fixture exited before screenshot: $scene" >&2
+    cat /tmp/pocket-fixture-launch.log >&2 || true
+    cat /tmp/pocket-fixture-launchctl.log >&2 || true
+    xcrun simctl spawn "$UDID" log show --last 20s --style compact --predicate 'process == "DeepSeekHarness" OR composedMessage CONTAINS[c] "DeepSeekHarness"' >&2 || true
+    exit 1
+  fi
   xcrun simctl io "$UDID" screenshot "$dir/$scene-$size-$appearance.png"
   xcrun simctl terminate "$UDID" com.example.DeepSeekHarness >/dev/null 2>&1 || true
 }
