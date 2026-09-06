@@ -11,6 +11,8 @@ import re
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
+APPSTATE = (ROOT / "DeepSeekHarness/AppState.swift").read_text()
+ENDPOINT = (ROOT / "DeepSeekHarness/HarnessEndpoint.swift").read_text()
 RUNTIME = (ROOT / "DeepSeekHarness/HarnessRuntime.swift").read_text()
 WIRE = (ROOT / "DeepSeekHarness/HarnessWire.swift").read_text()
 PROJECT = (ROOT / "DeepSeekHarness.xcodeproj/project.pbxproj").read_text()
@@ -42,7 +44,18 @@ class ProductionSwiftContractTests(unittest.TestCase):
         self.assertIn("HarnessWire.directoryListArguments(path: path)", RUNTIME)
         self.assertIn("HarnessWire.directoryCreateArguments(path: path, name: name)", RUNTIME)
 
-    def test_webkit_and_legacy_symbols_are_absent_from_active_swift(self) -> None:
+    def test_endpoint_canonicalizer_is_shared_and_wired_everywhere(self) -> None:
+        self.assertIn("HarnessEndpointCanonicalizer", ENDPOINT)
+        self.assertIn("HarnessEndpointCanonicalizer.canonicalize", APPSTATE)
+        self.assertIn("HarnessEndpointCanonicalizer.canonicalize", RUNTIME)
+        self.assertIn("HarnessEndpoint.swift in Sources", PROJECT)
+        self.assertIn("HarnessEndpoint.swift in Tests", PROJECT)
+        self.assertIn("queryItems = remaining.isEmpty ? nil : remaining", ENDPOINT)
+        self.assertIn("components.fragment = nil", ENDPOINT)
+        self.assertIn("func bootstrapURL()", RUNTIME)
+        self.assertIn("func apiURL(_ endpoint: String)", RUNTIME)
+        self.assertIn("func webSocketRequest()", RUNTIME)
+
         for path in (ROOT / "DeepSeekHarness").glob("*.swift"):
             source = path.read_text()
             for marker in ("WebKit", "WKWebView", "evaluateJavaScript", "AutoNativeAdapter", "HarnessWebView", "openLegacy", "legacyURL", "dom-projection"):

@@ -24,15 +24,19 @@ final class AppState: ObservableObject {
     @Published private(set) var hasConfiguredEndpoint: Bool
     @Published private(set) var settings: HarnessClientSettings
     @Published private(set) var viewPreferences: HarnessViewPreferences
+    private let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
         let saved = defaults.string(forKey: Keys.endpoint) ?? ""
-        if let parsed = Self.parse(saved) {
+        if let parsed = HarnessEndpointCanonicalizer.canonicalize(saved) {
             endpointString = parsed.url.absoluteString
             hasConfiguredEndpoint = true
+            if parsed.url.absoluteString != saved.trimmingCharacters(in: .whitespacesAndNewlines) {
+                defaults.set(parsed.url.absoluteString, forKey: Keys.endpoint)
+            }
             if let token = parsed.token, !token.isEmpty {
                 HarnessCredentialStore(baseURL: parsed.url).write(token)
-                defaults.set(parsed.url.absoluteString, forKey: Keys.endpoint)
             }
         } else {
             endpointString = ""
@@ -54,7 +58,7 @@ final class AppState: ObservableObject {
         viewPreferences = view
     }
 
-    var endpointURL: URL? { Self.makeURL(from: endpointString) }
+    var endpointURL: URL? { HarnessEndpointCanonicalizer.canonicalize(endpointString)?.url }
 
     var hasStoredCredential: Bool {
         guard let url = endpointURL else { return false }
@@ -63,9 +67,9 @@ final class AppState: ObservableObject {
 
     @discardableResult
     func saveEndpoint(_ value: String, token: String? = nil) -> Bool {
-        guard let parsed = Self.parse(value) else { return false }
+        guard let parsed = HarnessEndpointCanonicalizer.canonicalize(value) else { return false }
         let normalized = parsed.url.absoluteString
-        UserDefaults.standard.set(normalized, forKey: Keys.endpoint)
+        defaults.set(normalized, forKey: Keys.endpoint)
         if let suppliedToken = token?.trimmingCharacters(in: .whitespacesAndNewlines), !suppliedToken.isEmpty {
             HarnessCredentialStore(baseURL: parsed.url).write(suppliedToken)
         } else if let urlToken = parsed.token, !urlToken.isEmpty {
@@ -78,7 +82,7 @@ final class AppState: ObservableObject {
 
     func clearEndpoint() {
         if let url = endpointURL { HarnessCredentialStore(baseURL: url).remove() }
-        UserDefaults.standard.removeObject(forKey: Keys.endpoint)
+        defaults.removeObject(forKey: Keys.endpoint)
         endpointString = ""
         hasConfiguredEndpoint = false
     }
@@ -115,15 +119,5 @@ final class AppState: ObservableObject {
         scenes.flatMap(\.windows).forEach { $0.overrideUserInterfaceStyle = style }
     }
 
-    static func makeURL(from value: String) -> URL? { parse(value)?.url }
-
-    private static func parse(_ value: String) -> (url: URL, token: String?)? {
-        let text = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, var components = URLComponents(string: text) else { return nil }
-        guard let scheme = components.scheme?.lowercased(), scheme == "http" || scheme == "https", let host = components.host, !host.isEmpty, components.user == nil, components.password == nil else { return nil }
-        let token = components.queryItems?.first(where: { $0.name == "token" })?.value
-        components.queryItems = (components.queryItems ?? []).filter { $0.name != "token" }
-        guard let url = components.url else { return nil }
-        return (url, token)
-    }
+    static func makeURL(from value: String) -> URL? { HarnessEndpointCanonicalizer.canonicalize(value)?.url }
 }

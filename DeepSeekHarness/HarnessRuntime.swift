@@ -100,18 +100,16 @@ final class HarnessCredentialStore {
     }
 }
 
-private final class HarnessClient {
+final class HarnessClient {
     let baseURL: URL
     private let tokenFromURL: String?
     private let credentials: HarnessCredentialStore
     private let session: URLSession
 
     init(baseURL: URL) {
-        var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)
-        let queryItems = components?.queryItems ?? []
-        tokenFromURL = queryItems.first(where: { $0.name == "token" })?.value
-        components?.queryItems = queryItems.filter { $0.name != "token" }
-        self.baseURL = components?.url ?? baseURL
+        let parsed = HarnessEndpointCanonicalizer.canonicalize(baseURL)
+        self.baseURL = parsed?.url ?? baseURL
+        tokenFromURL = parsed?.token
         credentials = HarnessCredentialStore(baseURL: self.baseURL)
         let configuration = URLSessionConfiguration.default
         configuration.httpCookieStorage = HTTPCookieStorage.shared
@@ -122,14 +120,9 @@ private final class HarnessClient {
     }
 
     func bootstrap(completion: @escaping (Result<Void, Error>) -> Void) {
-        var url = baseURL
-        if let token = tokenFromURL ?? credentials.read(), !token.isEmpty {
-            var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)
-            var items = components?.queryItems ?? []
-            items.removeAll { $0.name == "token" }
-            items.append(URLQueryItem(name: "token", value: token))
-            components?.queryItems = items
-            url = components?.url ?? baseURL
+        guard let url = bootstrapURL() else {
+            completion(.failure(HarnessClientError.invalidURL))
+            return
         }
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
@@ -149,6 +142,15 @@ private final class HarnessClient {
         }.resume()
     }
 
+    func bootstrapURL() -> URL? {
+        guard let token = tokenFromURL ?? credentials.read(), !token.isEmpty else { return baseURL }
+        guard var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else { return nil }
+        var items = components.queryItems ?? []
+        items.removeAll { $0.name == "token" }
+        items.append(URLQueryItem(name: "token", value: token))
+        components.queryItems = items
+        return components.url
+    }
     func call(endpoint: String, args: [String: Any], completion: @escaping (Result<Any, Error>) -> Void) {
         guard Self.validEndpoint(endpoint), let url = apiURL(endpoint) else {
             completion(.failure(HarnessClientError.invalidURL)); return
@@ -194,7 +196,8 @@ private final class HarnessClient {
     }
 
     func webSocketRequest() -> URLRequest? {
-        guard var components = URLComponents(url: baseURL.appendingPathComponent("api/remote.mux"), resolvingAgainstBaseURL: false) else { return nil }
+        guard var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else { return nil }
+        components.path = appendingPath("api/remote.mux", to: components.path)
         components.scheme = components.scheme == "https" ? "wss" : "ws"
         guard let url = components.url else { return nil }
         var request = URLRequest(url: url)
@@ -211,10 +214,15 @@ private final class HarnessClient {
 
     func invalidate() { session.invalidateAndCancel() }
 
-    private func apiURL(_ endpoint: String) -> URL? {
-        var url = baseURL.appendingPathComponent("api")
-        endpoint.split(separator: "/").forEach { url.appendPathComponent(String($0)) }
-        return url
+    private func appendingPath(_ suffix: String, to path: String) -> String {
+        let prefix = path.hasSuffix("/") ? String(path.dropLast()) : path
+        return prefix + "/" + suffix
+    }
+
+    func apiURL(_ endpoint: String) -> URL? {
+        guard var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else { return nil }
+        components.path = appendingPath("api/\(endpoint)", to: components.path)
+        return components.url
     }
 
     private static func validEndpoint(_ endpoint: String) -> Bool {
@@ -270,8 +278,9 @@ final class HarnessRuntime: NSObject {
     var onQuestion: ((HarnessPendingQuestion) -> Void)?
 
     init(baseURL: URL) {
-        self.baseURL = baseURL
-        client = HarnessClient(baseURL: baseURL)
+        let parsed = HarnessEndpointCanonicalizer.canonicalize(baseURL)
+        self.baseURL = parsed?.url ?? baseURL
+        client = HarnessClient(baseURL: self.baseURL)
         super.init()
     }
 

@@ -178,7 +178,7 @@ final class NativeFixtureViewController: UIViewController {
         detail.textColor = DHTheme.secondaryText
         detail.numberOfLines = 0
         let address = UITextField()
-        address.text = "https://harness.example.com"
+        address.text = canonicalEndpointPreview
         address.font = DHTheme.font(.body)
         address.textColor = DHTheme.text
         address.backgroundColor = DHTheme.surfaceMuted
@@ -264,7 +264,7 @@ final class NativeFixtureViewController: UIViewController {
     private func renderSettings() {
         let stack = UIStackView(); install(stack)
         stack.addArrangedSubview(heading("设置", subtitle: "本机显示偏好 · 可编辑"))
-        stack.addArrangedSubview(card("连接", body: "https://harness.example.com\n令牌已保存"))
+        stack.addArrangedSubview(card("连接", body: "\(canonicalEndpointPreview)\n令牌已保存"))
         stack.addArrangedSubview(row("外观", value: "跟随系统", icon: "paintbrush"))
         stack.addArrangedSubview(row("会话字号", value: "16 pt", icon: "textformat.size"))
         stack.addArrangedSubview(row("对话显示", value: "Normal", icon: "text.alignleft"))

@@ -143,6 +143,78 @@ final class HarnessWireTests: XCTestCase {
         XCTAssertEqual((result["outcome"] as? [String: String])?["value"], "allowed-once")
     }
 
+    func testEndpointCanonicalizerRemovesEmptyQueryAndFragments() throws {
+        let cases = [
+            ("http://host:43127", "http://host:43127"),
+            ("http://host:43127?", "http://host:43127"),
+            ("http://host:43127/?", "http://host:43127/"),
+            ("http://host:43127#fragment", "http://host:43127"),
+            ("http://host:43127?foo=bar", "http://host:43127?foo=bar")
+        ]
+        for (input, expected) in cases {
+            let parsed = try XCTUnwrap(HarnessEndpointCanonicalizer.canonicalize(input))
+            XCTAssertEqual(parsed.url.absoluteString, expected, input)
+            XCTAssertNil(HarnessEndpointCanonicalizer.canonicalize(parsed.url)?.token)
+        }
+    }
+
+    func testEndpointCanonicalizerExtractsTokenAndPreservesOtherQueries() throws {
+        let parsed = try XCTUnwrap(HarnessEndpointCanonicalizer.canonicalize("https://host:49215/?foo=bar&token=secret"))
+        XCTAssertEqual(parsed.url.absoluteString, "https://host:49215/?foo=bar")
+        XCTAssertEqual(parsed.token, "secret")
+        let empty = try XCTUnwrap(HarnessEndpointCanonicalizer.canonicalize("https://host:49215/?token="))
+        XCTAssertEqual(empty.url.absoluteString, "https://host:49215/")
+        XCTAssertNil(empty.token)
+    }
+
+    func testEndpointCanonicalizerIsIdempotent() throws {
+        let once = try XCTUnwrap(HarnessEndpointCanonicalizer.canonicalize(" HTTP://host:43127?foo=bar&token=x "))
+        let twice = try XCTUnwrap(HarnessEndpointCanonicalizer.canonicalize(once.url))
+        XCTAssertEqual(once.url, twice.url)
+        XCTAssertNil(twice.token)
+    }
+
+    @MainActor
+    func testAppStateMigratesLegacyEndpointAndWritesCanonicalValue() throws {
+        let suite = "HarnessEndpointTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        let legacy = "https://host:49215/?foo=bar&token=secret"
+        let canonical = try XCTUnwrap(URL(string: "https://host:49215/?foo=bar"))
+        defaults.set(legacy, forKey: "harness.endpoint")
+        defer {
+            HarnessCredentialStore(baseURL: canonical).remove()
+            defaults.removePersistentDomain(forName: suite)
+        }
+        let state = AppState(defaults: defaults)
+        XCTAssertEqual(state.endpointString, canonical.absoluteString)
+        XCTAssertEqual(state.endpointURL, canonical)
+        XCTAssertEqual(defaults.string(forKey: "harness.endpoint"), canonical.absoluteString)
+        XCTAssertTrue(state.hasStoredCredential)
+        XCTAssertFalse(state.endpointString.hasSuffix("?"))
+    }
+
+    @MainActor
+    func testClientRuntimeAndTransportURLsShareCanonicalBase() throws {
+        let input = try XCTUnwrap(URL(string: "http://host:43127?foo=bar&token=secret"))
+        let client = HarnessClient(baseURL: input)
+        defer { HarnessCredentialStore(baseURL: client.baseURL).remove() }
+        let expected = try XCTUnwrap(URL(string: "http://host:43127?foo=bar"))
+        XCTAssertEqual(client.baseURL, expected)
+        XCTAssertTrue(HarnessCredentialStore(baseURL: client.baseURL).hasValue())
+
+        let bootstrap = try XCTUnwrap(client.bootstrapURL())
+        XCTAssertEqual(bootstrap.absoluteString, "http://host:43127?foo=bar&token=secret")
+        let api = try XCTUnwrap(client.apiURL("session/list"))
+        XCTAssertEqual(api.absoluteString, "http://host:43127/api/session/list?foo=bar")
+        XCTAssertFalse(api.absoluteString.hasSuffix("?"))
+        let webSocket = try XCTUnwrap(client.webSocketRequest()?.url)
+        XCTAssertEqual(webSocket.absoluteString, "ws://host:43127/api/remote.mux?foo=bar")
+        XCTAssertFalse(webSocket.absoluteString.hasSuffix("?"))
+
+        let runtime = HarnessRuntime(baseURL: input)
+        XCTAssertEqual(runtime.baseURL, client.baseURL)
+    }
+
     private func json(_ object: [String: Any]) throws -> Data {
         try JSONSerialization.data(withJSONObject: object)
     }
