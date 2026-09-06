@@ -145,6 +145,10 @@ final class NativeFixtureViewController: UIViewController {
         return button
     }
 
+    private var canonicalEndpointPreview: String {
+        HarnessEndpointCanonicalizer.canonicalize("http://harness.example.com:43127?")?.url.absoluteString ?? "http://harness.example.com:43127"
+    }
+
     private func actionButton(_ title: String, filled: Bool = false) -> UIButton {
         var configuration = filled ? UIButton.Configuration.filled() : UIButton.Configuration.bordered()
         configuration.title = title
