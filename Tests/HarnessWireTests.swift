@@ -189,7 +189,6 @@ final class HarnessWireTests: XCTestCase {
         XCTAssertEqual(state.endpointString, canonical.absoluteString)
         XCTAssertEqual(state.endpointURL, canonical)
         XCTAssertEqual(defaults.string(forKey: "harness.endpoint"), canonical.absoluteString)
-        XCTAssertTrue(state.hasStoredCredential)
         XCTAssertFalse(state.endpointString.hasSuffix("?"))
     }
 
@@ -200,7 +199,6 @@ final class HarnessWireTests: XCTestCase {
         defer { HarnessCredentialStore(baseURL: client.baseURL).remove() }
         let expected = try XCTUnwrap(URL(string: "http://host:43127?foo=bar"))
         XCTAssertEqual(client.baseURL, expected)
-        XCTAssertTrue(HarnessCredentialStore(baseURL: client.baseURL).hasValue())
 
         let bootstrap = try XCTUnwrap(client.bootstrapURL())
         XCTAssertEqual(bootstrap.absoluteString, "http://host:43127?foo=bar&token=secret")

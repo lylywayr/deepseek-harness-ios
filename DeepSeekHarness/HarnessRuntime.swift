@@ -53,7 +53,8 @@ final class HarnessCredentialStore {
     private let account: String
 
     init(baseURL: URL) {
-        account = "launch-token-\(baseURL.host ?? "unknown")-\(baseURL.port ?? 80)"
+        let canonical = HarnessEndpointCanonicalizer.canonicalize(baseURL)?.url ?? baseURL
+        account = "launch-token-\(canonical.host ?? "unknown")-\(canonical.port ?? 80)"
     }
 
     func read() -> String? {
