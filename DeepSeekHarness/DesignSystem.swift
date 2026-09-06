@@ -59,6 +59,12 @@ enum DHTheme {
             : UIColor.white
     }
 
+    static let userBubble = UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 0.20, green: 0.32, blue: 0.70, alpha: 1)
+            : UIColor(red: 0.275, green: 0.400, blue: 0.900, alpha: 1)
+    }
+
     static let text = UIColor.label
     static let secondaryText = UIColor.secondaryLabel
     static let tertiaryText = UIColor.tertiaryLabel

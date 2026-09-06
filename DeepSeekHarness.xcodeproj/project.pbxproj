@@ -62,7 +62,7 @@
 		B10000000000000000000010 /* HarnessSettingsCenterViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessSettingsCenterViewController.swift; sourceTree = "<group>"; };
 		B10000000000000000000012 /* HarnessWire.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessWire.swift; sourceTree = "<group>"; };
 		B10000000000000000000016 /* HarnessClientModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessClientModels.swift; sourceTree = "<group>"; };
-		B10000000000000000000018 /* NativeFixtureViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeFixtureViewController.swift; sourceTree = "<group>"; };
+		B1000000000000000000001A /* HarnessEndpoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessEndpoint.swift; sourceTree = "<group>"; };
 		B1000000000000000000001E /* PocketWorkspaceViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PocketWorkspaceViewController.swift; sourceTree = "<group>"; };
 		B1000000000000000000001F /* PocketConversationViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PocketConversationViewController.swift; sourceTree = "<group>"; };
 		B10000000000000000000020 /* PocketActivityViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PocketActivityViewController.swift; sourceTree = "<group>"; };
