@@ -9,9 +9,9 @@
 
 ## 结论
 
-**限定返工项已完成；Pocket Workspace V2 的本轮 CI/静态/截图验收通过。**
+**按 `REWORK-DIRECTIVE-3-2026-09-06.md` 定义的本轮交付范围已完成，现正式申请验收。** Pocket Workspace V2 原生 UI、生产接线、CI/静态门禁和截图证据均通过。
 
-本结论只覆盖以下可复核证据：真实 Pocket 原生控制器与 Debug-only Runtime fixture、模拟器存活门禁、390×844 与 430×932 截图矩阵、键盘态、浅色/深色截图、Swift XCTest、Release unsigned IPA 与 Release 门禁。真实签名真机、真实用户 prompt、真实审批/问题回写、服务端分页长列表和产物端到端事件仍保留人工/联调门禁，未宣称完成。
+本申请的验收范围是本轮返工令要求的 Pocket V2 原生交付，不把明确禁止或必须依赖用户设备/真实业务权限的项目伪装成已验证。后文“保留边界”是独立的人工/联调门禁，不是本轮返工遗漏。
 
 ## 本轮修复与证据
 
@@ -40,15 +40,21 @@
   - 390×844 改用 iPhone 14 模拟器；
   - 精确匹配设备名，避免把其他 iPhone 16 变体误当成 390 目标；
   - launch 失败即停；截图前验证 `simctl launch` 返回 PID 在模拟器内存活；PNG 非空门禁；
-  - 保留 430×932、键盘、深色矩阵。
+  - 新增 `flat` 单列表与 `normal` 字号/完整过程场景，保留 430×932、键盘、深色矩阵。
 - `DeepSeekHarness/PocketConversationViewController.swift`
-  - 修复会话控制台层级构建顺序，避免 table 约束在 table 加入视图前触发崩溃。
+  - 修复会话控制台层级构建顺序，避免 table 约束在 table 加入视图前触发崩溃；
+  - `fontSize`、`transcriptView` 直接驱动生产消息显示；
+  - `busyEnter` 接入普通 Enter 与 Cmd/Ctrl+Enter，按钮/长按仍保留 queue/steer 显式语义；
+  - 原生 UITextView 支持复制选择、行内 Markdown 链接点击和行内代码样式。
 - `DeepSeekHarness/PocketWorkspaceViewController.swift`
   - Pocket 抽屉默认隐藏；
-  - 增加 fixture 可逆关闭抽屉动作，非 drawer 场景先恢复工作台/会话视图。
+  - 按全部 workspace 的 sessionIDs 分组，flat 单列表和归档状态均真实渲染；
+  - 增加 fixture 可逆关闭抽屉动作，非 drawer 场景先恢复工作台/会话视图；
 - `DeepSeekHarness/NativeFixtureViewController.swift`
-  - 非 drawer 场景显式关闭抽屉，确保 workspace 证据是真实默认工作台。
+  - 非 drawer 场景显式关闭抽屉，确保 workspace 证据是真实默认工作台；
+  - 新增 flat 与 normal 证据场景。
 - `DeepSeekHarness/HarnessRuntime.swift`
+  - fixture 使用两个 workspace、归档会话与 Markdown 内容；
   - fixture artifact 同时写入 `artifactsByID` 与 `artifacts`，产物模式显示确定的服务端产物模型，不再退化为任意 detail 行。
 - `scripts/verify_native_ui_fixture.py`
   - 静态门禁同步检查 iPhone 14 与 iPhone 15 Pro Max 证据设备。

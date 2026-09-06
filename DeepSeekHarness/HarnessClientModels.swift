@@ -186,6 +186,11 @@ enum HarnessPresentationPolicy {
         return result
     }
 
+    static func sessionTitle(_ session: HarnessSessionSummary, archived: Bool) -> String {
+        let title = session.title.isEmpty ? "新会话" : session.title
+        return archived ? "已归档 · \(title)" : title
+    }
+
     static func transcriptVisibleItems(_ items: [HarnessConversationItem], view: HarnessTranscriptView) -> [HarnessConversationItem] {
         guard view == .compact else { return items }
         return items.filter { item in

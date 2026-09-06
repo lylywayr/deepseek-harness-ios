@@ -49,6 +49,7 @@ final class HarnessClientModelsTests: XCTestCase {
         XCTAssertTrue(HarnessPresentationPolicy.sections(sessions: [archived], workspaces: [workspace], archived: ["archived"], preferences: HarnessViewPreferences()).isEmpty)
         var preferences = HarnessViewPreferences(); preferences.showArchived = true
         XCTAssertEqual(HarnessPresentationPolicy.sections(sessions: [archived], workspaces: [workspace], archived: ["archived"], preferences: preferences).flatMap(\.sessions).map(\.id), ["archived"])
+        XCTAssertEqual(HarnessPresentationPolicy.sessionTitle(archived, archived: true), "已归档 · Archived")
     }
 
     func testCompactTranscriptHidesProcessRowsButRetainsErrors() {

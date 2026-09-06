@@ -14,6 +14,9 @@ final class PocketV2Tests: XCTestCase {
         XCTAssertEqual(navigation, 1)
         stopChanges()
         stopNavigation()
+        runtime.emitFixtureUpdateForTesting()
+        XCTAssertEqual(changes, 1)
+        XCTAssertEqual(navigation, 1)
     }
 
     func testPocketFixtureContainsWorkspaceConsoleState() {
@@ -28,12 +31,36 @@ final class PocketV2Tests: XCTestCase {
         XCTAssertFalse(runtime.pendingQuestions.isEmpty)
     }
 
+    func testPocketRuntimeObserverTokensCanBeIndependentlyRemoved() {
+        let runtime = HarnessRuntime(baseURL: URL(string: "http://fixture.invalid")!)
+        var first = 0
+        var second = 0
+        let stopFirst = runtime.observeChanges { first += 1 }
+        let stopSecond = runtime.observeChanges { second += 1 }
+        runtime.emitFixtureUpdateForTesting()
+        stopFirst()
+        runtime.emitFixtureUpdateForTesting()
+        stopSecond()
+        runtime.emitFixtureUpdateForTesting()
+        XCTAssertEqual(first, 1)
+        XCTAssertEqual(second, 2)
+    }
+
     func testPocketProcessAndArtifactPoliciesRemainSeparate() {
         let runtime = HarnessRuntime.fixture(scene: "artifacts")
         let process = runtime.items.filter { $0.kind == .system || $0.kind == .tool }
         XCTAssertTrue(process.contains { $0.subtitle == "轮次" })
         XCTAssertEqual(runtime.artifacts.map(\.id), ["artifact-1"])
         XCTAssertFalse(runtime.items.contains { $0.subtitle == "产物" })
+    }
+
+    func testPocketFixtureExposesMarkdownInlineAttributes() {
+        let value = HarnessMarkdown.attributed("Inline `code` and [Harness](https://harness.example.com/docs)")
+        let codeRange = (value.string as NSString).range(of: "code")
+        let linkRange = (value.string as NSString).range(of: "Harness")
+        XCTAssertNotEqual(codeRange.location, NSNotFound)
+        XCTAssertNotNil(value.attribute(.backgroundColor, at: codeRange.location, effectiveRange: nil))
+        XCTAssertEqual((value.attribute(.link, at: linkRange.location, effectiveRange: nil) as? URL)?.absoluteString, "https://harness.example.com/docs")
     }
 
     func testPocketSendModesKeepQueueAndSteerSemantics() {
@@ -50,5 +77,9 @@ final class PocketV2Tests: XCTestCase {
         let sections = HarnessPresentationPolicy.sections(sessions: runtime.sessions, workspaces: runtime.workspaces, archived: [], preferences: flat)
         XCTAssertEqual(sections.count, 1)
         XCTAssertEqual(sections[0].title, "全部会话")
+        var grouped = HarnessViewPreferences()
+        grouped.showArchived = true
+        let groupedSections = HarnessPresentationPolicy.sections(sessions: runtime.sessions, workspaces: runtime.workspaces, archived: runtime.archivedSessionIDsForPresentation, preferences: grouped)
+        XCTAssertEqual(groupedSections.map(\.title), ["Pocket 项目", "验收文档"])
     }
 }

@@ -328,7 +328,8 @@ final class HarnessRuntime: NSObject {
     #if DEBUG
     static func fixture(scene: String = "workspace") -> HarnessRuntime {
         let runtime = HarnessRuntime(baseURL: URL(string: "http://fixture.invalid")!)
-        let workspace = HarnessWorkspace(id: "workspace-project", title: "Pocket 项目", path: "/Users/demo/Pocket", sessionIDs: ["session-active", "session-research"])
+        let workspace = HarnessWorkspace(id: "workspace-project", title: "Pocket 项目", path: "/Users/demo/Pocket", sessionIDs: ["session-active"])
+        let docsWorkspace = HarnessWorkspace(id: "workspace-docs", title: "验收文档", path: "/Users/demo/Pocket/docs", sessionIDs: ["session-research"])
         let active = HarnessSessionSummary(id: "session-active", title: "原生工作台 V2", cwd: "/Users/demo/Pocket", updatedAt: 200, running: scene == "workspace" || scene == "conversation" || scene == "process", blank: false, preset: "standard", permission: "workspace-write", provider: "deepseek", model: "DeepSeek V4", turns: 4, steps: 12, contextUsed: 0.42, status: "running", stage: "工具调用")
         let research = HarnessSessionSummary(id: "session-research", title: "验收与交付", cwd: "/Users/demo/Pocket/docs", updatedAt: 100, running: false, blank: false, preset: "standard", permission: "read-only", provider: "deepseek", model: "DeepSeek V4", turns: 2, steps: 6, contextUsed: 0.18)
         runtime.connected = true
@@ -337,14 +338,14 @@ final class HarnessRuntime: NSObject {
         runtime.currentStage = scene == "artifacts" ? "已完成" : "工具调用"
         runtime.contextDirectory = "/Users/demo/Pocket"
         runtime.sessions = [active, research]
-        runtime.workspaces = [workspace]
-        runtime.selectedSessionID = "session-active"
+        runtime.workspaces = [workspace, docsWorkspace]
+        runtime.archivedSessionIDs = ["session-research"]
         runtime.isGenerating = scene == "workspace" || scene == "conversation" || scene == "process" || scene == "keyboard"
         runtime.reasoningEffort = "balanced"
         runtime.models = [HarnessModelOption(provider: "deepseek", providerName: "DeepSeek", model: "deepseek-v4", modelName: "DeepSeek V4", reasoning: [["id": "balanced", "name": "均衡"], ["id": "deep", "name": "深入"]])]
         runtime.items = [
             HarnessConversationItem(id: "u1", kind: .user, text: "请继续检查这个 Pocket 工作区。", subtitle: "刚刚", seq: 1, time: 1),
-            HarnessConversationItem(id: "a1", kind: .assistant, text: "我会先读取工作区状态，再汇总可以验证的结果。", subtitle: "回答", seq: 2, time: 2, isMarkdown: true),
+            HarnessConversationItem(id: "a1", kind: .assistant, text: "我会先读取工作区状态，再汇总可以验证的结果。\n\n内联 `session/list` 与 [Harness 文档](https://harness.example.com/docs) 均可原生渲染。", subtitle: "回答", seq: 2, time: 2, isMarkdown: true),
             HarnessConversationItem(id: "t1", kind: .tool, text: "workspace/list", subtitle: "工具", seq: 3, time: 3, detail: "返回 2 个工作区条目"),
             HarnessConversationItem(id: "r1", kind: .system, text: "分析上下文与执行阶段", subtitle: "轮次", seq: 4, time: 4, detail: "耗时 1.8 s"),
             HarnessConversationItem(id: "e1", kind: .system, text: "本轮完成，产物已由服务端确认。", subtitle: "完成", seq: 5, time: 5)

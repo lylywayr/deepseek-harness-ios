@@ -63,7 +63,7 @@ capture() {
 
 # iPhone 14 is the 390x844 evidence target. 430x932 is produced with a
 # second simulator when the runtime is available; all scenes remain real Pocket.
-for scene in workspace drawer conversation process artifacts activity settings; do capture "$scene" "390x844" "light" ""; done
+for scene in workspace drawer flat conversation normal process artifacts activity settings; do capture "$scene" "390x844" "light" ""; done
 capture keyboard "390x844" "light" ""
 capture workspace "390x844" "dark" "-PocketDark"
 
@@ -76,7 +76,7 @@ if [[ -n "$UDID430" ]]; then
   xcrun simctl bootstatus "$UDID430" -b
   xcrun simctl install "$UDID430" "$APP_PATH"
   UDID="$UDID430"
-  for scene in workspace drawer conversation process artifacts activity settings keyboard; do capture "$scene" "430x932" "light" ""; done
+  for scene in workspace drawer flat conversation normal process artifacts activity settings keyboard; do capture "$scene" "430x932" "light" ""; done
   capture workspace "430x932" "dark" "-PocketDark"
 else
   printf '430x932 simulator unavailable; 390x844 evidence retained\n'

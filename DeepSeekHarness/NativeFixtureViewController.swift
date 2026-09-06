@@ -48,7 +48,7 @@ final class NativeFixtureViewController: UIViewController {
 
     private func normalizedScene(_ value: String) -> String {
         switch value {
-        case "workspace", "drawer", "conversation", "process", "artifacts", "activity", "settings", "keyboard": return value
+        case "workspace", "drawer", "flat", "conversation", "normal", "process", "artifacts", "activity", "settings", "keyboard": return value
         case "trajectory": return "process"
         default: return "workspace"
         }
@@ -57,7 +57,9 @@ final class NativeFixtureViewController: UIViewController {
     private func applyScene() {
         switch normalizedScene(screen) {
         case "drawer": home.fixtureOpenDrawer()
+        case "flat": home.fixtureOpenFlatDrawer()
         case "conversation": home.fixtureOpenConversation()
+        case "normal": home.fixtureOpenNormalConversation()
         case "process": home.fixtureSelectMode(1)
         case "artifacts": home.fixtureSelectMode(2)
         case "activity": home.fixtureShowActivity()

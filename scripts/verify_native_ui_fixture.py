@@ -15,27 +15,29 @@ LAUNCH = (ROOT / "DeepSeekHarness/NativeMainViewController.swift").read_text()
 if "#if DEBUG" not in SOURCE or "#endif" not in SOURCE:
     raise SystemExit("FAIL: fixture implementation is not DEBUG-only")
 for marker in (
-    'case "workspace"', 'case "drawer"', 'case "conversation"',
-    'case "process"', 'case "artifacts"', 'case "activity"',
-    'case "settings"', 'case "keyboard"',
+    'case "workspace"', 'case "drawer"', 'case "flat"', 'case "conversation"', 'case "normal"',
+    'case "process"', 'case "artifacts"', 'case "activity"', 'case "settings"', 'case "keyboard"',
 ):
     if marker not in SOURCE:
         raise SystemExit(f"FAIL: missing fixture scene {marker}")
 for marker in (
     "HarnessRuntime.fixture", "NativeHomeViewController", "fixtureOpenDrawer",
-    "fixtureSelectMode", "fixtureShowActivity", "fixtureShowSettings",
+    "fixtureOpenFlatDrawer", "fixtureOpenNormalConversation", "fixtureSelectMode", "fixtureShowActivity", "fixtureShowSettings",
 ):
     if marker not in SOURCE + WORKSPACE + CONVERSATION:
         raise SystemExit(f"FAIL: missing real Pocket fixture marker {marker}")
+for marker in ("groupBy", "transcriptView", "HarnessMarkdown", "PocketInputTextView"):
+    if marker not in WORKSPACE + CONVERSATION + (ROOT / "DeepSeekHarness/HarnessClientModels.swift").read_text():
+        raise SystemExit(f"FAIL: missing Pocket production wiring marker {marker}")
 for marker in ("NativeFixtureViewController.swift in Sources", "-UITestFixture", "390", "844"):
     haystack = PROJECT if marker == "NativeFixtureViewController.swift in Sources" else LAUNCH + SCRIPT
     if marker not in haystack:
         raise SystemExit(f"FAIL: missing fixture integration marker {marker}")
 if 'SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG"' not in PROJECT:
     raise SystemExit("FAIL: Debug fixture compilation condition is missing")
-for marker in ("workspace drawer conversation process artifacts activity settings keyboard", "390x844", "430x932", "PocketDark", "pocket-v2-ui-matrix", "UITestFixture", "-NativeFixtureScreen", "iPhone 14", "iPhone 15 Pro Max"):
+for marker in ("workspace drawer flat conversation normal process artifacts activity settings keyboard", "390x844", "430x932", "PocketDark", "pocket-v2-ui-matrix", "UITestFixture", "-NativeFixtureScreen", "iPhone 14", "iPhone 15 Pro Max"):
     if marker not in LAUNCH + SCRIPT + WORKFLOW:
         raise SystemExit(f"FAIL: missing screenshot marker {marker}")
-print("ok: Pocket fixture scenes 8")
+print("ok: Pocket fixture scenes 10")
 print("ok: real Pocket controllers and Runtime are fixture-backed")
 print("ok: native fixture is DEBUG-only and workflow-covered")

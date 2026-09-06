@@ -92,7 +92,22 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
     #if DEBUG
     func fixtureOpenDrawer() { if !isDrawerVisible { toggleDrawer() } }
     func fixtureCloseDrawer() { if isDrawerVisible { toggleDrawer() } }
+    func fixtureOpenFlatDrawer() {
+        var preferences = appState.viewPreferences
+        preferences.groupBy = .flat
+        preferences.orderBy = .updated
+        preferences.showArchived = true
+        appState.updateViewPreferences(preferences)
+        fixtureOpenDrawer()
+    }
     func fixtureOpenConversation() { fixtureCloseDrawer(); showConversation() }
+    func fixtureOpenNormalConversation() {
+        var settings = appState.settings
+        settings.fontSize = 16
+        settings.transcriptView = .normal
+        appState.updateSettings(settings)
+        fixtureOpenConversation()
+    }
     func fixtureSelectMode(_ index: Int) { fixtureOpenConversation(); conversation.fixtureSelectMode(index) }
     func fixtureFocusComposer() { fixtureOpenConversation(); conversation.fixtureFocusComposer() }
     func fixtureShowActivity() { showActivityCenter() }
@@ -275,8 +290,9 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
         for section in visible {
             let title = UILabel(); title.text = "▾  \(section.title)"; title.font = DHTheme.font(.subheadline, weight: .semibold); title.textColor = DHTheme.secondaryText; drawerContent.addArrangedSubview(title)
             section.sessions.forEach { session in
-                let button = dhButton(title: (session.running ? "● " : "○ ") + (session.title.isEmpty ? "新会话" : session.title), systemName: session.running ? "bolt.fill" : "message", filled: false) { [weak self] in self?.runtime.openSession(session.id); self?.showConversation(); self?.toggleDrawer() }
-                button.contentHorizontalAlignment = .leading; button.accessibilityLabel = "会话：\(session.title)，\(metadata(session))"; drawerContent.addArrangedSubview(button)
+                let isArchived = runtime.archivedSessionIDsForPresentation.contains(session.id)
+                let button = dhButton(title: (session.running ? "● " : "○ ") + HarnessPresentationPolicy.sessionTitle(session, archived: isArchived), systemName: session.running ? "bolt.fill" : (isArchived ? "archivebox" : "message"), filled: false) { [weak self] in self?.runtime.openSession(session.id); self?.showConversation(); self?.toggleDrawer() }
+                button.contentHorizontalAlignment = .leading; button.accessibilityLabel = "会话：\(HarnessPresentationPolicy.sessionTitle(session, archived: isArchived))，\(metadata(session))"; drawerContent.addArrangedSubview(button)
             }
         }
         drawerContent.addArrangedSubview(dhButton(title: "添加工作区", systemName: "folder.badge.plus", filled: false) { [weak self] in self?.showDirectoryPicker() })

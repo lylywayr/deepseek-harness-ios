@@ -30,7 +30,7 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
     private let composer = UIView()
     private let composerStack = UIStackView()
     private let inputWrapper = UIView()
-    private let input = UITextView()
+    private let input = PocketInputTextView()
     private let placeholder = UILabel()
     private let attachmentScroll = UIScrollView()
     private let attachmentStrip = UIStackView()
@@ -219,6 +219,7 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
         composerStack.addArrangedSubview(inputWrapper)
         input.font = DHTheme.scaledFont(size: CGFloat(appState.settings.fontSize)); input.textColor = DHTheme.text; input.backgroundColor = .clear
         input.textContainerInset = UIEdgeInsets(top: 8, left: 10, bottom: 7, right: 10); input.textContainer.lineFragmentPadding = 0; input.delegate = self
+        input.onSubmit = { [weak self] commandModified in self?.sendCurrentInput(commandModified: commandModified) }
         input.translatesAutoresizingMaskIntoConstraints = false; inputWrapper.addSubview(input)
         placeholder.text = "输入任务或继续指令…"; placeholder.font = DHTheme.scaledFont(size: CGFloat(appState.settings.fontSize)); placeholder.textColor = DHTheme.tertiaryText; placeholder.isUserInteractionEnabled = false
         placeholder.translatesAutoresizingMaskIntoConstraints = false; inputWrapper.addSubview(placeholder)
@@ -262,6 +263,14 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
     }
 
     @objc private func settingsDidChange() { input.font = DHTheme.scaledFont(size: CGFloat(appState.settings.fontSize)); placeholder.font = input.font; table.reloadData(); render() }
+    override var canBecomeFirstResponder: Bool { true }
+    override var keyCommands: [UIKeyCommand]? {
+        [
+            UIKeyCommand(input: UIKeyCommand.inputReturn, modifierFlags: [.command], action: #selector(modifiedEnter)),
+            UIKeyCommand(input: UIKeyCommand.inputReturn, modifierFlags: [.control], action: #selector(modifiedEnter))
+        ]
+    }
+    @objc private func modifiedEnter() { sendCurrentInput(commandModified: true) }
     @objc private func modeChanged() { mode = modeControl.selectedSegmentIndex; processControlsHeight.constant = mode == 1 ? 78 : 0; processControls.isHidden = mode != 1; render() }
     @objc private func toggleTurns() { showTurns.toggle(); processTurns.configuration?.image = UIImage(systemName: showTurns ? "rectangle.compress.vertical" : "rectangle.expand.vertical"); render() }
     @objc private func toggleCalls() { showCalls.toggle(); processCalls.configuration?.image = UIImage(systemName: showCalls ? "wrench.and.screwdriver" : "rectangle.expand.vertical"); render() }
@@ -317,19 +326,19 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
 
     @objc private func sendTapped() {
         if runtime.isGenerating && input.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && images.isEmpty { runtime.cancel(); return }
-        sendCurrentInput()
+        sendCurrentInput(explicitMode: runtime.isGenerating ? selectedSendMode : "queue")
     }
 
     @objc private func sendLongPress(_ gesture: UILongPressGestureRecognizer) {
         guard gesture.state == .began else { return }
         selectedSendMode = "steer"
-        sendCurrentInput()
+        sendCurrentInput(explicitMode: "steer")
     }
 
-    private func sendCurrentInput() {
+    private func sendCurrentInput(commandModified: Bool = false, explicitMode: String? = nil) {
         let text = input.text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty || !images.isEmpty else { return }
-        let mode = runtime.isGenerating ? selectedSendMode : "queue"
+        let mode = explicitMode ?? HarnessBusyEnterBehavior.sendMode(for: appState.settings.busyEnter, isGenerating: runtime.isGenerating, commandModified: commandModified)
         runtime.send(text, mode: mode, images: images)
         input.text = ""; images.removeAll(); inputHeight.constant = 46; renderAttachments(); updateHeader()
     }
@@ -445,4 +454,24 @@ private final class PocketArtifactCell: UITableViewCell {
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) { super.init(style: style, reuseIdentifier: reuseIdentifier); backgroundColor = .clear; selectionStyle = .default; icon.translatesAutoresizingMaskIntoConstraints = false; let labels = UIStackView(arrangedSubviews: [titleLabel, pathLabel, detailLabel]); labels.axis = .vertical; labels.spacing = 4; labels.translatesAutoresizingMaskIntoConstraints = false; titleLabel.font = DHTheme.font(.body, weight: .semibold); titleLabel.textColor = DHTheme.text; pathLabel.font = DHTheme.font(.caption1); pathLabel.textColor = DHTheme.secondaryText; pathLabel.numberOfLines = 2; detailLabel.font = DHTheme.font(.caption2); detailLabel.textColor = DHTheme.tertiaryText; detailLabel.numberOfLines = 2; contentView.addSubview(icon); contentView.addSubview(labels); NSLayoutConstraint.activate([icon.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16), icon.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 14), icon.widthAnchor.constraint(equalToConstant: 28), icon.heightAnchor.constraint(equalToConstant: 28), labels.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 12), labels.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16), labels.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12), labels.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12)]) }
     @available(*, unavailable) required init?(coder: NSCoder) { fatalError() }
     func configure(_ artifact: HarnessArtifact) { icon.image = UIImage(systemName: artifact.kind == "image" ? "photo" : "doc.richtext"); icon.tintColor = DHTheme.accent; titleLabel.text = artifact.name; pathLabel.text = artifact.path; detailLabel.text = artifact.detail ?? "服务端确认产物"; accessibilityLabel = "产物：\(artifact.name)，\(artifact.path)" }
+}
+
+
+private final class PocketInputTextView: UITextView {
+    var onSubmit: ((Bool) -> Void)?
+
+    override var keyCommands: [UIKeyCommand]? {
+        [UIKeyCommand(input: UIKeyCommand.inputReturn, modifierFlags: [.command], action: #selector(commandEnter)),
+         UIKeyCommand(input: UIKeyCommand.inputReturn, modifierFlags: [.control], action: #selector(commandEnter))]
+    }
+
+    @objc private func commandEnter() { onSubmit?(true) }
+
+    override func insertText(_ text: String) {
+        if text == "\n" {
+            onSubmit?(false)
+        } else {
+            super.insertText(text)
+        }
+    }
 }
