@@ -15,6 +15,33 @@ struct HarnessSessionSummary {
     var turns: Int
     var steps: Int
     var contextUsed: Double?
+    var status: String = "idle"
+    var stage: String? = nil
+}
+
+struct HarnessArtifact: Equatable {
+    let id: String
+    let name: String
+    let path: String
+    let kind: String
+    let detail: String?
+}
+
+struct HarnessApprovalRequest: Equatable {
+    let clientID: String
+    let eventID: String
+    let sessionID: String?
+    let toolName: String
+    let risk: String
+    let reason: String?
+    let target: String?
+    let detail: String?
+    let arguments: String?
+
+    var isHighRisk: Bool {
+        let combined = "\(risk) \(toolName) \(detail ?? \"\") \(target ?? \"\")".lowercased()
+        return combined.contains("high") || combined.contains("danger") || combined.contains("shell") || combined.contains("write") || combined.contains("external")
+    }
 }
 
 struct HarnessConversationItem {
@@ -88,9 +115,16 @@ enum HarnessBusyEnterBehavior: String, CaseIterable {
 struct HarnessClientSettings: Equatable {
     var theme: HarnessThemePreference = .system
     var fontSize: Int = 14
+    var codeFontSize: Int = 14
     var transcriptView: HarnessTranscriptView = .compact
     var busyEnter: HarnessBusyEnterBehavior = .queue
     var defaultPermission: String = "read-only"
+    var defaultModel: String = ""
+    var defaultWorkspaceID: String = ""
+    var reduceMotion = false
+    var notifyFinished = true
+    var notifyApproval = true
+    var notifyQuestion = true
     static let defaults = HarnessClientSettings()
 }
 
@@ -165,7 +199,8 @@ enum HarnessPresentationPolicy {
 enum HarnessMarkdown {
     static func attributed(_ markdown: String, fontSize: CGFloat = 14, color: UIColor = .label) -> NSAttributedString {
         let output = NSMutableAttributedString()
-        let bodyFont = UIFont.systemFont(ofSize: fontSize)
+        let base = UIFont.systemFont(ofSize: fontSize)
+        let bodyFont = UIFontMetrics(forTextStyle: .body).scaledFont(for: base)
         let codeFont = UIFont.monospacedSystemFont(ofSize: max(12, fontSize - 1), weight: .regular)
         let lines = markdown.components(separatedBy: "\n")
         var inCode = false

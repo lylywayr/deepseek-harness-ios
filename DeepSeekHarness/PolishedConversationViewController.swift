@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 final class PolishedConversationViewController: UIViewController, UITableViewDataSource, UITableViewDelegate, UITextViewDelegate, UISearchBarDelegate, PHPickerViewControllerDelegate, UIDocumentPickerDelegate {
     private let appState: AppState
     private let runtime: HarnessRuntime
+    private let onOpenContext: () -> Void
     private let tableView = UITableView(frame: .zero, style: .plain)
     private let sessionHeader = UIView()
     private let headerTitleButton = UIButton(type: .system)
@@ -48,9 +49,10 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
     private var pendingQuestion: HarnessPendingQuestion?
     private var activeSendMode: String { HarnessBusyEnterBehavior.sendMode(for: appState.settings.busyEnter, isGenerating: runtime.isGenerating, commandModified: false) }
 
-    init(runtime: HarnessRuntime, appState: AppState) {
+    init(runtime: HarnessRuntime, appState: AppState, onOpenContext: @escaping () -> Void = {}) {
         self.runtime = runtime
         self.appState = appState
+        self.onOpenContext = onOpenContext
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -93,7 +95,7 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
         view.addSubview(sessionHeader)
 
         configureHeaderButton(headerTitleButton, title: "新会话", icon: "sidebar.left")
-        headerTitleButton.addAction(UIAction { [weak self] _ in self?.renameSession() }, for: .touchUpInside)
+        headerTitleButton.addAction(UIAction { [weak self] _ in self?.onOpenContext() }, for: .touchUpInside)
         configureHeaderButton(headerPresetButton, title: "标准模式", icon: "point.3.connected.trianglepath.dotted")
         headerPresetButton.addAction(UIAction { [weak self] _ in self?.showPresetNotice() }, for: .touchUpInside)
         configureHeaderButton(headerFilesButton, title: nil, icon: "folder")

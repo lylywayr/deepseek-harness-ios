@@ -254,6 +254,7 @@ final class HarnessRuntime: NSObject {
     private var workspaceOrder: [String] = []
     private var archivedSessionIDs = Set<String>()
     private var controlProjection: [String: [String: Any]] = [:]
+    private var artifactsByID: [String: HarnessArtifact] = [:]
     private var isStarted = false
     private var isRefreshing = false
     private var followStreamID: String?
@@ -273,6 +274,12 @@ final class HarnessRuntime: NSObject {
     private(set) var connected = false
     private(set) var lastError: String?
     private(set) var statusText = "正在连接"
+    private(set) var currentStage: String?
+    private(set) var pendingApprovals: [HarnessApprovalRequest] = []
+    private(set) var pendingQuestions: [HarnessPendingQuestion] = []
+    private(set) var artifacts: [HarnessArtifact] = []
+    private(set) var contextDirectory: String?
+    private(set) var reasoningEffort: String?
     var onChange: (() -> Void)?
     var onNavigationChange: (() -> Void)?
     var onApproval: (([String: Any]) -> Void)?
@@ -358,12 +365,20 @@ final class HarnessRuntime: NSObject {
 
     func answerQuestion(_ pending: HarnessPendingQuestion, answers: [[String: Any]], completion: ((Result<Void, Error>) -> Void)? = nil) {
         let outcome: [String: Any] = ["kind": "result", "value": ["answers": answers]]
-        call("$events/result", args: HarnessWire.eventResult(clientID: pending.clientID, eventID: pending.eventID, outcome: outcome)) { _ in completion?(.success(())) } failure: { error in completion?(.failure(error)) }
+        call("$events/result", args: HarnessWire.eventResult(clientID: pending.clientID, eventID: pending.eventID, outcome: outcome)) { [weak self] _ in
+            self?.pendingQuestions.removeAll { $0.eventID == pending.eventID }
+            self?.publish()
+            completion?(.success(()))
+        } failure: { error in completion?(.failure(error)) }
     }
 
     func cancelQuestion(_ pending: HarnessPendingQuestion, completion: ((Result<Void, Error>) -> Void)? = nil) {
         let outcome: [String: Any] = ["kind": "cancel"]
-        call("$events/result", args: HarnessWire.eventResult(clientID: pending.clientID, eventID: pending.eventID, outcome: outcome)) { _ in completion?(.success(())) } failure: { error in completion?(.failure(error)) }
+        call("$events/result", args: HarnessWire.eventResult(clientID: pending.clientID, eventID: pending.eventID, outcome: outcome)) { [weak self] _ in
+            self?.pendingQuestions.removeAll { $0.eventID == pending.eventID }
+            self?.publish()
+            completion?(.success(()))
+        } failure: { error in completion?(.failure(error)) }
     }
 
     func createSession(workspaceID: String?, defaultPermission: String? = nil, completion: ((Result<String, Error>) -> Void)? = nil) {
@@ -509,7 +524,10 @@ final class HarnessRuntime: NSObject {
 
     func answerApproval(clientID: String, eventID: String, decision: String) {
         guard !clientID.isEmpty else { return }
-        call("$events/result", args: HarnessWire.eventResult(clientID: clientID, eventID: eventID, outcome: ["kind": "result", "value": decision]))
+        call("$events/result", args: HarnessWire.eventResult(clientID: clientID, eventID: eventID, outcome: ["kind": "result", "value": decision])) { [weak self] _ in
+            self?.pendingApprovals.removeAll { $0.eventID == eventID }
+            self?.publish()
+        }
     }
 
     private func loadInitialState() {
@@ -691,14 +709,21 @@ final class HarnessRuntime: NSObject {
                 for (id, block) in projections { controlProjection[id] = (block as? [String: Any])?["values"] as? [String: Any] ?? [:] }
             }
             updateGeneration(body["jobs"] as? [String: Any], queues: body["queues"] as? [String: Any])
+            if let id = selectedSessionID, let projection = controlProjection[id] { for (key, value) in projection { applyRuntimeProjection(id, key: key, value: value) } }
         } else if object["type"] as? String == "projection", let id = object["sessionId"] as? String, let key = object["key"] as? String {
             var values = controlProjection[id] ?? [:]
             values[key] = object["value"]
             controlProjection[id] = values
             applyProjection(id, key: key, value: object["value"])
+            applyRuntimeProjection(id, key: key, value: object["value"])
         } else if object["type"] as? String == "jobs", let id = object["sessionId"] as? String {
             let jobs = object["jobs"] as? [[String: Any]] ?? []
+            let active = jobs.first(where: { ($0["status"] as? String) == "running" || ($0["status"] as? String) == "waiting" })
             isGenerating = id == selectedSessionID && jobs.contains { $0["status"] as? String == "running" }
+            if id == selectedSessionID {
+                currentStage = active?["stage"] as? String ?? active?["phase"] as? String ?? active?["name"] as? String
+                if let status = active?["status"] as? String { statusText = status == "waiting" ? "等待你的介入" : "运行中" }
+            }
         }
         publish()
     }
@@ -750,12 +775,18 @@ final class HarnessRuntime: NSObject {
                 }
                 return HarnessQuestion(id: id, header: raw["header"] as? String, question: question, detail: raw["detail"] as? String, options: options.map { HarnessQuestionOption(label: $0.label, description: $0.description) }, multiSelect: raw["multiSelect"] as? Bool ?? false)
             }
-            if !questions.isEmpty { onQuestion?(HarnessPendingQuestion(clientID: clientID, eventID: eventID, questions: questions)) }
+            if !questions.isEmpty {
+                let pending = HarnessPendingQuestion(clientID: clientID, eventID: eventID, questions: questions)
+                if !pendingQuestions.contains(where: { $0.eventID == eventID }) { pendingQuestions.append(pending) }
+                onQuestion?(pending)
+            }
             return
         }
         var approval = object
         approval["clientId"] = clientID
         approval["request"] = request
+        let pending = Self.approval(value: approval)
+        if let pending, !pendingApprovals.contains(where: { $0.eventID == pending.eventID }) { pendingApprovals.append(pending) }
         onApproval?(approval)
     }
 
@@ -787,12 +818,19 @@ final class HarnessRuntime: NSObject {
             let message = data["message"] as? [String: Any] ?? data
             if let text = contentText(message["content"]), !text.isEmpty { upsert(HarnessConversationItem(id: eventID, kind: .assistant, text: text, subtitle: nil, seq: seq, time: time, isMarkdown: true)) }
         case "tool/call":
-            upsert(HarnessConversationItem(id: eventID, kind: .tool, text: data["name"] as? String ?? "工具调用", subtitle: "调用", seq: seq, time: time, detail: data["arguments"] as? String))
+            let name = data["name"] as? String ?? "工具调用"
+            let detail = data["arguments"] as? String ?? stringify(data["arguments"])
+            upsert(HarnessConversationItem(id: eventID, kind: .tool, text: name, subtitle: "调用", seq: seq, time: time, detail: detail))
         case "tool/result":
             let message = data["message"] as? [String: Any]
             let resultText = contentText(message?["content"]) ?? "工具结果"
             let resultKind = (message?["isError"] as? Bool == true) ? "错误" : "结果"
             upsert(HarnessConversationItem(id: eventID, kind: .tool, text: resultText, subtitle: resultKind, seq: seq, time: time, detail: data["callId"] as? String))
+        case "artifact", "file/created", "file/updated", "file/output", "attachment/created":
+            if let artifact = Self.artifact(data: data, eventID: eventID) {
+                artifactsByID[artifact.id] = artifact
+                upsert(HarnessConversationItem(id: eventID, kind: .system, text: artifact.name, subtitle: "产物", seq: seq, time: time, detail: artifact.path))
+            }
         case "command/done":
             if let result = data["result"] as? [String: Any], let text = result["text"] as? String { upsert(HarnessConversationItem(id: eventID, kind: .system, text: text, subtitle: result["kind"] as? String ?? "指令结果", seq: seq, time: time)) }
         case "turn/start":
@@ -840,6 +878,11 @@ final class HarnessRuntime: NSObject {
         items = []
         liveItems.removeAll()
         liveOrder.removeAll()
+        artifactsByID.removeAll()
+        artifacts = []
+        currentStage = nil
+        contextDirectory = nil
+        reasoningEffort = nil
         seenEventIDs.removeAll()
         selectedCursor = -1
         oldestSeq = -1
@@ -871,12 +914,26 @@ final class HarnessRuntime: NSObject {
         sessions[index] = session
     }
 
-    private func rebuildWorkspaces() {
-        let ordered = workspaceOrder.compactMap { workspacesByID[$0] }
-        // Keep every workspace in the model. Archived-session visibility is a
-        // presentation concern and must not erase an otherwise valid workspace.
-        workspaces = ordered
+    private func applyRuntimeProjection(_ id: String, key: String, value: Any?) {
+        guard id == selectedSessionID else { return }
+        switch key {
+        case "currentStage", "stage", "phase": currentStage = value as? String ?? currentStage
+        case "reasoningEffort": reasoningEffort = value as? String ?? reasoningEffort
+        case "contextDirectory", "cwd": contextDirectory = value as? String ?? contextDirectory
+        case "artifacts", "outputs":
+            let rows = (value as? [[String: Any]] ?? []).compactMap { Self.artifact(data: $0, eventID: UUID().uuidString) }
+            artifactsByID.merge(rows.map { ($0.id, $0) }, uniquingKeysWith: { _, next in next })
+        default: break
+        }
     }
+
+    private func stringify(_ value: Any?) -> String? {
+        guard let value else { return nil }
+        if let text = value as? String { return text }
+        guard JSONSerialization.isValidJSONObject(value), let data = try? JSONSerialization.data(withJSONObject: value, options: [.prettyPrinted]), let text = String(data: data, encoding: .utf8) else { return nil }
+        return text
+    }
+
 
     private func call(_ endpoint: String, args: [String: Any], completion: ((Any?) -> Void)? = nil, failure: ((Error) -> Void)? = nil) {
         client.call(endpoint: endpoint, args: args) { [weak self] result in
@@ -907,6 +964,7 @@ final class HarnessRuntime: NSObject {
     }
 
     private func publish() {
+        artifacts = Array(artifactsByID.values).sorted { $0.id < $1.id }
         onChange?()
         onNavigationChange?()
     }
@@ -949,8 +1007,30 @@ private extension HarnessRuntime {
             model: "",
             turns: 0,
             steps: 0,
-            contextUsed: nil
+            contextUsed: nil,
+            status: value["status"] as? String ?? ((value["running"] as? Bool ?? false) ? "running" : "idle"),
+            stage: value["stage"] as? String
         )
+    }
+
+    static func artifact(data: [String: Any], eventID: String) -> HarnessArtifact? {
+        let source = (data["artifact"] as? [String: Any]) ?? data
+        guard let name = source["name"] as? String ?? source["filename"] as? String,
+              let path = source["path"] as? String ?? source["url"] as? String else { return nil }
+        return HarnessArtifact(id: source["id"] as? String ?? eventID, name: name, path: path, kind: source["kind"] as? String ?? "file", detail: source["detail"] as? String)
+    }
+
+    static func approval(value: [String: Any]) -> HarnessApprovalRequest? {
+        guard let clientID = value["clientId"] as? String, let eventID = value["eventId"] as? String else { return nil }
+        let request = value["request"] as? [String: Any] ?? [:]
+        return HarnessApprovalRequest(clientID: clientID, eventID: eventID, sessionID: request["sessionId"] as? String, toolName: request["toolName"] as? String ?? "未知工具", risk: request["risk"] as? String ?? "unknown", reason: request["reason"] as? String, target: request["target"] as? String ?? request["path"] as? String, detail: request["command"] as? String ?? request["input"] as? String, arguments: stringify(request["arguments"]))
+    }
+
+    static func stringify(_ value: Any?) -> String? {
+        guard let value else { return nil }
+        if let text = value as? String { return text }
+        guard JSONSerialization.isValidJSONObject(value), let data = try? JSONSerialization.data(withJSONObject: value, options: [.prettyPrinted]), let text = String(data: data, encoding: .utf8) else { return nil }
+        return text
     }
 
     static func workspace(_ value: [String: Any]) -> HarnessWorkspace? {

@@ -12,9 +12,16 @@ final class AppState: ObservableObject {
         static let endpoint = "harness.endpoint"
         static let theme = "harness.settings.theme"
         static let fontSize = "harness.settings.fontSize"
+        static let codeFontSize = "harness.settings.codeFontSize"
         static let transcriptView = "harness.settings.transcriptView"
         static let busyEnter = "harness.settings.busyEnter"
         static let defaultPermission = "harness.settings.defaultPermission"
+        static let defaultModel = "harness.settings.defaultModel"
+        static let defaultWorkspaceID = "harness.settings.defaultWorkspaceID"
+        static let reduceMotion = "harness.settings.reduceMotion"
+        static let notifyFinished = "harness.settings.notifyFinished"
+        static let notifyApproval = "harness.settings.notifyApproval"
+        static let notifyQuestion = "harness.settings.notifyQuestion"
         static let groupBy = "harness.view.groupBy"
         static let orderBy = "harness.view.orderBy"
         static let showArchived = "harness.view.showArchived"
@@ -46,9 +53,16 @@ final class AppState: ObservableObject {
         var client = HarnessClientSettings.defaults
         if let raw = defaults.string(forKey: Keys.theme), let value = HarnessThemePreference(rawValue: raw) { client.theme = value }
         if defaults.object(forKey: Keys.fontSize) != nil { client.fontSize = min(max(defaults.integer(forKey: Keys.fontSize), 12), 17) }
+        if defaults.object(forKey: Keys.codeFontSize) != nil { client.codeFontSize = min(max(defaults.integer(forKey: Keys.codeFontSize), 12), 17) }
         if let raw = defaults.string(forKey: Keys.transcriptView), let value = HarnessTranscriptView(rawValue: raw) { client.transcriptView = value }
         if let raw = defaults.string(forKey: Keys.busyEnter), let value = HarnessBusyEnterBehavior(rawValue: raw) { client.busyEnter = value }
         if let value = defaults.string(forKey: Keys.defaultPermission), !value.isEmpty { client.defaultPermission = value }
+        client.defaultModel = defaults.string(forKey: Keys.defaultModel) ?? ""
+        client.defaultWorkspaceID = defaults.string(forKey: Keys.defaultWorkspaceID) ?? ""
+        if defaults.object(forKey: Keys.reduceMotion) != nil { client.reduceMotion = defaults.bool(forKey: Keys.reduceMotion) }
+        if defaults.object(forKey: Keys.notifyFinished) != nil { client.notifyFinished = defaults.bool(forKey: Keys.notifyFinished) }
+        if defaults.object(forKey: Keys.notifyApproval) != nil { client.notifyApproval = defaults.bool(forKey: Keys.notifyApproval) }
+        if defaults.object(forKey: Keys.notifyQuestion) != nil { client.notifyQuestion = defaults.bool(forKey: Keys.notifyQuestion) }
         settings = client
 
         var view = HarnessViewPreferences()
@@ -92,9 +106,16 @@ final class AppState: ObservableObject {
         let defaults = UserDefaults.standard
         defaults.set(value.theme.rawValue, forKey: Keys.theme)
         defaults.set(value.fontSize, forKey: Keys.fontSize)
+        defaults.set(value.codeFontSize, forKey: Keys.codeFontSize)
         defaults.set(value.transcriptView.rawValue, forKey: Keys.transcriptView)
         defaults.set(value.busyEnter.rawValue, forKey: Keys.busyEnter)
         defaults.set(value.defaultPermission, forKey: Keys.defaultPermission)
+        defaults.set(value.defaultModel, forKey: Keys.defaultModel)
+        defaults.set(value.defaultWorkspaceID, forKey: Keys.defaultWorkspaceID)
+        defaults.set(value.reduceMotion, forKey: Keys.reduceMotion)
+        defaults.set(value.notifyFinished, forKey: Keys.notifyFinished)
+        defaults.set(value.notifyApproval, forKey: Keys.notifyApproval)
+        defaults.set(value.notifyQuestion, forKey: Keys.notifyQuestion)
         applyAppearance(value.theme)
         NotificationCenter.default.post(name: .harnessClientSettingsDidChange, object: self)
     }
