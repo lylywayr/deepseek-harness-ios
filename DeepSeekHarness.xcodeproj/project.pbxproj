@@ -21,7 +21,6 @@
 		A1000000000000000000000D /* PolishedConversationViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000E /* PolishedConversationViewController.swift */; };
 		A1000000000000000000000E /* HarnessRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000F /* HarnessRuntime.swift */; };
 		A1000000000000000000000F /* HarnessSettingsCenterViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000010 /* HarnessSettingsCenterViewController.swift */; };
-		A10000000000000000000011 /* HarnessWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000012 /* HarnessWire.swift */; };
 		A10000000000000000000016 /* HarnessClientModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000016 /* HarnessClientModels.swift */; };
 		A10000000000000000000018 /* NativeFixtureViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000018 /* NativeFixtureViewController.swift */; };
 		A1000000000000000000001A /* HarnessEndpoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001A /* HarnessEndpoint.swift */; };
