@@ -9,7 +9,7 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
     private let transport: NativeUITransport
     private let onSettings: () -> Void
     private var runtime: HarnessRuntime!
-    private var conversation: PolishedConversationViewController!
+    private var conversation: UIViewController!
     private var stopObserving: (() -> Void)?
     private var isDrawerVisible = false
     private var drawerWidth: NSLayoutConstraint!
@@ -221,6 +221,8 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
     private func addSession(_ session: HarnessSessionSummary, to stack: UIStackView, icon: String, tint: UIColor) { let button = dhButton(title: session.title.isEmpty ? "新会话" : session.title, systemName: icon, filled: false) { [weak self] in self?.runtime.openSession(session.id); self?.showConversation() }; button.contentHorizontalAlignment = .leading; button.accessibilityLabel = "会话：\(session.title)，\(metadata(session))"; stack.addArrangedSubview(button) }
     private func addActivity(_ approval: HarnessApprovalRequest, to stack: UIStackView) { let title = "\(approval.isHighRisk ? "高风险审批" : "审批") · \(approval.toolName)"; let button = dhButton(title: title, systemName: approval.isHighRisk ? "exclamationmark.triangle.fill" : "checkmark.shield", filled: false) { [weak self] in self?.showApproval(approval) }; button.contentHorizontalAlignment = .leading; stack.addArrangedSubview(button) }
     private func addActivity(_ question: HarnessPendingQuestion, to stack: UIStackView) { let title = question.questions.first?.question ?? "Agent 等待回答"; let button = dhButton(title: title, systemName: "questionmark.bubble", filled: false) { [weak self] in self?.showQuestion(question) }; button.contentHorizontalAlignment = .leading; stack.addArrangedSubview(button) }
+    private func showApproval(_ request: HarnessApprovalRequest) { let c = HarnessApprovalViewController(runtime: runtime, request: request); present(UINavigationController(rootViewController: c), animated: true) }
+    private func showQuestion(_ pending: HarnessPendingQuestion) { let c = QuestionViewController(pending: pending, onAnswer: { [weak self] answers in self?.runtime.answerQuestion(pending, answers: answers); self?.dismiss(animated: true) }, onCancel: { [weak self] in self?.runtime.cancelQuestion(pending); self?.dismiss(animated: true) }); present(UINavigationController(rootViewController: c), animated: true) }
 
     private func buildDrawer() {
         drawerScrim.backgroundColor = UIColor.black.withAlphaComponent(0.34); drawerScrim.alpha = 0; drawerScrim.isHidden = true; drawerScrim.translatesAutoresizingMaskIntoConstraints = false; drawerScrim.addTarget(self, action: #selector(toggleDrawer), for: .touchUpInside); view.addSubview(drawerScrim)

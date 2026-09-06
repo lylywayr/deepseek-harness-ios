@@ -53,10 +53,10 @@ enum DHTheme {
             : UIColor(red: 0.885, green: 0.920, blue: 1.0, alpha: 1)
     }
 
-    static let userBubble = UIColor { traits in
+    static let assistantBubble = UIColor { traits in
         traits.userInterfaceStyle == .dark
-            ? UIColor(red: 0.20, green: 0.32, blue: 0.70, alpha: 1)
-            : UIColor(red: 0.275, green: 0.400, blue: 0.900, alpha: 1)
+            ? UIColor(red: 0.095, green: 0.120, blue: 0.190, alpha: 1)
+            : UIColor.white
     }
 
     static let text = UIColor.label
