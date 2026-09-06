@@ -338,6 +338,7 @@ final class HarnessRuntime: NSObject {
         runtime.currentStage = scene == "artifacts" ? "已完成" : "工具调用"
         runtime.contextDirectory = "/Users/demo/Pocket"
         runtime.sessions = [active, research]
+        runtime.selectedSessionID = active.id
         runtime.workspaces = [workspace, docsWorkspace]
         runtime.archivedSessionIDs = ["session-research"]
         runtime.isGenerating = scene == "workspace" || scene == "conversation" || scene == "process" || scene == "keyboard"
