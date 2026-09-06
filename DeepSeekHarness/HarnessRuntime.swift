@@ -355,7 +355,6 @@ final class HarnessRuntime: NSObject {
         return runtime
     }
 
-    #if DEBUG
     func emitFixtureUpdateForTesting() {
         publish()
     }
