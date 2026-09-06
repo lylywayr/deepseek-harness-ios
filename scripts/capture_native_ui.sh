@@ -58,6 +58,8 @@ capture() {
   fi
   xcrun simctl io "$UDID" screenshot "$dir/$scene-$size-$appearance.png"
   test -s "$dir/$scene-$size-$appearance.png"
+  # Keep a deterministic scene manifest beside the real PNG evidence.
+  printf "%s\n" "$scene|$size|$appearance" >> "$OUT/manifest.txt"
   xcrun simctl terminate "$UDID" "$BUNDLE_ID" >/dev/null 2>&1 || true
 }
 
