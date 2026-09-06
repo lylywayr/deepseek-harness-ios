@@ -28,9 +28,10 @@
 
 - 工程：`/var/minis/shared/deepseek-harness-ios-native`
 - 分支：`feature/native-renderer`
-- 最终代码 SHA：`a9290fa25896668d44e40b185d28efce5b4ae31c`
+- 最终代码 SHA：`acfdbb525a67b7decc7ae219554c279e68014a2d`
+- 构建代码 SHA：`a9290fa25896668d44e40b185d28efce5b4ae31c`（之后仅更新本报告）
 - 远端：`origin/feature/native-renderer` 与本地一致
-- 文档 HEAD：本报告将在代码构建证据对齐后单独提交；该提交只更新报告，不改变 IPA 构建代码
+- 文档 HEAD：`acfdbb525a67b7decc7ae219554c279e68014a2d`
 - `main` 未修改；未 force push
 - 用户已有未跟踪移交/验收文档未纳入本轮报告提交：`HANDOFF-*`、`REWORK-*` 及既有验收文档
 
