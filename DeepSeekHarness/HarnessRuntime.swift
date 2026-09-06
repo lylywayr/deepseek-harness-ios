@@ -349,7 +349,9 @@ final class HarnessRuntime: NSObject {
             HarnessConversationItem(id: "r1", kind: .system, text: "分析上下文与执行阶段", subtitle: "轮次", seq: 4, time: 4, detail: "耗时 1.8 s"),
             HarnessConversationItem(id: "e1", kind: .system, text: "本轮完成，产物已由服务端确认。", subtitle: "完成", seq: 5, time: 5)
         ]
-        runtime.artifacts = [HarnessArtifact(id: "artifact-1", name: "acceptance-report.md", path: "/Users/demo/Pocket/docs/acceptance-report.md", kind: "file", detail: "服务端确认的交付报告")]
+        let artifact = HarnessArtifact(id: "artifact-1", name: "acceptance-report.md", path: "/Users/demo/Pocket/docs/acceptance-report.md", kind: "file", detail: "服务端确认的交付报告")
+        runtime.artifactsByID = [artifact.id: artifact]
+        runtime.artifacts = [artifact]
         runtime.pendingApprovals = [HarnessApprovalRequest(clientID: "fixture-client", eventID: "fixture-approval", sessionID: active.id, toolName: "workspace/write", risk: "normal", reason: "更新交付报告", target: "acceptance-report.md", detail: "写入报告内容", arguments: nil)]
         runtime.pendingQuestions = [HarnessPendingQuestion(clientID: "fixture-client", eventID: "fixture-question", questions: [HarnessQuestion(id: "fixture-q", header: "需要确认", question: "是否继续执行下一步？", detail: "这是 Debug-only Pocket UI 夹具状态。", options: [HarnessQuestionOption(label: "继续", description: "继续当前任务"), HarnessQuestionOption(label: "暂停", description: "保留当前状态")], multiSelect: false)])]
         return runtime

@@ -33,7 +33,7 @@ for marker in ("NativeFixtureViewController.swift in Sources", "-UITestFixture",
         raise SystemExit(f"FAIL: missing fixture integration marker {marker}")
 if 'SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG"' not in PROJECT:
     raise SystemExit("FAIL: Debug fixture compilation condition is missing")
-for marker in ("workspace drawer conversation process artifacts activity settings keyboard", "390x844", "430x932", "PocketDark", "pocket-v2-ui-matrix", "UITestFixture", "-NativeFixtureScreen", "iPhone 16"):
+for marker in ("workspace drawer conversation process artifacts activity settings keyboard", "390x844", "430x932", "PocketDark", "pocket-v2-ui-matrix", "UITestFixture", "-NativeFixtureScreen", "iPhone 14", "iPhone 15 Pro Max"):
     if marker not in LAUNCH + SCRIPT + WORKFLOW:
         raise SystemExit(f"FAIL: missing screenshot marker {marker}")
 print("ok: Pocket fixture scenes 8")

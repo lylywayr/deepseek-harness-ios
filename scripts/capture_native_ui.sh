@@ -2,14 +2,14 @@
 set -euo pipefail
 ROOT="${GITHUB_WORKSPACE:-$(pwd)}"
 BUNDLE_ID="com.example.DeepSeekHarness"
-DEVICE="iPhone 16"
+DEVICE="iPhone 14"
 RUNTIME="18.2"
 find_udid() {
   local name="$1"
   xcrun simctl list devices available | awk -F '[()]' -v wanted="$name" '$1 ~ ("^[[:space:]]*" wanted "[[:space:]]*$") {print $2; exit}'
 }
 UDID="$(find_udid "$DEVICE")"
-if [[ -z "$UDID" ]]; then UDID="$(xcrun simctl create "PocketV2Fixture" com.apple.CoreSimulator.SimDeviceType.iPhone-16 com.apple.CoreSimulator.SimRuntime.iOS-18-2)"; fi
+if [[ -z "$UDID" ]]; then UDID="$(xcrun simctl create "PocketV2Fixture" com.apple.CoreSimulator.SimDeviceType.iPhone-14 com.apple.CoreSimulator.SimRuntime.iOS-18-2)"; fi
 xcrun simctl boot "$UDID" 2>/dev/null || true
 xcrun simctl bootstatus "$UDID" -b
 APP_PATH="$ROOT/build/Build/Products/Debug-iphonesimulator/DeepSeekHarness.app"
@@ -61,7 +61,7 @@ capture() {
   xcrun simctl terminate "$UDID" "$BUNDLE_ID" >/dev/null 2>&1 || true
 }
 
-# iPhone 16 is the 390x844 evidence target. 430x932 is produced with a
+# iPhone 14 is the 390x844 evidence target. 430x932 is produced with a
 # second simulator when the runtime is available; all scenes remain real Pocket.
 for scene in workspace drawer conversation process artifacts activity settings; do capture "$scene" "390x844" "light" ""; done
 capture keyboard "390x844" "light" ""

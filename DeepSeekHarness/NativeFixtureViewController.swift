@@ -63,7 +63,7 @@ final class NativeFixtureViewController: UIViewController {
         case "activity": home.fixtureShowActivity()
         case "settings": home.fixtureShowSettings()
         case "keyboard": home.fixtureFocusComposer()
-        default: break
+        default: home.fixtureCloseDrawer()
         }
     }
 }

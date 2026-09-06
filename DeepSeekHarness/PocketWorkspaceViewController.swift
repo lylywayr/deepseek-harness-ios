@@ -91,7 +91,8 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
     #endif
     #if DEBUG
     func fixtureOpenDrawer() { if !isDrawerVisible { toggleDrawer() } }
-    func fixtureOpenConversation() { showConversation() }
+    func fixtureCloseDrawer() { if isDrawerVisible { toggleDrawer() } }
+    func fixtureOpenConversation() { fixtureCloseDrawer(); showConversation() }
     func fixtureSelectMode(_ index: Int) { fixtureOpenConversation(); conversation.fixtureSelectMode(index) }
     func fixtureFocusComposer() { fixtureOpenConversation(); conversation.fixtureFocusComposer() }
     func fixtureShowActivity() { showActivityCenter() }
@@ -256,7 +257,7 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
 
     private func buildDrawer() {
         drawerScrim.backgroundColor = UIColor.black.withAlphaComponent(0.34); drawerScrim.alpha = 0; drawerScrim.isHidden = true; drawerScrim.translatesAutoresizingMaskIntoConstraints = false; drawerScrim.addTarget(self, action: #selector(toggleDrawer), for: .touchUpInside); view.addSubview(drawerScrim)
-        drawer.translatesAutoresizingMaskIntoConstraints = false; drawer.backgroundColor = DHTheme.surface; view.addSubview(drawer); drawerWidth = drawer.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: 0.88)
+        drawer.translatesAutoresizingMaskIntoConstraints = false; drawer.backgroundColor = DHTheme.surface; drawer.isHidden = true; view.addSubview(drawer); drawerWidth = drawer.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: 0.88)
         NSLayoutConstraint.activate([drawer.leadingAnchor.constraint(equalTo: view.leadingAnchor), drawer.topAnchor.constraint(equalTo: view.topAnchor), drawer.bottomAnchor.constraint(equalTo: view.bottomAnchor), drawerWidth, drawerScrim.leadingAnchor.constraint(equalTo: drawer.trailingAnchor), drawerScrim.trailingAnchor.constraint(equalTo: view.trailingAnchor), drawerScrim.topAnchor.constraint(equalTo: view.topAnchor), drawerScrim.bottomAnchor.constraint(equalTo: view.bottomAnchor)])
         let header = UIStackView(); header.axis = .horizontal; header.alignment = .center; header.spacing = 8; header.translatesAutoresizingMaskIntoConstraints = false
         let logo = dhIconView(systemName: "sparkles", size: 38, symbolSize: 17); let label = UILabel(); label.text = "上下文"; label.font = DHTheme.font(.title3, weight: .bold); label.textColor = DHTheme.text; header.addArrangedSubview(logo); header.addArrangedSubview(label); header.addArrangedSubview(UIView()); let close = makeIconButton("xmark", label: "关闭上下文抽屉"); close.addAction(UIAction { [weak self] _ in self?.toggleDrawer() }, for: .touchUpInside); header.addArrangedSubview(close); drawer.addSubview(header)
