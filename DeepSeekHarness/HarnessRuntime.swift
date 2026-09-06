@@ -236,6 +236,11 @@ final class HarnessClient {
     }
 }
 
+enum HarnessRuntimeEvent {
+    case approval(HarnessApprovalRequest)
+    case question(HarnessPendingQuestion)
+}
+
 @MainActor
 final class HarnessRuntime: NSObject {
     let baseURL: URL
@@ -282,8 +287,22 @@ final class HarnessRuntime: NSObject {
     private(set) var reasoningEffort: String?
     private var changeObservers: [UUID: () -> Void] = [:]
     private var navigationObservers: [UUID: () -> Void] = [:]
+    private var eventObservers: [UUID: (HarnessRuntimeEvent) -> Void] = [:]
+    // Kept for the older polished screen; Pocket itself uses observeEvents.
     var onApproval: (([String: Any]) -> Void)?
     var onQuestion: ((HarnessPendingQuestion) -> Void)?
+
+    /// Event delivery is token-based so the conversation, activity center, and
+    /// any future surface can subscribe without replacing another controller.
+    func observeEvents(_ observer: @escaping (HarnessRuntimeEvent) -> Void) -> () -> Void {
+        let id = UUID()
+        eventObservers[id] = observer
+        return { [weak self] in self?.eventObservers.removeValue(forKey: id) }
+    }
+
+    private func notify(_ event: HarnessRuntimeEvent) {
+        eventObservers.values.forEach { $0(event) }
+    }
 
     init(baseURL: URL) {
         let parsed = HarnessEndpointCanonicalizer.canonicalize(baseURL)
@@ -330,7 +349,7 @@ final class HarnessRuntime: NSObject {
         let runtime = HarnessRuntime(baseURL: URL(string: "http://fixture.invalid")!)
         let workspace = HarnessWorkspace(id: "workspace-project", title: "Pocket 项目", path: "/Users/demo/Pocket", sessionIDs: ["session-active"])
         let docsWorkspace = HarnessWorkspace(id: "workspace-docs", title: "验收文档", path: "/Users/demo/Pocket/docs", sessionIDs: ["session-research"])
-        let active = HarnessSessionSummary(id: "session-active", title: "原生工作台 V2", cwd: "/Users/demo/Pocket", updatedAt: 200, running: scene == "workspace" || scene == "conversation" || scene == "process", blank: false, preset: "standard", permission: "workspace-write", provider: "deepseek", model: "DeepSeek V4", turns: 4, steps: 12, contextUsed: 0.42, status: "running", stage: "工具调用")
+        let active = HarnessSessionSummary(id: "session-active", title: "原生工作台 V2", cwd: "/Users/demo/Pocket", updatedAt: 200, running: scene == "workspace" || scene == "conversation" || scene == "process" || scene == "trajectory", blank: false, preset: "standard", permission: "workspace-write", provider: "deepseek", model: "DeepSeek V4", turns: 4, steps: 12, contextUsed: 0.42, status: "running", stage: "工具调用")
         let research = HarnessSessionSummary(id: "session-research", title: "验收与交付", cwd: "/Users/demo/Pocket/docs", updatedAt: 100, running: false, blank: false, preset: "standard", permission: "read-only", provider: "deepseek", model: "DeepSeek V4", turns: 2, steps: 6, contextUsed: 0.18)
         runtime.connected = true
         runtime.isLoading = false
@@ -341,7 +360,7 @@ final class HarnessRuntime: NSObject {
         runtime.selectedSessionID = active.id
         runtime.workspaces = [workspace, docsWorkspace]
         runtime.archivedSessionIDs = ["session-research"]
-        runtime.isGenerating = scene == "workspace" || scene == "conversation" || scene == "process" || scene == "keyboard"
+        runtime.isGenerating = scene == "workspace" || scene == "conversation" || scene == "process" || scene == "trajectory" || scene == "keyboard"
         runtime.reasoningEffort = "balanced"
         runtime.models = [HarnessModelOption(provider: "deepseek", providerName: "DeepSeek", model: "deepseek-v4", modelName: "DeepSeek V4", reasoning: [["id": "balanced", "name": "均衡"], ["id": "deep", "name": "深入"]])]
         runtime.items = [
@@ -361,6 +380,10 @@ final class HarnessRuntime: NSObject {
 
     func emitFixtureUpdateForTesting() {
         publish()
+    }
+
+    func emitFixtureEventForTesting(_ event: HarnessRuntimeEvent) {
+        notify(event)
     }
     #endif
 
@@ -439,7 +462,7 @@ final class HarnessRuntime: NSObject {
         } failure: { error in completion?(.failure(error)) }
     }
 
-    func createSession(workspaceID: String?, defaultPermission: String? = nil, completion: ((Result<String, Error>) -> Void)? = nil) {
+    func createSession(workspaceID: String?, defaultPermission: String? = nil, defaultModel: String? = nil, completion: ((Result<String, Error>) -> Void)? = nil) {
         var request: [String: Any] = [:]
         if let workspaceID { request["workspaceId"] = workspaceID }
         let createArgs = HarnessWire.requestArguments(request)
@@ -451,17 +474,28 @@ final class HarnessRuntime: NSObject {
             self.selectedSessionID = id
             self.resetConversation()
             self.openSessionStream(id)
+            let finish: (Result<Void, Error>) -> Void = { result in
+                switch result {
+                case .success: completion?(.success(id))
+                case let .failure(error): completion?(.failure(error))
+                }
+            }
+            let applyModel: () -> Void = {
+                guard let defaultModel,
+                      let option = self.models.first(where: { $0.key == defaultModel || $0.model == defaultModel || $0.modelName == defaultModel }) else {
+                    finish(.success(())); return
+                }
+                self.selectModel(option, completion: finish)
+            }
             if let defaultPermission, !defaultPermission.isEmpty {
                 self.setPermission(defaultPermission, sessionID: id) { result in
                     switch result {
-                    case .success:
-                        completion?(.success(id))
-                    case let .failure(error):
-                        completion?(.failure(error))
+                    case .success: applyModel()
+                    case let .failure(error): finish(.failure(error))
                     }
                 }
             } else {
-                completion?(.success(id))
+                applyModel()
             }
         } failure: { error in completion?(.failure(error)) }
     }
@@ -498,22 +532,26 @@ final class HarnessRuntime: NSObject {
         }
     }
 
-    func loadOlder() {
-        guard let id = selectedSessionID, let cursor = sessionCursors[id], cursor.oldest >= 0, hasMore else { return }
+    func loadOlder(completion: (() -> Void)? = nil) {
+        guard let id = selectedSessionID, let cursor = sessionCursors[id], cursor.oldest >= 0, hasMore else { completion?(); return }
         call("session/page", args: HarnessWire.sessionPageArguments(sessionID: id, throughSeq: cursor.cursor, beforeSeq: cursor.oldest, maxMessages: 30)) { [weak self] value in
-            guard let self, let page = value as? [String: Any] else { return }
+            guard let self, let page = value as? [String: Any] else { completion?(); return }
             self.parseRecords(page["records"] as? [Any] ?? [], prepend: true)
             self.hasMore = page["hasMore"] as? Bool ?? false
             self.sessionCursors[id] = (cursor.cursor, self.oldestSeq)
             self.publish()
-        }
+            completion?()
+        } failure: { _ in completion?() }
     }
 
-    func selectModel(_ option: HarnessModelOption, reasoning: String? = nil) {
-        guard let id = selectedSessionID else { return }
+    func selectModel(_ option: HarnessModelOption, reasoning: String? = nil, completion: ((Result<Void, Error>) -> Void)? = nil) {
+        guard let id = selectedSessionID else { completion?(.failure(HarnessClientError.invalidResponse)); return }
         var request: [String: Any] = ["sessionId": id, "provider": option.provider, "model": option.model]
         if let reasoning { request["reasoningEffort"] = reasoning }
-        call("session/selectModel", args: HarnessWire.requestArguments(request)) { [weak self] _ in self?.refresh() }
+        call("session/selectModel", args: HarnessWire.requestArguments(request)) { [weak self] _ in
+            self?.refresh()
+            completion?(.success(()))
+        } failure: { error in completion?(.failure(error)) }
     }
 
     func setPermission(_ value: String, sessionID: String? = nil, completion: ((Result<Void, Error>) -> Void)? = nil) {
@@ -525,6 +563,11 @@ final class HarnessRuntime: NSObject {
 
     func rename(_ title: String) {
         guard let id = selectedSessionID else { return }
+        renameSession(id, title: title)
+    }
+
+    func renameSession(_ id: String, title: String) {
+        guard !id.isEmpty, !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         call("session/rename", args: HarnessWire.requestArguments(["sessionId": id, "title": title])) { [weak self] _ in self?.refresh() }
     }
 
@@ -835,8 +878,11 @@ final class HarnessRuntime: NSObject {
             }
             if !questions.isEmpty {
                 let pending = HarnessPendingQuestion(clientID: clientID, eventID: eventID, questions: questions)
-                if !pendingQuestions.contains(where: { $0.eventID == eventID }) { pendingQuestions.append(pending) }
-                onQuestion?(pending)
+                if !pendingQuestions.contains(where: { $0.eventID == eventID }) {
+                    pendingQuestions.append(pending)
+                    notify(.question(pending))
+                    onQuestion?(pending)
+                }
             }
             return
         }
@@ -844,8 +890,11 @@ final class HarnessRuntime: NSObject {
         approval["clientId"] = clientID
         approval["request"] = request
         let pending = Self.approval(value: approval)
-        if let pending, !pendingApprovals.contains(where: { $0.eventID == pending.eventID }) { pendingApprovals.append(pending) }
-        onApproval?(approval)
+        if let pending, !pendingApprovals.contains(where: { $0.eventID == pending.eventID }) {
+            pendingApprovals.append(pending)
+            notify(.approval(pending))
+            onApproval?(approval)
+        }
     }
 
     private func parseRecords(_ records: [Any], prepend: Bool) {

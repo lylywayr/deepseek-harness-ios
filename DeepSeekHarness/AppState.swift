@@ -103,7 +103,6 @@ final class AppState: ObservableObject {
 
     func updateSettings(_ value: HarnessClientSettings) {
         settings = value
-        let defaults = UserDefaults.standard
         defaults.set(value.theme.rawValue, forKey: Keys.theme)
         defaults.set(value.fontSize, forKey: Keys.fontSize)
         defaults.set(value.codeFontSize, forKey: Keys.codeFontSize)
@@ -122,7 +121,6 @@ final class AppState: ObservableObject {
 
     func updateViewPreferences(_ value: HarnessViewPreferences) {
         viewPreferences = value
-        let defaults = UserDefaults.standard
         defaults.set(value.groupBy.rawValue, forKey: Keys.groupBy)
         defaults.set(value.orderBy.rawValue, forKey: Keys.orderBy)
         defaults.set(value.showArchived, forKey: Keys.showArchived)

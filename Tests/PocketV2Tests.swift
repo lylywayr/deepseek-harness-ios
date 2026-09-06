@@ -46,7 +46,42 @@ final class PocketV2Tests: XCTestCase {
         XCTAssertEqual(second, 2)
     }
 
-    func testPocketProcessAndArtifactPoliciesRemainSeparate() {
+    func testPocketRuntimeEventObserversCanBeIndependentlyRemoved() {
+        let runtime = HarnessRuntime(baseURL: URL(string: "http://fixture.invalid")!)
+        var approvals = 0
+        var questions = 0
+        let stopApproval = runtime.observeEvents { event in if case .approval = event { approvals += 1 } }
+        let stopQuestion = runtime.observeEvents { event in if case .question = event { questions += 1 } }
+        let request = HarnessApprovalRequest(clientID: "c", eventID: "a", sessionID: nil, toolName: "tool", risk: "normal", reason: nil, target: nil, detail: nil, arguments: nil)
+        let pending = HarnessPendingQuestion(clientID: "c", eventID: "q", questions: [])
+        runtime.emitFixtureEventForTesting(.approval(request))
+        runtime.emitFixtureEventForTesting(.question(pending))
+        stopApproval()
+        runtime.emitFixtureEventForTesting(.approval(request))
+        runtime.emitFixtureEventForTesting(.question(pending))
+        stopQuestion()
+        runtime.emitFixtureEventForTesting(.question(pending))
+        XCTAssertEqual(approvals, 1)
+        XCTAssertEqual(questions, 2)
+    }
+
+    func testPocketFixtureExposesTaskConsoleCapabilities() {
+        let runtime = HarnessRuntime.fixture(scene: "trajectory")
+        XCTAssertTrue(runtime.models.contains { !$0.reasoning.isEmpty })
+        XCTAssertEqual(runtime.sessions.first?.permission, "workspace-write")
+        XCTAssertEqual(runtime.reasoningEffort, "balanced")
+        XCTAssertTrue(runtime.items.contains { $0.kind == .tool })
+        XCTAssertTrue(runtime.items.contains { $0.isMarkdown })
+        XCTAssertFalse(runtime.pendingApprovals.isEmpty)
+        XCTAssertFalse(runtime.pendingQuestions.isEmpty)
+    }
+
+    func testPocketSettingsHaveCompactAndNormalPresentationOptions() {
+        XCTAssertEqual(HarnessTranscriptView.allCases, [.compact, .normal])
+        XCTAssertEqual(HarnessBusyEnterBehavior.sendMode(for: .queue, isGenerating: false, commandModified: true), "queue")
+    }
+
+
         let runtime = HarnessRuntime.fixture(scene: "artifacts")
         let process = runtime.items.filter { $0.kind == .system || $0.kind == .tool }
         XCTAssertTrue(process.contains { $0.subtitle == "轮次" })

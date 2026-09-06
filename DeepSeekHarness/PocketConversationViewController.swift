@@ -12,6 +12,7 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
     private let onBack: () -> Void
     private let onSettings: () -> Void
     private var stopObserving: (() -> Void)?
+    private var stopEventObserving: (() -> Void)?
 
     private let topBar = UIView()
     private let backButton = UIButton(type: .system)
@@ -19,7 +20,7 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
     private let titleLabel = UILabel()
     private let stateButton = UIButton(type: .system)
     private let settingsButton = UIButton(type: .system)
-    private let modeControl = UISegmentedControl(items: ["对话", "过程", "产物"])
+    private let modeControl = UISegmentedControl(items: ["对话", "过程", "轨迹", "产物"])
     private let processControls = UIView()
     private let processSearch = UISearchBar()
     private let processTurns = UIButton(type: .system)
@@ -37,6 +38,7 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
     private let attachButton = UIButton(type: .system)
     private let permissionButton = UIButton(type: .system)
     private let modelButton = UIButton(type: .system)
+    private let reasoningButton = UIButton(type: .system)
     private let sendModeButton = UIButton(type: .system)
     private let sendButton = UIButton(type: .system)
     private let status = UILabel()
@@ -77,10 +79,7 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
         stopObserving = runtime.observeChanges { [weak self] in
             DispatchQueue.main.async { self?.render() }
         }
-        runtime.onApproval = { [weak self] _ in
-            DispatchQueue.main.async { self?.render() }
-        }
-        runtime.onQuestion = { [weak self] _ in
+        stopEventObserving = runtime.observeEvents { [weak self] _ in
             DispatchQueue.main.async { self?.render() }
         }
         NotificationCenter.default.addObserver(self, selector: #selector(settingsDidChange), name: .harnessClientSettingsDidChange, object: appState)
@@ -89,6 +88,7 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
 
     deinit {
         stopObserving?()
+        stopEventObserving?()
         NotificationCenter.default.removeObserver(self)
     }
 
@@ -143,7 +143,7 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
         topBar.addSubview(row)
         NSLayoutConstraint.activate([
             topBar.leadingAnchor.constraint(equalTo: view.leadingAnchor), topBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            topBar.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor), topBar.heightAnchor.constraint(equalToConstant: 58),
+            topBar.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor), topBar.heightAnchor.constraint(equalToConstant: 50),
             row.leadingAnchor.constraint(equalTo: topBar.leadingAnchor, constant: 8), row.trailingAnchor.constraint(equalTo: topBar.trailingAnchor, constant: -8),
             row.topAnchor.constraint(equalTo: topBar.topAnchor), row.bottomAnchor.constraint(equalTo: topBar.bottomAnchor)
         ])
@@ -198,38 +198,39 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
 
     private func buildTable() {
         table.backgroundColor = .clear; table.separatorStyle = .none; table.keyboardDismissMode = .interactive
-        table.dataSource = self; table.delegate = self; table.estimatedRowHeight = 96; table.rowHeight = UITableView.automaticDimension
+        table.dataSource = self; table.delegate = self; table.estimatedRowHeight = 72; table.rowHeight = UITableView.automaticDimension
         table.register(HarnessMessageCell.self, forCellReuseIdentifier: "pocket.message")
+        table.register(PocketTrajectoryCell.self, forCellReuseIdentifier: "pocket.trajectory")
         table.register(PocketArtifactCell.self, forCellReuseIdentifier: "pocket.artifact")
         table.translatesAutoresizingMaskIntoConstraints = false; view.addSubview(table)
         NSLayoutConstraint.activate([
             table.leadingAnchor.constraint(equalTo: view.leadingAnchor), table.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            table.topAnchor.constraint(equalTo: processControls.bottomAnchor, constant: 5), table.bottomAnchor.constraint(equalTo: composer.topAnchor, constant: -7)
+            table.topAnchor.constraint(equalTo: processControls.bottomAnchor, constant: 2), table.bottomAnchor.constraint(equalTo: composer.topAnchor, constant: -7)
         ])
     }
 
     private func buildComposer() {
-        composer.dhApplyCard(backgroundColor: DHTheme.surface, cornerRadius: 22, borderColor: DHTheme.separator.withAlphaComponent(0.35), shadow: true)
+        composer.dhApplyCard(backgroundColor: DHTheme.surface, cornerRadius: DHTheme.cornerMedium, borderColor: DHTheme.separator.withAlphaComponent(0.35), shadow: true)
         composer.translatesAutoresizingMaskIntoConstraints = false; view.addSubview(composer)
-        composerStack.axis = .vertical; composerStack.spacing = 4; composerStack.translatesAutoresizingMaskIntoConstraints = false
+        composerStack.axis = .vertical; composerStack.spacing = 2; composerStack.translatesAutoresizingMaskIntoConstraints = false
         composer.addSubview(composerStack)
         status.font = DHTheme.font(.caption2, weight: .medium); status.textColor = DHTheme.secondaryText; status.numberOfLines = 2
         composerStack.addArrangedSubview(status)
         inputWrapper.translatesAutoresizingMaskIntoConstraints = false
         composerStack.addArrangedSubview(inputWrapper)
         input.font = DHTheme.scaledFont(size: CGFloat(appState.settings.fontSize)); input.textColor = DHTheme.text; input.backgroundColor = .clear
-        input.textContainerInset = UIEdgeInsets(top: 8, left: 10, bottom: 7, right: 10); input.textContainer.lineFragmentPadding = 0; input.delegate = self
+        input.textContainerInset = UIEdgeInsets(top: 6, left: 9, bottom: 5, right: 9); input.textContainer.lineFragmentPadding = 0; input.delegate = self
         input.onSubmit = { [weak self] commandModified in self?.sendCurrentInput(commandModified: commandModified) }
         input.translatesAutoresizingMaskIntoConstraints = false; inputWrapper.addSubview(input)
         placeholder.text = "输入任务或继续指令…"; placeholder.font = DHTheme.scaledFont(size: CGFloat(appState.settings.fontSize)); placeholder.textColor = DHTheme.tertiaryText; placeholder.isUserInteractionEnabled = false
         placeholder.translatesAutoresizingMaskIntoConstraints = false; inputWrapper.addSubview(placeholder)
-        inputHeight = input.heightAnchor.constraint(equalToConstant: 46)
+        inputHeight = input.heightAnchor.constraint(equalToConstant: 42)
         NSLayoutConstraint.activate([
             input.leadingAnchor.constraint(equalTo: inputWrapper.leadingAnchor), input.trailingAnchor.constraint(equalTo: inputWrapper.trailingAnchor),
             input.topAnchor.constraint(equalTo: inputWrapper.topAnchor), input.bottomAnchor.constraint(equalTo: inputWrapper.bottomAnchor), inputHeight,
-            placeholder.leadingAnchor.constraint(equalTo: input.leadingAnchor, constant: 10), placeholder.topAnchor.constraint(equalTo: input.topAnchor, constant: 8)
+            placeholder.leadingAnchor.constraint(equalTo: input.leadingAnchor, constant: 10), placeholder.topAnchor.constraint(equalTo: input.topAnchor, constant: 6)
         ])
-        attachmentScroll.showsHorizontalScrollIndicator = false; attachmentScroll.translatesAutoresizingMaskIntoConstraints = false; attachmentScroll.heightAnchor.constraint(equalToConstant: 38).isActive = true
+        attachmentScroll.showsHorizontalScrollIndicator = false; attachmentScroll.translatesAutoresizingMaskIntoConstraints = false; attachmentScroll.heightAnchor.constraint(equalToConstant: 34).isActive = true
         attachmentStrip.axis = .horizontal; attachmentStrip.spacing = 6; attachmentStrip.translatesAutoresizingMaskIntoConstraints = false
         attachmentScroll.addSubview(attachmentStrip); composerStack.addArrangedSubview(attachmentScroll); attachmentScroll.isHidden = true
         NSLayoutConstraint.activate([
@@ -237,20 +238,30 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
             attachmentStrip.topAnchor.constraint(equalTo: attachmentScroll.contentLayoutGuide.topAnchor), attachmentStrip.bottomAnchor.constraint(equalTo: attachmentScroll.contentLayoutGuide.bottomAnchor),
             attachmentStrip.heightAnchor.constraint(equalTo: attachmentScroll.frameLayoutGuide.heightAnchor)
         ])
-        let actions = UIStackView(); actions.axis = .horizontal; actions.alignment = .center; actions.spacing = 3; actions.translatesAutoresizingMaskIntoConstraints = false
-        configureSmallIcon(attachButton, icon: "plus", label: "添加图片或文件"); attachButton.addTarget(self, action: #selector(chooseAttachment), for: .touchUpInside)
-        configureSmallIcon(permissionButton, icon: "shield", label: "切换权限"); permissionButton.addTarget(self, action: #selector(choosePermission), for: .touchUpInside)
+        let actionScroll = UIScrollView(); actionScroll.showsHorizontalScrollIndicator = false; actionScroll.translatesAutoresizingMaskIntoConstraints = false
+        let actions = UIStackView(); actions.axis = .horizontal; actions.alignment = .center; actions.spacing = 2; actions.translatesAutoresizingMaskIntoConstraints = false
+        configureSmallText(attachButton, title: "附件", icon: "plus"); attachButton.addTarget(self, action: #selector(chooseAttachment), for: .touchUpInside)
+        configureSmallText(permissionButton, title: "权限", icon: "shield"); permissionButton.addTarget(self, action: #selector(choosePermission), for: .touchUpInside)
         configureSmallText(modelButton, title: "模型"); modelButton.addTarget(self, action: #selector(chooseModel), for: .touchUpInside)
+        configureSmallText(reasoningButton, title: "推理"); reasoningButton.addTarget(self, action: #selector(chooseReasoning), for: .touchUpInside)
         configureSmallText(sendModeButton, title: "队列"); sendModeButton.addTarget(self, action: #selector(chooseSendMode), for: .touchUpInside)
-        var sendConfig = UIButton.Configuration.filled(); sendConfig.image = UIImage(systemName: "arrow.up"); sendConfig.cornerStyle = .capsule; sendConfig.baseBackgroundColor = DHTheme.accent; sendConfig.baseForegroundColor = .white; sendConfig.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8); sendButton.configuration = sendConfig; sendButton.accessibilityLabel = "发送或停止"; sendButton.addTarget(self, action: #selector(sendTapped), for: .touchUpInside)
+        var sendConfig = UIButton.Configuration.filled(); sendConfig.image = UIImage(systemName: "arrow.up"); sendConfig.cornerStyle = .capsule; sendConfig.baseBackgroundColor = DHTheme.accent; sendConfig.baseForegroundColor = .white; sendConfig.contentInsets = NSDirectionalEdgeInsets(top: 7, leading: 8, bottom: 7, trailing: 8); sendButton.configuration = sendConfig; sendButton.accessibilityLabel = "发送或停止"; sendButton.addTarget(self, action: #selector(sendTapped), for: .touchUpInside)
         sendButton.addGestureRecognizer(UILongPressGestureRecognizer(target: self, action: #selector(sendLongPress(_:))))
-        actions.addArrangedSubview(attachButton); actions.addArrangedSubview(permissionButton); actions.addArrangedSubview(modelButton); actions.addArrangedSubview(sendModeButton); actions.addArrangedSubview(UIView()); actions.addArrangedSubview(sendButton)
-        sendButton.widthAnchor.constraint(equalToConstant: 40).isActive = true; sendButton.heightAnchor.constraint(equalToConstant: 40).isActive = true
-        composerStack.addArrangedSubview(actions)
+        [attachButton, permissionButton, modelButton, reasoningButton, sendModeButton].forEach(actions.addArrangedSubview)
+        actionScroll.addSubview(actions)
+        NSLayoutConstraint.activate([actions.leadingAnchor.constraint(equalTo: actionScroll.contentLayoutGuide.leadingAnchor), actions.trailingAnchor.constraint(equalTo: actionScroll.contentLayoutGuide.trailingAnchor), actions.topAnchor.constraint(equalTo: actionScroll.contentLayoutGuide.topAnchor), actions.bottomAnchor.constraint(equalTo: actionScroll.contentLayoutGuide.bottomAnchor), actions.heightAnchor.constraint(equalTo: actionScroll.frameLayoutGuide.heightAnchor)])
+        actionScroll.heightAnchor.constraint(equalToConstant: 40).isActive = true
+        let actionRow = UIStackView(arrangedSubviews: [actionScroll, sendButton])
+        actionRow.axis = .horizontal; actionRow.alignment = .center; actionRow.spacing = 4; actionRow.translatesAutoresizingMaskIntoConstraints = false
+        actionScroll.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        actionScroll.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        sendButton.widthAnchor.constraint(equalToConstant: 40).isActive = true
+        sendButton.heightAnchor.constraint(equalToConstant: 40).isActive = true
+        composerStack.addArrangedSubview(actionRow)
         NSLayoutConstraint.activate([
-            composer.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12), composer.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
-            composer.bottomAnchor.constraint(equalTo: view.keyboardLayoutGuide.topAnchor, constant: -8), composerStack.leadingAnchor.constraint(equalTo: composer.leadingAnchor, constant: 10),
-            composerStack.trailingAnchor.constraint(equalTo: composer.trailingAnchor, constant: -10), composerStack.topAnchor.constraint(equalTo: composer.topAnchor, constant: 8), composerStack.bottomAnchor.constraint(equalTo: composer.bottomAnchor, constant: -7)
+            composer.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8), composer.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
+            composer.bottomAnchor.constraint(equalTo: view.keyboardLayoutGuide.topAnchor, constant: -5), composerStack.leadingAnchor.constraint(equalTo: composer.leadingAnchor, constant: 8),
+            composerStack.trailingAnchor.constraint(equalTo: composer.trailingAnchor, constant: -8), composerStack.topAnchor.constraint(equalTo: composer.topAnchor, constant: 5), composerStack.bottomAnchor.constraint(equalTo: composer.bottomAnchor, constant: -5)
         ])
     }
 
@@ -258,8 +269,8 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
         var c = UIButton.Configuration.plain(); c.image = UIImage(systemName: icon); c.baseForegroundColor = DHTheme.secondaryText; c.contentInsets = NSDirectionalEdgeInsets(top: 7, leading: 7, bottom: 7, trailing: 7); button.configuration = c; button.accessibilityLabel = label; button.widthAnchor.constraint(greaterThanOrEqualToConstant: 36).isActive = true; button.heightAnchor.constraint(equalToConstant: 40).isActive = true
     }
 
-    private func configureSmallText(_ button: UIButton, title: String) {
-        var c = UIButton.Configuration.tinted(); c.title = title; c.baseForegroundColor = DHTheme.secondaryText; c.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 7, bottom: 6, trailing: 7); c.background.cornerRadius = 9; button.configuration = c; button.titleLabel?.font = DHTheme.font(.caption1, weight: .medium); button.heightAnchor.constraint(equalToConstant: 34).isActive = true
+    private func configureSmallText(_ button: UIButton, title: String, icon: String? = nil) {
+        var c = UIButton.Configuration.tinted(); c.title = title; c.image = icon.flatMap { UIImage(systemName: $0) }; c.imagePadding = 3; c.baseForegroundColor = DHTheme.secondaryText; c.contentInsets = NSDirectionalEdgeInsets(top: 4, leading: 6, bottom: 4, trailing: 6); c.background.cornerRadius = 8; button.configuration = c; button.titleLabel?.font = DHTheme.font(.caption1, weight: .medium); button.heightAnchor.constraint(equalToConstant: 34).isActive = true
     }
 
     @objc private func settingsDidChange() { input.font = DHTheme.scaledFont(size: CGFloat(appState.settings.fontSize)); placeholder.font = input.font; table.reloadData(); render() }
@@ -271,7 +282,7 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
         ]
     }
     @objc private func modifiedEnter() { sendCurrentInput(commandModified: true) }
-    @objc private func modeChanged() { mode = modeControl.selectedSegmentIndex; processControlsHeight.constant = mode == 1 ? 78 : 0; processControls.isHidden = mode != 1; render() }
+    @objc private func modeChanged() { mode = modeControl.selectedSegmentIndex; processControlsHeight.constant = mode == 1 || mode == 2 ? 72 : 0; processControls.isHidden = mode != 1 && mode != 2; render() }
     @objc private func toggleTurns() { showTurns.toggle(); processTurns.configuration?.image = UIImage(systemName: showTurns ? "rectangle.compress.vertical" : "rectangle.expand.vertical"); render() }
     @objc private func toggleCalls() { showCalls.toggle(); processCalls.configuration?.image = UIImage(systemName: showCalls ? "wrench.and.screwdriver" : "rectangle.expand.vertical"); render() }
     @objc private func showDuration() { let a = UIAlertController(title: "过程时长", message: "时间字段来自 Harness 事件；当前按事件实际时间显示。", preferredStyle: .actionSheet); a.addAction(UIAlertAction(title: "实际时间 ✓", style: .default)); a.addAction(UIAlertAction(title: "相对耗时", style: .default)); a.addAction(UIAlertAction(title: "取消", style: .cancel)); presentSheet(a, source: processDuration) }
@@ -286,8 +297,8 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
         let oldIDs = previousVisibleIDs
         let wasNearBottom = isNearBottom || isTableNearBottom()
         visibleItems = mode == 0 ? HarnessPresentationPolicy.transcriptVisibleItems(runtime.items, view: appState.settings.transcriptView) : processItems()
-        visibleArtifacts = mode == 2 ? runtime.artifacts : []
-        let nextIDs = mode == 2 ? visibleArtifacts.map(\.id) : visibleItems.map(\.id)
+        visibleArtifacts = mode == 3 ? runtime.artifacts : []
+        let nextIDs = mode == 3 ? visibleArtifacts.map(\.id) : visibleItems.map(\.id)
         previousVisibleIDs = nextIDs
         table.reloadData()
         updateHeader()
@@ -309,12 +320,13 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
     private func updateHeader() {
         if let session = runtime.sessions.first(where: { $0.id == runtime.selectedSessionID }) {
             titleLabel.text = session.title.isEmpty ? "新会话" : session.title
-            let model = session.model.isEmpty ? "未选模型" : session.model
-            modelButton.configuration?.title = model.count > 16 ? String(model.prefix(14)) + "…" : model
+            let title = session.model.isEmpty ? "未选模型" : session.model
+        modelButton.configuration?.title = title.count > 12 ? String(title.prefix(11)) + "…" : title
             permissionButton.configuration?.image = UIImage(systemName: session.permission == "danger-full-access" ? "shield.slash" : "shield")
             permissionButton.accessibilityLabel = "权限：\(permissionName(session.permission))"
         } else { titleLabel.text = "Harness Pocket" }
-        status.text = [runtime.lastError ?? runtime.statusText, runtime.currentStage.map { "阶段：\($0)" }, runtime.isGenerating ? "运行中" : nil, runtime.reasoningEffort.map { "推理：\($0)" }].compactMap { $0 }.joined(separator: " · ")
+        status.text = [runtime.lastError ?? runtime.statusText, runtime.currentStage.map { "阶段：\($0)" }, runtime.isGenerating ? "运行中" : nil].compactMap { $0 }.joined(separator: " · ")
+        reasoningButton.configuration?.title = runtime.reasoningEffort.map { "推理 \($0)" } ?? "推理"
         status.textColor = runtime.lastError == nil ? DHTheme.secondaryText : DHTheme.danger
         stateButton.configuration?.title = runtime.pendingApprovals.isEmpty && runtime.pendingQuestions.isEmpty ? (runtime.isGenerating ? "运行中" : "状态") : "待处理"
         stateButton.configuration?.baseForegroundColor = runtime.pendingApprovals.isEmpty && runtime.pendingQuestions.isEmpty ? DHTheme.secondaryText : DHTheme.warning
@@ -340,7 +352,29 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
         guard !text.isEmpty || !images.isEmpty else { return }
         let mode = explicitMode ?? HarnessBusyEnterBehavior.sendMode(for: appState.settings.busyEnter, isGenerating: runtime.isGenerating, commandModified: commandModified)
         runtime.send(text, mode: mode, images: images)
-        input.text = ""; images.removeAll(); inputHeight.constant = 46; renderAttachments(); updateHeader()
+        input.text = ""; images.removeAll(); inputHeight.constant = 42; renderAttachments(); updateHeader()
+    }
+
+    func textViewDidChange(_ textView: UITextView) {
+        let fitting = textView.sizeThatFits(CGSize(width: textView.bounds.width, height: .greatestFiniteMagnitude)).height
+        inputHeight.constant = min(max(42, ceil(fitting)), 128)
+        placeholder.isHidden = !textView.text.isEmpty
+        view.layoutIfNeeded()
+    }
+
+    @objc private func chooseReasoning() {
+        let current = runtime.reasoningEffort
+        let a = UIAlertController(title: "Reasoning effort", message: "当前会话的推理强度。", preferredStyle: .actionSheet)
+        a.addAction(UIAlertAction(title: "默认" + (current == nil ? " ✓" : ""), style: .default) { [weak self] _ in self?.selectReasoning(nil) })
+        let values = Set(runtime.models.flatMap { $0.reasoning.compactMap { $0["id"] } })
+        for value in values.sorted() { a.addAction(UIAlertAction(title: value + (current == value ? " ✓" : ""), style: .default) { [weak self] _ in self?.selectReasoning(value) }) }
+        a.addAction(UIAlertAction(title: "取消", style: .cancel)); presentSheet(a, source: reasoningButton)
+    }
+
+    private func selectReasoning(_ value: String?) {
+        let session = runtime.sessions.first { $0.id == runtime.selectedSessionID }
+        guard let option = runtime.models.first(where: { $0.provider == session?.provider && $0.model == session?.model }) ?? runtime.models.first else { return }
+        runtime.selectModel(option, reasoning: value)
     }
 
     @objc private func chooseSendMode() {
@@ -372,7 +406,8 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
     }
 
     @objc private func chooseAttachment() {
-        let a = UIAlertController(title: "添加附件", message: "发送协议支持图片内容。", preferredStyle: .actionSheet)
+        guard images.count < 20 else { showError("最多添加 20 个图片附件"); return }
+        let a = UIAlertController(title: "添加附件", message: "发送协议支持图片内容；单张不超过 20 MB。", preferredStyle: .actionSheet)
         a.addAction(UIAlertAction(title: "照片图库", style: .default) { [weak self] _ in var c = PHPickerConfiguration(); c.selectionLimit = 20; c.filter = .images; let p = PHPickerViewController(configuration: c); p.delegate = self; self?.present(p, animated: true) })
         a.addAction(UIAlertAction(title: "文件（图片）", style: .default) { [weak self] _ in let p = UIDocumentPickerViewController(forOpeningContentTypes: [.image], asCopy: true); p.allowsMultipleSelection = true; p.delegate = self; self?.present(p, animated: true) })
         a.addAction(UIAlertAction(title: "取消", style: .cancel)); presentSheet(a, source: attachButton)
@@ -385,9 +420,17 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
         }
     }
 
-    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) { urls.forEach { if let data = try? Data(contentsOf: $0) { appendImage(data, name: $0.lastPathComponent) } } }
+    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        let remaining = max(0, 20 - images.count)
+        for url in urls.prefix(remaining) {
+            guard url.startAccessingSecurityScopedResource() else { continue }
+            defer { url.stopAccessingSecurityScopedResource() }
+            if let data = try? Data(contentsOf: url) { appendImage(data, name: url.lastPathComponent) }
+        }
+    }
 
     private func appendImage(_ data: Data, name: String?) {
+        guard images.count < 20 else { showError("最多添加 20 个图片附件"); return }
         guard data.count <= 20 * 1024 * 1024 else { showError("单张图片不能超过 20 MB"); return }
         let type = name?.lowercased().hasSuffix(".png") == true ? "image/png" : "image/jpeg"
         images.append(["type": "image", "mediaType": type, "data": data.base64EncodedString(), "name": name ?? "图片"])
@@ -405,19 +448,24 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
     private func showError(_ message: String) { let a = UIAlertController(title: "提示", message: message, preferredStyle: .alert); a.addAction(UIAlertAction(title: "知道了", style: .default)); present(a, animated: true) }
 
     func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) { processQuery = searchText; render() }
-    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { mode == 2 ? max(visibleArtifacts.count, 1) : max(visibleItems.count, 1) }
+    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { mode == 3 ? max(visibleArtifacts.count, 1) : max(visibleItems.count, 1) }
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        if mode == 2 {
+        if mode == 3 {
             guard !visibleArtifacts.isEmpty else { let cell = UITableViewCell(style: .default, reuseIdentifier: nil); cell.backgroundColor = .clear; cell.textLabel?.text = "当前会话尚无服务端确认的产物"; cell.textLabel?.textColor = DHTheme.secondaryText; return cell }
             let cell = tableView.dequeueReusableCell(withIdentifier: "pocket.artifact", for: indexPath) as! PocketArtifactCell; cell.configure(visibleArtifacts[indexPath.row]); return cell
         }
         guard !visibleItems.isEmpty else { let cell = UITableViewCell(style: .default, reuseIdentifier: nil); cell.backgroundColor = .clear; cell.textLabel?.text = runtime.selectedSessionID == nil ? "从上下文抽屉选择一个真实会话" : "等待 Harness 返回内容"; cell.textLabel?.textColor = DHTheme.secondaryText; cell.textLabel?.numberOfLines = 0; return cell }
+        if mode == 2 {
+            let cell = tableView.dequeueReusableCell(withIdentifier: "pocket.trajectory", for: indexPath) as! PocketTrajectoryCell
+            cell.configure(visibleItems[indexPath.row], settings: appState.settings)
+            return cell
+        }
         let cell = tableView.dequeueReusableCell(withIdentifier: "pocket.message", for: indexPath) as! HarnessMessageCell; cell.configure(visibleItems[indexPath.row], settings: appState.settings); return cell
     }
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
-        if mode == 2, visibleArtifacts.indices.contains(indexPath.row) { let a = UIAlertController(title: visibleArtifacts[indexPath.row].name, message: "\(visibleArtifacts[indexPath.row].path)\n\n\(visibleArtifacts[indexPath.row].detail ?? "服务端已确认此产物。")", preferredStyle: .actionSheet); a.addAction(UIAlertAction(title: "复制路径", style: .default) { _ in UIPasteboard.general.string = self.visibleArtifacts[indexPath.row].path }); a.addAction(UIAlertAction(title: "取消", style: .cancel)); presentSheet(a, source: table); return }
+        if mode == 3, visibleArtifacts.indices.contains(indexPath.row) { let a = UIAlertController(title: visibleArtifacts[indexPath.row].name, message: "\(visibleArtifacts[indexPath.row].path)\n\n\(visibleArtifacts[indexPath.row].detail ?? "服务端已确认此产物。")", preferredStyle: .actionSheet); a.addAction(UIAlertAction(title: "复制路径", style: .default) { _ in UIPasteboard.general.string = self.visibleArtifacts[indexPath.row].path }); a.addAction(UIAlertAction(title: "取消", style: .cancel)); presentSheet(a, source: table); return }
         guard visibleItems.indices.contains(indexPath.row) else { return }
         let item = visibleItems[indexPath.row]
         guard item.kind == .tool || item.detail != nil || item.subtitle == "错误" else { return }
@@ -426,15 +474,16 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) { if scrollView === table { isNearBottom = isTableNearBottom() } }
     func tableView(_ tableView: UITableView, willDisplay cell: UITableViewCell, forRowAt indexPath: IndexPath) {
-        guard indexPath.row == 0, mode != 2, runtime.hasMore, !isLoadingOlder else { return }
+        guard indexPath.row == 0, mode != 3, runtime.hasMore, !isLoadingOlder else { return }
         isLoadingOlder = true
         let oldOffset = table.contentOffset.y; let oldHeight = table.contentSize.height
-        runtime.loadOlder()
-        DispatchQueue.main.async { [weak self] in guard let self else { return }; self.table.layoutIfNeeded(); let delta = self.table.contentSize.height - oldHeight; if delta > 0 { self.table.contentOffset.y = oldOffset + delta }; self.isLoadingOlder = false }
+        runtime.loadOlder { [weak self] in
+            DispatchQueue.main.async { guard let self else { return }; self.table.layoutIfNeeded(); let delta = self.table.contentSize.height - oldHeight; if delta > 0 { self.table.contentOffset.y = oldOffset + delta }; self.isLoadingOlder = false }
+        }
     }
 
     private func isTableNearBottom() -> Bool { let bottom = table.contentOffset.y + table.bounds.height - table.adjustedContentInset.bottom; return table.contentSize.height <= 0 || bottom >= table.contentSize.height - 120 }
-    private func scrollBottom() { let count = mode == 2 ? visibleArtifacts.count : visibleItems.count; guard count > 0 else { return }; table.scrollToRow(at: IndexPath(row: count - 1, section: 0), at: .bottom, animated: false); isNearBottom = true }
+    private func scrollBottom() { let count = mode == 3 ? visibleArtifacts.count : visibleItems.count; guard count > 0 else { return }; table.scrollToRow(at: IndexPath(row: count - 1, section: 0), at: .bottom, animated: false); isNearBottom = true }
 }
 
 private final class PocketAttachmentChip: UIView {
@@ -447,6 +496,45 @@ private final class PocketAttachmentChip: UIView {
         NSLayoutConstraint.activate([image.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 5), image.centerYAnchor.constraint(equalTo: centerYAnchor), image.widthAnchor.constraint(equalToConstant: 28), image.heightAnchor.constraint(equalToConstant: 28), label.leadingAnchor.constraint(equalTo: image.trailingAnchor, constant: 5), label.centerYAnchor.constraint(equalTo: centerYAnchor), label.widthAnchor.constraint(lessThanOrEqualToConstant: 100), remove.leadingAnchor.constraint(equalTo: label.trailingAnchor, constant: 3), remove.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -5), remove.centerYAnchor.constraint(equalTo: centerYAnchor), remove.widthAnchor.constraint(equalToConstant: 22), remove.heightAnchor.constraint(equalToConstant: 22), heightAnchor.constraint(equalToConstant: 38)])
     }
     @available(*, unavailable) required init?(coder: NSCoder) { fatalError() }
+}
+
+private final class PocketTrajectoryCell: UITableViewCell {
+    private let rail = UIView()
+    private let kindLabel = UILabel()
+    private let textLabelValue = UILabel()
+    private let metaLabel = UILabel()
+
+    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+        super.init(style: style, reuseIdentifier: reuseIdentifier)
+        backgroundColor = .clear
+        selectionStyle = .default
+        rail.layer.cornerRadius = 3
+        rail.translatesAutoresizingMaskIntoConstraints = false
+        kindLabel.font = DHTheme.font(.caption2, weight: .semibold)
+        kindLabel.textColor = DHTheme.accent
+        textLabelValue.font = DHTheme.font(.subheadline)
+        textLabelValue.textColor = DHTheme.text
+        textLabelValue.numberOfLines = 2
+        metaLabel.font = DHTheme.font(.caption2)
+        metaLabel.textColor = DHTheme.tertiaryText
+        let labels = UIStackView(arrangedSubviews: [kindLabel, textLabelValue, metaLabel])
+        labels.axis = .vertical; labels.spacing = 2; labels.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(rail); contentView.addSubview(labels)
+        NSLayoutConstraint.activate([
+            rail.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16), rail.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 8), rail.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -8), rail.widthAnchor.constraint(equalToConstant: 4),
+            labels.leadingAnchor.constraint(equalTo: rail.trailingAnchor, constant: 10), labels.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16), labels.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 7), labels.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -7)
+        ])
+    }
+    @available(*, unavailable) required init?(coder: NSCoder) { fatalError() }
+    func configure(_ item: HarnessConversationItem, settings: HarnessClientSettings) {
+        let kind = item.kind == .tool ? (item.subtitle ?? "工具") : item.kind == .assistant ? "Harness" : item.kind == .user ? "输入" : (item.subtitle ?? "系统")
+        kindLabel.text = kind
+        textLabelValue.text = item.text
+        metaLabel.text = item.detail ?? (item.seq >= 0 ? "事件 #\(item.seq)" : nil)
+        rail.backgroundColor = item.kind == .tool ? DHTheme.warning : item.kind == .assistant ? DHTheme.accent : DHTheme.secondaryText
+        textLabelValue.font = DHTheme.scaledFont(size: CGFloat(settings.fontSize), textStyle: .subheadline)
+        accessibilityLabel = "轨迹：\(kind)，\(item.text)"
+    }
 }
 
 private final class PocketArtifactCell: UITableViewCell {

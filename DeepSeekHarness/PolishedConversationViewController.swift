@@ -716,7 +716,7 @@ final class HarnessMessageCell: UITableViewCell, UITextViewDelegate {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
         selectionStyle = .none
         backgroundColor = .clear
-        card.layer.cornerRadius = 14
+        card.layer.cornerRadius = DHTheme.cornerSmall
         card.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(card)
         [title, body, meta].forEach {
@@ -734,20 +734,20 @@ final class HarnessMessageCell: UITableViewCell, UITextViewDelegate {
         meta.font = DHTheme.font(.caption2)
         meta.textColor = DHTheme.tertiaryText
         NSLayoutConstraint.activate([
-            card.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 14),
-            card.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -14),
-            card.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 5),
-            card.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -5),
+            card.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 10),
+            card.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -10),
+            card.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 2),
+            card.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -2),
             title.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 13),
             title.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -13),
-            title.topAnchor.constraint(equalTo: card.topAnchor, constant: 10),
+            title.topAnchor.constraint(equalTo: card.topAnchor, constant: 7),
             body.leadingAnchor.constraint(equalTo: title.leadingAnchor),
             body.trailingAnchor.constraint(equalTo: title.trailingAnchor),
-            body.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 5),
+            body.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 3),
             meta.leadingAnchor.constraint(equalTo: title.leadingAnchor),
             meta.trailingAnchor.constraint(equalTo: title.trailingAnchor),
-            meta.topAnchor.constraint(equalTo: body.bottomAnchor, constant: 6),
-            meta.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -9)
+            meta.topAnchor.constraint(equalTo: body.bottomAnchor, constant: 3),
+            meta.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -6)
         ])
     }
 
@@ -756,9 +756,9 @@ final class HarnessMessageCell: UITableViewCell, UITextViewDelegate {
 
     func configure(_ item: HarnessConversationItem, settings: HarnessClientSettings = .defaults) {
         title.text = item.kind == .user ? "你" : item.kind == .assistant ? "Harness" : item.kind == .tool ? "工具" : "系统"
-        body.attributedText = item.isMarkdown ? HarnessMarkdown.attributed(item.text, fontSize: CGFloat(settings.fontSize), color: DHTheme.text) : NSAttributedString(string: item.text, attributes: [.font: UIFont.systemFont(ofSize: CGFloat(settings.fontSize)), .foregroundColor: DHTheme.text])
+        body.attributedText = item.isMarkdown ? HarnessMarkdown.attributed(item.text, fontSize: CGFloat(settings.fontSize), codeFontSize: CGFloat(settings.codeFontSize), color: DHTheme.text) : NSAttributedString(string: item.text, attributes: [.font: DHTheme.scaledFont(size: CGFloat(settings.fontSize)), .foregroundColor: DHTheme.text])
         meta.text = item.subtitle
-        meta.font = UIFont.systemFont(ofSize: max(10, CGFloat(settings.fontSize - 4)))
+        meta.font = DHTheme.scaledFont(size: max(10, CGFloat(settings.fontSize - 4)), textStyle: .caption2)
         card.backgroundColor = item.kind == .user ? DHTheme.accentSoft : item.kind == .tool ? DHTheme.surfaceMuted : DHTheme.surface
         title.textColor = item.kind == .user ? DHTheme.accent : DHTheme.secondaryText
         let compact = settings.transcriptView == .compact

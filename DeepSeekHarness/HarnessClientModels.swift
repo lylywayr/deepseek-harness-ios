@@ -202,11 +202,11 @@ enum HarnessPresentationPolicy {
 
 /// Small, deterministic presentation helpers used by the native renderer and XCTest.
 enum HarnessMarkdown {
-    static func attributed(_ markdown: String, fontSize: CGFloat = 14, color: UIColor = .label) -> NSAttributedString {
+    static func attributed(_ markdown: String, fontSize: CGFloat = 14, codeFontSize: CGFloat? = nil, color: UIColor = .label) -> NSAttributedString {
         let output = NSMutableAttributedString()
         let base = UIFont.systemFont(ofSize: fontSize)
         let bodyFont = UIFontMetrics(forTextStyle: .body).scaledFont(for: base)
-        let codeFont = UIFont.monospacedSystemFont(ofSize: max(12, fontSize - 1), weight: .regular)
+        let codeFont = UIFont.monospacedSystemFont(ofSize: max(12, codeFontSize ?? (fontSize - 1)), weight: .regular)
         let lines = markdown.components(separatedBy: "\n")
         var inCode = false
         for (index, line) in lines.enumerated() {

@@ -58,6 +58,7 @@ final class HarnessSettingsCenterViewController: UIViewController, UITableViewDa
         ]
         let agent = [
             SettingRow(title: "新会话默认权限", subtitle: "仅影响随后创建的会话；当前会话在任务控制台切换。", value: permissionName(s.defaultPermission), action: { [weak self] in self?.choosePermission() }),
+            SettingRow(title: "默认模型", subtitle: "新建任务时使用；当前会话仍可在 Pocket 控制台切换。", value: defaultModelName, action: { [weak self] in self?.chooseDefaultModel() }),
             SettingRow(title: "默认工作区", subtitle: runtime == nil ? "连接到 Harness 后可选择名称" : "新建任务时使用；来自当前 Harness 工作区", value: defaultWorkspaceName, action: { [weak self] in self?.chooseWorkspace() }),
             SettingRow(title: "繁忙时 Enter", subtitle: "运行中可排队或插话；Cmd/Ctrl+Enter 使用另一行为。", value: s.busyEnter == .queue ? "排队发送" : "插话发送", action: { [weak self] in self?.chooseBusyEnter() })
         ]
@@ -76,9 +77,23 @@ final class HarnessSettingsCenterViewController: UIViewController, UITableViewDa
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell { let cell = tableView.dequeueReusableCell(withIdentifier: "row", for: indexPath) as! SettingsRowCell; cell.configure(rows[indexPath.section].1[indexPath.row]); return cell }
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) { tableView.deselectRow(at: indexPath, animated: true); rows[indexPath.section].1[indexPath.row].action?() }
 
+    private var defaultModelName: String {
+        guard !appState.settings.defaultModel.isEmpty else { return "未指定" }
+        return runtime?.models.first(where: { $0.key == appState.settings.defaultModel })?.modelName ?? appState.settings.defaultModel
+    }
     private var defaultWorkspaceName: String {
         guard let runtime else { return appState.settings.defaultWorkspaceID.isEmpty ? "未指定" : "已保存" }
         return runtime.workspaces.first(where: { $0.id == appState.settings.defaultWorkspaceID })?.title ?? "未指定"
+    }
+    private func chooseDefaultModel() {
+        guard let runtime else { return }
+        let alert = UIAlertController(title: "默认模型", message: "只影响随后创建的会话。", preferredStyle: .actionSheet)
+        alert.addAction(UIAlertAction(title: appState.settings.defaultModel.isEmpty ? "未指定 ✓" : "清除默认模型", style: .default) { [weak self] _ in self?.update { $0.defaultModel = "" } })
+        runtime.models.forEach { option in
+            alert.addAction(UIAlertAction(title: "\(option.providerName) · \(option.modelName)" + (option.key == appState.settings.defaultModel ? " ✓" : ""), style: .default) { [weak self] _ in self?.update { $0.defaultModel = option.key } })
+        }
+        if runtime.models.isEmpty { alert.message = "当前没有服务端返回的模型目录。" }
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel)); presentSheet(alert)
     }
     private func chooseWorkspace() {
         guard let runtime else { return }

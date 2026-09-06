@@ -74,12 +74,35 @@ enum DHTheme {
     static let danger = UIColor.systemRed
     static let purple = UIColor.systemPurple
 
-    static let cornerLarge: CGFloat = 24
-    static let cornerMedium: CGFloat = 16
-    static let cornerSmall: CGFloat = 12
+    // Pocket uses a dense tool-like rhythm. Touch targets remain native-sized,
+    // while visual padding and decoration stay compact at every screen size.
+    static let pageHorizontal: CGFloat = 16
+    static let sectionSpacing: CGFloat = 14
+    static let cardPaddingVertical: CGFloat = 10
+    static let rowMinHeight: CGFloat = 46
+    static let cornerLarge: CGFloat = 16
+    static let cornerMedium: CGFloat = 12
+    static let cornerSmall: CGFloat = 8
 
     static func font(_ style: UIFont.TextStyle, weight: UIFont.Weight = .regular) -> UIFont {
-        let base = UIFont.systemFont(ofSize: UIFont.preferredFont(forTextStyle: style).pointSize, weight: weight)
+        // Keep the native Dynamic Type curve, but use a denser Pocket baseline.
+        // UIFontMetrics still expands these values when the user requests larger text.
+        let size: CGFloat
+        switch style.rawValue {
+        case UIFont.TextStyle.largeTitle.rawValue: size = 30
+        case UIFont.TextStyle.title1.rawValue: size = 25
+        case UIFont.TextStyle.title2.rawValue: size = 22
+        case UIFont.TextStyle.title3.rawValue: size = 18
+        case UIFont.TextStyle.headline.rawValue: size = 16
+        case UIFont.TextStyle.body.rawValue: size = 15
+        case UIFont.TextStyle.callout.rawValue: size = 15
+        case UIFont.TextStyle.subheadline.rawValue: size = 14
+        case UIFont.TextStyle.footnote.rawValue: size = 12
+        case UIFont.TextStyle.caption1.rawValue: size = 12
+        case UIFont.TextStyle.caption2.rawValue: size = 11
+        default: size = 15
+        }
+        let base = UIFont.systemFont(ofSize: size, weight: weight)
         return UIFontMetrics(forTextStyle: style).scaledFont(for: base)
     }
 
@@ -108,8 +131,8 @@ extension UIView {
             layer.masksToBounds = false
             layer.shadowColor = UIColor.black.cgColor
             layer.shadowOpacity = traitCollection.userInterfaceStyle == .dark ? 0.28 : 0.09
-            layer.shadowRadius = 16
-            layer.shadowOffset = CGSize(width: 0, height: 6)
+            layer.shadowRadius = 10
+            layer.shadowOffset = CGSize(width: 0, height: 3)
         } else {
             layer.shadowOpacity = 0
         }
@@ -137,7 +160,7 @@ final class DHBadgeLabel: UILabel {
         setContentHuggingPriority(.required, for: .horizontal)
         setContentCompressionResistancePriority(.required, for: .horizontal)
         translatesAutoresizingMaskIntoConstraints = false
-        heightAnchor.constraint(greaterThanOrEqualToConstant: 28).isActive = true
+        heightAnchor.constraint(greaterThanOrEqualToConstant: 24).isActive = true
         accessibilityTraits = .staticText
     }
 
@@ -187,7 +210,7 @@ func dhButton(
     configuration.image = systemName.flatMap { UIImage(systemName: $0) }
     configuration.imagePadding = 8
     configuration.cornerStyle = .medium
-    configuration.contentInsets = NSDirectionalEdgeInsets(top: 11, leading: 14, bottom: 11, trailing: 14)
+    configuration.contentInsets = NSDirectionalEdgeInsets(top: 7, leading: 11, bottom: 7, trailing: 11)
     let button = UIButton(configuration: configuration)
     button.titleLabel?.font = DHTheme.font(.body, weight: .semibold)
     button.addAction(UIAction { _ in action() }, for: .touchUpInside)
