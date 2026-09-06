@@ -18,7 +18,7 @@
 - 设置接线：对话控制器持有 `AppState`，字号传入消息 Markdown/正文和 Session 日志；`transcriptView` 通过生产展示策略即时过滤过程行；`busyEnter` 计算 queue/steer，并保留 Cmd/Ctrl+Enter 反向语义；新会话创建成功后通过官方 `commands/execute` 权限命令应用 `defaultPermission`。
 - 视图选项：`HarnessPresentationPolicy.sections` 按全部 workspace 的 `sessionIDs` 分组，flat 为单列表，未归属会话进入“其他会话”；归档仅作展示过滤，updated/manual 均尊重数据顺序。
 - Markdown：补齐行内代码样式、HTTP/HTTPS `.link` attribute；消息使用可选择复制的原生 `UITextView`，仅安全打开 HTTP/HTTPS 链接。
-- 截图夹具收尾：入口和实现均置于 `#if DEBUG`；移除会让滚动内容撑满视口并拉伸 arranged subviews 的高度下限；连接场景改为单一垂直内容栈；对话场景的权限控件设置独立宽度；Release IPA 门禁禁止 fixture marker 与真实内网地址；fixture 使用虚构示例地址，最终 8 个场景无纵向拉伸、重叠或裁切。
+- P0 端点修复：新增生产共用 `HarnessEndpointCanonicalizer`，对 `http/https` endpoint 去除 token、清空 query 时写入 `queryItems = nil` 并清除空 query，保留其他 query，清除无意义 fragment；`AppState` 启动时自动迁移旧值并回写，保存时提取 URL token 到 Keychain。`HarnessClient`、`HarnessRuntime`、Keychain account、bootstrap 临时 token、HTTP API 和 WebSocket 均以同一 canonical base URL 为基准；连接页和设置页的等价 Debug fixture 使用动态端口示例且不显示裸问号。
 
 
 目标服务仅用于只读与一次性临时对象联调；没有记录 token、Cookie 或消息正文。
@@ -51,12 +51,12 @@ python3 scripts/verify_native_rework.py 全部 ok
 python3 scripts/verify_native_ui_fixture.py 全部 ok
 ```
 
-Swift XCTest、Release device archive、IPA gate 和原生截图 job 均由最终 CI 执行成功：Run `33986018201`，对应代码 HEAD `57ac816c172b7ad2f285ffbd6aac0b6d082d04ff`。其中 Swift 协议回归测试通过，包含生产模型的 workspace/flat、归档过滤、Compact 过程显示、busy Enter、Markdown inline code/link 断言及创建权限参数测试。
+Swift XCTest、Release device archive、IPA gate 和原生截图 job 均由 P0 修复后的最终 CI 执行成功：Run `34004545196`，对应代码 HEAD `8dfa386ec2c0291adb7052c89a0630ba7eb961c0`。Swift XCTest 共 26 项全部通过（HarnessClientModelsTests 9、HarnessWireTests 17），新增端点 canonicalization、任意端口、token 提取/非 token query 保留、旧值迁移、Runtime/Keychain/API/WebSocket 一致性断言。
 
 ## 代码与分支
 
 - 当前分支：`feature/native-renderer`
-- 最终构建代码提交：`57ac816c172b7ad2f285ffbd6aac0b6d082d04ff`（仅 Debug 截图夹具布局收尾）
+- 最终构建代码提交：`8dfa386ec2c0291adb7052c89a0630ba7eb961c0`（P0 服务地址 canonicalization 及必要 Swift XCTest）
 - 报告提交位于构建代码之后；报告提交只更新本报告证据，不改变构建代码。最终文档 HEAD 以推送后的提交为准。
 - 已推送：`origin/feature/native-renderer`
 - 未修改 `main`，未 force push
@@ -64,18 +64,21 @@ Swift XCTest、Release device archive、IPA gate 和原生截图 job 均由最�
 
 ## 最终 CI / IPA / 截图证据
 
-- Actions Run：`33986018201`，`completed / success`
-- Workflow：https://github.com/lylywayr/deepseek-harness-ios/actions/runs/33986018201
+- Actions Run：`34004545196`，`completed / success`
+- Workflow：https://github.com/lylywayr/deepseek-harness-ios/actions/runs/34004545196
 - 成功 jobs：unsigned IPA 构建与 `Native UI screenshots 390x844`；Swift XCTest、Release archive、IPA verify 全部通过。
-- 截图目录：[最终 Native UI 390×844 截图](minis://attachments/native-ui-390x844-33986018201/)
-- 截图文件：`connection`、`conversation`、`sidebar`、`settings`、`directory`、`approval`、`question`、`trajectory`，共 8 张；PNG 原始尺寸均为 1206×2622（iPhone 16 Simulator，内容区域 390×844pt）。逐张视觉检查确认：夹具卡片/按钮不再纵向拉伸，connection 无文字重叠，conversation 的模型/权限控件无重叠，8 个场景均无裁切或异常遮挡。
-- IPA：[最终未签名 IPA](minis://attachments/native-rework-33986018201/DeepSeekHarness-unsigned.ipa)
-- IPA 文件大小：304145 bytes
-- IPA SHA-256：`4e3bbef3c23b6ed0f10d5af20f3f1adaf0e0a8c5aa67cc92f9297a4a4727cce4`
-- 独立 `verify_ipa.py`：`bundleIdentifier=com.example.DeepSeekHarness`、`minimumOSVersion=15.0`、`arm64`、`unsigned=true`、`forbiddenMarkers=0`；扫描禁止 fixture marker 与真实内网地址均未命中。
+- 截图目录：[P0 修复后 Native UI 390×844 截图](minis://attachments/native-ui-390x844-34004545196/)
+- 截图文件：`connection`、`conversation`、`sidebar`、`settings`、`directory`、`approval`、`question`、`trajectory`，共 8 张；PNG 原始尺寸均为 1206×2622（iPhone 16 Simulator，内容区域 390×844pt）。已逐张视觉检查；connection 与 settings 中动态端口 endpoint 均无尾随 `?`，8 个场景均无纵向拉伸、文字重叠、裁切或异常遮挡。
+- IPA：[P0 修复后最终未签名 IPA](minis://attachments/native-rework-34004545196/DeepSeekHarness-unsigned.ipa)
+- IPA 文件大小：305244 bytes
+- IPA SHA-256：`8e8e3f5c10c047f5eaa39a716c65a0bd36b452363d51c295747797230a65af0d`
+- 独立 `verify_ipa.py`：`bundleIdentifier=com.example.DeepSeekHarness`、`minimumOSVersion=15.0`、`arm64`、`unsigned=true`、`forbiddenMarkers=0`；扫描禁止 fixture marker、真实内网地址、WebKit/legacy marker 均未命中。
 - IPA 中未发现 `_CodeSignature` 或 `embedded.mobileprovision`。
 
-## 仍需明确的门禁
+## 本次 P0 缺陷结论
+
+真机发现的服务地址尾随裸问号问题已完成定点修复。`http://host:任意端口`、裸 `?`、带 token、带其他 query 的 URL 均由同一生产 canonicalizer 处理；空 query 不再序列化为 `?`，旧值在启动时自动迁移回写，token 不进入持久化 endpoint。真实签名真机安装与服务端鉴权的最终人工门禁仍需在用户设备上复验；本轮未发送付费 prompt，也未修改 NAS、插件或服务。
+
 
 - 当前 8 张截图是确定性 Native-only fixture 的 Simulator 产物；已检查截图非空白且场景之间存在可见差异，但它不等于所有真实服务数据态都已逐项复现。
 - 未完成签名真机安装；需要用户 Team 签名后才能验证真机行为。
