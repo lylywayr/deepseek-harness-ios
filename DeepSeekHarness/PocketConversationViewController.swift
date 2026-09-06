@@ -266,8 +266,8 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
     override var canBecomeFirstResponder: Bool { true }
     override var keyCommands: [UIKeyCommand]? {
         [
-            UIKeyCommand(input: UIKeyCommand.inputEnter, modifierFlags: [.command], action: #selector(modifiedEnter)),
-            UIKeyCommand(input: UIKeyCommand.inputEnter, modifierFlags: [.control], action: #selector(modifiedEnter))
+            UIKeyCommand(input: "\r", modifierFlags: [.command], action: #selector(modifiedEnter)),
+            UIKeyCommand(input: "\r", modifierFlags: [.control], action: #selector(modifiedEnter))
         ]
     }
     @objc private func modifiedEnter() { sendCurrentInput(commandModified: true) }
@@ -461,8 +461,8 @@ private final class PocketInputTextView: UITextView {
     var onSubmit: ((Bool) -> Void)?
 
     override var keyCommands: [UIKeyCommand]? {
-        [UIKeyCommand(input: UIKeyCommand.inputEnter, modifierFlags: [.command], action: #selector(commandEnter)),
-         UIKeyCommand(input: UIKeyCommand.inputEnter, modifierFlags: [.control], action: #selector(commandEnter))]
+        [UIKeyCommand(input: "\r", modifierFlags: [.command], action: #selector(commandEnter)),
+         UIKeyCommand(input: "\r", modifierFlags: [.control], action: #selector(commandEnter))]
     }
 
     @objc private func commandEnter() { onSubmit?(true) }
