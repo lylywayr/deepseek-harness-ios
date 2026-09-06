@@ -28,10 +28,10 @@
 
 - 工程：`/var/minis/shared/deepseek-harness-ios-native`
 - 分支：`feature/native-renderer`
-- 最终代码 SHA：`1fb8118b869225ca426484ce276c3b4228eab00c`
-- 构建代码 SHA：`a9290fa25896668d44e40b185d28efce5b4ae31c`（之后仅更新本报告）
+- 最终代码 SHA：`ebb0b15da764ac1984f7bc26416ce7c6782c5dc5`
+- 构建代码 SHA：`ebb0b15da764ac1984f7bc26416ce7c6782c5dc5`（Actions Run `34014872564` 对应当前 HEAD）
 - 远端：`origin/feature/native-renderer` 与本地一致
-- 文档 HEAD：`22d002ce49b4b42b28e7117cdeb8eb01ffa27332`
+- 报告文件：`docs/native-completion-report.md`（报告自身提交以 `git log -1 -- docs/native-completion-report.md` 为准）
 - `main` 未修改；未 force push
 - 用户已有未跟踪移交/验收文档未纳入本轮报告提交：`HANDOFF-*`、`REWORK-*` 及既有验收文档
 
@@ -52,18 +52,18 @@ git diff --check
 
 ### GitHub Actions
 
-- Actions Run：`34010483300`
+- Actions Run：`34014872564`
 - 状态：`completed / success`
-- Workflow：https://github.com/lylywayr/deepseek-harness-ios/actions/runs/34010483300
+- Workflow：https://github.com/lylywayr/deepseek-harness-ios/actions/runs/34014872564
 - 成功 Job：`Build iOS device IPA`、`Native UI screenshots 390x844`
 - 成功包含生产 Swift XCTest、Release device archive、IPA verify、原生截图 job
 - Swift/Xcode 构建在 macOS Xcode 16.2 完成；iSH 本机没有 Xcode，未伪称本地执行 archive
 
 ### IPA 独立验证
 
-- IPA：[Harness Pocket Workspace 最终未签名 IPA](minis://attachments/pocket-run-34010483300/ipa/DeepSeekHarness-unsigned.ipa)
-- 路径：`/var/minis/attachments/pocket-run-34010483300/ipa/DeepSeekHarness-unsigned.ipa`
-- SHA-256：`8dbaa767161eeaab4f63c4fc9eb2bd5bbdd9f7304f7a5ae606866f3539bb7ac5`
+- IPA：[Harness Pocket Workspace 最新未签名 IPA](minis://attachments/pocket-run-34014872564/ipa/DeepSeekHarness-unsigned.ipa)
+- 路径：`/var/minis/attachments/pocket-run-34014872564/ipa/DeepSeekHarness-unsigned.ipa`
+- SHA-256：`8b93a86379c55c224e1390f221da2c9923f29aaab45af9af57ea896f73cedcfb`
 - `verify_ipa.py`：`bundleIdentifier=com.example.DeepSeekHarness`、`minimumOSVersion=15.0`、`arm64`、`unsigned=true`、`forbiddenMarkers=0`
 - IPA 未发现 `_CodeSignature` 或 `embedded.mobileprovision`
 - IPA 不含 Release fixture marker；DEBUG-only 夹具通过 `#if DEBUG` 和 Debug compilation condition 接入
@@ -72,8 +72,8 @@ git diff --check
 
 本次成功 Run 已下载并独立检查 8 张 Native-only 场景截图：
 
-- 目录：`/var/minis/attachments/pocket-run-34010483300/screens/`
-- 链接：[390×844 Native UI 截图证据目录](minis://attachments/pocket-run-34010483300/screens/)
+- 目录：`/var/minis/attachments/pocket-run-34014872564/screens/`
+- 链接：[390×844 Native UI 截图证据目录](minis://attachments/pocket-run-34014872564/screens/)
 - 文件：`connection`、`conversation`、`sidebar`、`settings`、`directory`、`approval`、`question`、`trajectory`
 - 全部 PNG 原始尺寸：`1206×2622`（iPhone 16 Simulator，内容区域 390×844pt）
 - 已视觉检查：设置、目录、问题等场景无拉伸/重叠/异常裁切；截图脚本逐场景重启 App，使用 `-UITestFixture -NativeFixtureScreen <scene>`，避免场景状态串线
