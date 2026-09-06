@@ -80,7 +80,7 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
         installGestures()
     }
 
-    deinit { stopObserving?(); runtime.onApproval = nil; runtime.onQuestion = nil }
+    deinit { stopObserving?() }
 
     #if DEBUG
     private static func makeFixture(scene: String, appState: AppState) -> NativeHomeViewController {

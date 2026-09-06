@@ -90,8 +90,6 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
     deinit {
         stopObserving?()
         NotificationCenter.default.removeObserver(self)
-        runtime.onApproval = nil
-        runtime.onQuestion = nil
     }
 
     #if DEBUG

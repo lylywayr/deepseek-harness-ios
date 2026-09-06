@@ -81,7 +81,7 @@ final class PolishedConversationViewController: UIViewController, UITableViewDat
         render()
     }
 
-    deinit { stopObserving?(); NotificationCenter.default.removeObserver(self); runtime.onApproval = nil; runtime.onQuestion = nil }
+    deinit { stopObserving?(); NotificationCenter.default.removeObserver(self) }
 
     @objc private func settingsDidChange() {
         input.font = .systemFont(ofSize: CGFloat(appState.settings.fontSize))
