@@ -22,29 +22,37 @@ capture() {
   local scene="$1" size="$2" appearance="$3" args="$4"
   local dir="$OUT/$size/$appearance"
   local launch_log="/tmp/pocket-fixture-launch.log"
-  local launchctl_log="/tmp/pocket-fixture-launchctl.log"
+  local process_log="/tmp/pocket-fixture-process.log"
+  local launch_output=""
+  local pid=""
+  local alive=0
   mkdir -p "$dir"
   xcrun simctl terminate "$UDID" "$BUNDLE_ID" >/dev/null 2>&1 || true
-  if ! xcrun simctl launch "$UDID" "$BUNDLE_ID" -UITestFixture -NativeFixtureScreen "$scene" $args >"$launch_log" 2>&1; then
+  if ! launch_output="$(xcrun simctl launch "$UDID" "$BUNDLE_ID" -UITestFixture -NativeFixtureScreen "$scene" $args 2>&1)"; then
+    printf '%s\n' "$launch_output" >"$launch_log"
     cat "$launch_log" >&2
     echo "Pocket fixture launch failed: $scene" >&2
     exit 1
   fi
+  printf '%s\n' "$launch_output" >"$launch_log"
+  pid="$(printf '%s\n' "$launch_output" | sed -n 's/.*: \([0-9][0-9]*\).*/\1/p' | tail -1)"
   sleep 2
-  # Do not use `simctl spawn ... id -u`: the iOS 18.2 runtime does not
-  # guarantee that helper in the spawned environment.  The simulator GUI
-  # domain is stable at uid 501, and the full launchctl output is captured
-  # before grep so pipefail cannot turn a successful match into a failure.
-  if ! xcrun simctl spawn "$UDID" launchctl print "gui/501" >"$launchctl_log" 2>&1; then
-    echo "Pocket fixture process domain unavailable: $scene" >&2
-    cat "$launch_log" >&2 || true
-    cat "$launchctl_log" >&2 || true
-    exit 1
+  # simctl launch returns the simulator PID.  Verify that PID from inside
+  # the simulator instead of assuming a host-side GUI uid; the latter is
+  # unavailable on some iOS 18.2 runners and caused false failures.
+  if [[ -n "$pid" ]] && xcrun simctl spawn "$UDID" ps -p "$pid" >"$process_log" 2>&1; then
+    if awk -v wanted="$pid" '$1 == wanted { found = 1 } END { exit found ? 0 : 1 }' "$process_log"; then
+      alive=1
+    fi
   fi
-  if ! grep -q "$BUNDLE_ID" "$launchctl_log"; then
+  if [[ "$alive" -ne 1 ]]; then
+    xcrun simctl spawn "$UDID" launchctl list >"$process_log" 2>&1 || true
+    if grep -Eq "$BUNDLE_ID|^[[:space:]]*$pid[[:space:]]" "$process_log"; then alive=1; fi
+  fi
+  if [[ "$alive" -ne 1 ]]; then
     echo "Pocket fixture exited before screenshot: $scene" >&2
     cat "$launch_log" >&2 || true
-    cat "$launchctl_log" >&2 || true
+    cat "$process_log" >&2 || true
     xcrun simctl spawn "$UDID" log show --last 20s --style compact --predicate 'process == "DeepSeekHarness" OR composedMessage CONTAINS[c] "DeepSeekHarness"' >&2 || true
     exit 1
   fi
