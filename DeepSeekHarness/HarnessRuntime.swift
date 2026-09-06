@@ -914,7 +914,11 @@ final class HarnessRuntime: NSObject {
         sessions[index] = session
     }
 
-    private func applyRuntimeProjection(_ id: String, key: String, value: Any?) {
+    private func rebuildWorkspaces() {
+        let ordered = workspaceOrder.compactMap { workspacesByID[$0] }
+        workspaces = ordered
+    }
+
         guard id == selectedSessionID else { return }
         switch key {
         case "currentStage", "stage", "phase": currentStage = value as? String ?? currentStage
