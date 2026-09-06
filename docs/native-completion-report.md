@@ -31,7 +31,7 @@
 - 最终代码 SHA：`1fb8118b869225ca426484ce276c3b4228eab00c`
 - 构建代码 SHA：`a9290fa25896668d44e40b185d28efce5b4ae31c`（之后仅更新本报告）
 - 远端：`origin/feature/native-renderer` 与本地一致
-- 文档 HEAD：`59849b58d25f3fc7f0b098001640c803411bad78`
+- 文档 HEAD：`8dfe2a6d9ae6da0c1c9750899de1bf294f51fdd0`
 - `main` 未修改；未 force push
 - 用户已有未跟踪移交/验收文档未纳入本轮报告提交：`HANDOFF-*`、`REWORK-*` 及既有验收文档
 
