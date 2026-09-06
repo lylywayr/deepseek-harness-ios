@@ -39,7 +39,7 @@ struct HarnessApprovalRequest: Equatable {
     let arguments: String?
 
     var isHighRisk: Bool {
-        let combined = "\(risk) \(toolName) \(detail ?? \"\") \(target ?? \"\")".lowercased()
+        let combined = [risk, toolName, detail ?? "", target ?? ""].joined(separator: " ").lowercased()
         return combined.contains("high") || combined.contains("danger") || combined.contains("shell") || combined.contains("write") || combined.contains("external")
     }
 }
