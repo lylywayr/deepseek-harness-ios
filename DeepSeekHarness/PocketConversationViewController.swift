@@ -72,8 +72,8 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
         buildTopBar()
         buildModes()
         buildProcessControls()
-        buildTable()
         buildComposer()
+        buildTable()
         stopObserving = runtime.observeChanges { [weak self] in
             DispatchQueue.main.async { self?.render() }
         }
