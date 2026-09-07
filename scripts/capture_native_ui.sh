@@ -26,6 +26,7 @@ UDID="$(find_udid "$DEVICE")"
 if [[ -z "$UDID" ]]; then UDID="$(xcrun simctl create "PocketV2Fixture" com.apple.CoreSimulator.SimDeviceType.iPhone-14 com.apple.CoreSimulator.SimRuntime.iOS-18-2)"; fi
 xcrun simctl boot "$UDID" 2>/dev/null || true
 run_timeout bootstatus xcrun simctl bootstatus "$UDID" -b
+UDID390="$UDID"
 APP_PATH="$ROOT/build/Build/Products/Debug-iphonesimulator/DeepSeekHarness.app"
 run_timeout install xcrun simctl install "$UDID" "$APP_PATH"
 OUT="$ROOT/artifacts/pocket-v2-ui-matrix"
@@ -117,17 +118,14 @@ if [[ -n "$UDID430" ]]; then
 else
   printf '430x932 simulator unavailable; 390x844 evidence retained\n'
 fi
-# Matrix scenes: workspace drawer flat conversation normal process trajectory artifacts activity settings keyboard; 390x844 and 430x932; PocketDark.
-# Keyboard evidence is deliberately isolated from the ordinary matrix lifecycle.
-# Each fresh simulator gets onboarding defaults before launch and is never service-restarted after focus.
-for spec in "iPhone 14|390x844|iPhone-14" "iPhone 15 Pro Max|430x932|iPhone-15-Pro-Max"; do
-  IFS='|' read -r kname ksize ktype <<< "$spec"
-  KUDID=$(xcrun simctl create "PocketKeyboard-$ksize" com.apple.CoreSimulator.SimDeviceType.$ktype com.apple.CoreSimulator.SimRuntime.iOS-18-2)
-  UDID="$KUDID"
-  run_timeout keyboard-boot xcrun simctl boot "$UDID"
-  run_timeout keyboard-bootstatus xcrun simctl bootstatus "$UDID" -b
-  run_timeout keyboard-install xcrun simctl install "$UDID" "$APP_PATH"
-  capture keyboard "$ksize" light ""
-done
+# Keyboard evidence reuses the already-booted, fully migrated devices. Creating a
+# fresh simulator here can block indefinitely in iOS data migration (the failure
+# mode this workflow must avoid). Preferences are seeded immediately before launch.
+UDID="$UDID390"
+capture keyboard "390x844" light ""
+if [[ -n "${UDID430:-}" ]]; then
+  UDID="$UDID430"
+  capture keyboard "430x932" light ""
+fi
 printf 'Pocket V2 screenshot matrix: %s\n' "$OUT"
 find "$OUT" -type f -name '*.png' -print | sort
