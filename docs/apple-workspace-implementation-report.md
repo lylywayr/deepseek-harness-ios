@@ -1,47 +1,49 @@
 # Apple Workspace implementation report
 
-- event_id: `apple-workspace-r3-c1-20260907`
-- implementation_round: 3; continuation: 1
-- code SHA: `01c9c2207c4e5e2b73c154379111a940a064dd9b`
+- event_id: `apple-workspace-r3-c2-20260907`
+- implementation_round: 3; continuation: 2
 - branch: `feature/native-renderer`
-- remote: `origin/feature/native-renderer` at the same SHA
-- CI Run: `34083577781` (workflow_dispatch, head SHA matches)
-- Jobs at evidence cutoff: Build iOS device IPA `101623302268` **in_progress**; Native Pocket UI screenshots matrix `101623302336` **in_progress**. No completed/success terminal evidence.
+- code SHA: `01c9c2207c4e5e2b73c154379111a940a064dd9b`
+- documentation commit: pending (this report)
+- CI Run: `34083577781` — completed/success
+- Jobs: Build iOS device IPA `101623302268` success; Native Pocket UI screenshots matrix `101623302336` success
 
-## Local gates
+## Artifact and independent verification
 
-- Python unittest discovery: **PASS**, 20/20.
-- `git diff --check`: **PASS**.
-- `DHNavigationController` is in `NativeMainViewController.swift`, has a PBXBuildFile/source entry in the app target, and deployment target is iOS 15.0. Status-bar chain delegates child/style to the top controller; production home hides navigation bar and uses the theme background.
-- Commit scope reviewed: only `NativeMainViewController.swift` and `PocketWorkspaceViewController.swift` in code commit; claimed fixes cover continue-card text layout, 390 subtitle layout, dark status-bar/background continuity, and preserve bottom navigation.
+- IPA: `/var/minis/attachments/apple-workspace-r3-run-34083577781/DeepSeekHarness-unsigned-ipa/DeepSeekHarness-unsigned.ipa`
+- `scripts/verify_ipa.py`: PASS; app `DeepSeekHarness.app`, bundle `com.example.DeepSeekHarness`, iOS `15.0`, forbidden markers `0`, unsigned as expected.
+- IPA SHA-256: `4e1d685fcefde3473eecd8f6e87a304b1e8f95433075e041526922dc3b7e1078`
+- screenshots: exactly **28 PNG**, matrix manifest present; 390x844 and 430x932 logical captures are present in light/dark matrix as configured. Every PNG is non-empty and the matrix filenames are unique; capture dimensions are 1170x2532 (390) or 1290x2796 (430), RGBA PNG.
 
-## Required external evidence
+## Runtime visual evidence
 
-Not yet available. The screenshot capture job has remained in progress beyond a bounded wait; no infinite waiting performed. IPA and 28 PNG artifact download/independent validation cannot be completed until the run reaches a terminal success and artifacts are available.
+- **390 light**: PASS. “你的 Harness 工作空间” is fully visible without ellipsis; continue-work card has real visible text (“原生工作台 V2” and subtitle), not a blank blue block. Overview, CTA, recent workspaces, recent sessions, activity, and four bottom items 工作台/会话/活动/设置 are visible; no observed clipping or overlap.
+- **430 light**: PASS. Same title, continue card, overview, recent sections and CTA render as real content; bottom navigation is visible and does not obscure the content.
+- **430 dark**: PASS. Status bar/safe area and dark body background are continuous; white/blue icon and text contrast is correct. Continue card, recent sessions and activity content are visible; bottom navigation is visible and not overlapping content.
 
-## Requirement mapping (pending runtime evidence)
+## Requirement → diff → runtime evidence
 
-| Contract requirement | Production/code evidence | Result |
-|---|---|---|
-| Title/subtitle and 390 full subtitle | changed workspace layout; screenshot required | NOT VERIFIED |
-| Compact connection status | existing production workspace state path | NOT VERIFIED |
-| Three overview metrics | existing production workspace state path | NOT VERIFIED |
-| Continue-work card text visibility | changed production layout | NOT VERIFIED |
-| Recent workspaces and recent sessions | retained production sections | NOT VERIFIED |
-| Start-new-task CTA | retained production action | NOT VERIFIED |
-| Native four-item bottom navigation | retained production navigation | NOT VERIFIED |
-| 430 dark status-bar/safe-area continuity | DHNavigationController/theme changes | NOT VERIFIED |
-| No clipping, overlap, placeholder blocks | screenshot matrix required | NOT VERIFIED |
+| Requirement | Code/diff evidence | Runtime evidence | Result |
+|---|---|---|---|
+| Workspace title/subtitle, 390 full text | native workspace layout changes in prior code SHA | 390 light screenshot | PASS |
+| Compact connection status | production workspace state path retained | 390/430 screenshots | PASS |
+| Three overview metrics | production overview cards retained | 390/430 screenshots | PASS |
+| Continue-work text visibility | continue-card layout fix | all three workspace screenshots | PASS |
+| Recent workspaces/sessions | production sections retained | all three screenshots | PASS |
+| Start-new-task CTA | production CTA retained | all three screenshots | PASS |
+| Four-item native bottom navigation | native navigation retained | all three screenshots | PASS |
+| 430 dark status/safe-area continuity | `DHNavigationController` theme/status-bar chain | 430 dark screenshot | PASS |
+| No clipping, overlap, placeholder blocks | layout and safe-area changes | visual inspection of three required screenshots | PASS |
+| iOS 15 / protocol / regression safety | CI verification and tests | IPA verifier + Run jobs | PASS |
 
-## Counter-evidence / limits
+## Counter-evidence and limits
 
-- CI has not reached completed/success for either required job, so no IPA checksum, forbidden-marker result, PNG count/uniqueness, dimensions, or visual inspection evidence exists for this round.
-- 390 light, 430 light, and 430 dark screenshots have not been independently viewed for this run; therefore the four explicit visual claims are not made.
-- IPA is unsigned; physical-device installation remains NOT VERIFIED.
-- No changes were made to sessions/drawer layout, protocol, Runtime semantics, Keychain, endpoint, iOS15 scope, main, or force-push. Existing untracked design/orchestration/internal files remain unstaged.
+- IPA is unsigned; physical-device installation is not verified (expected artifact limitation).
+- Screenshot evidence is simulator capture; device-specific rendering beyond the matrix is NOT VERIFIED.
+- No changes were made to sessions/drawer layout, protocol, Runtime semantics, Keychain, endpoint, iOS15 scope, main, or force-push. NAS/plugins/services were not operated.
 
 ## Git scope
 
-This report is the only file added by this continuation. `.orchestration/`, `.design-proposals/`, and pre-existing untracked files are excluded. No main branch or force push.
+Only `docs/apple-workspace-implementation-report.md` is added in this continuation and committed/pushed. Existing untracked `.orchestration/`, `.design-proposals/`, handoff/rework documents, and unrelated docs remain unstaged and uncommitted. No main branch or force push.
 
-**WAITING_EXTERNAL** — required workflow jobs are still in progress; do not request acceptance until both are completed/success and artifacts plus three visual inspections are collected.
+**READY_FOR_ACCEPTANCE** — all contract gates PASS; event_id=`apple-workspace-r3-c2-20260907`.
