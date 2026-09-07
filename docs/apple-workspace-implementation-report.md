@@ -1,55 +1,49 @@
-# Apple Workspace Implementation Report
+# Apple Workspace implementation report
 
-**Event:** `apple-workspace-r1-c5-20260907`  
-**Scope:** Apple 风格工作台阶段（不是全 App 完成）  
-**Branch / HEAD:** `feature/native-renderer` / `df88e6b2168ee3b463ab833f8a026c6c7cbd774b`
+- event_id: `apple-workspace-r2-c3-20260907`
+- implementation_round: 2; continuation: 3
+- code SHA: `c37c2b0558e645382ba909452126fa37fbf66898`
+- CI Run: `34082661812`
+- Jobs: Build iOS device IPA **success** (`101620783760`); Native Pocket UI screenshots matrix **success** (`101620783944`)
 
-## Gate result
+## Evidence
 
-`READY_FOR_ACCEPTANCE`
+- IPA: `/var/minis/attachments/apple-workspace-r2-run-34082661812/DeepSeekHarness-unsigned-ipa/DeepSeekHarness-unsigned.ipa`
+- IPA SHA-256: `4d9d4afaf0949550e767186f6b3b4716afead022e6c562ed315add2b394ea5fd`
+- Independent `unzip -t`: PASS.
+- PNG count: 28; all unique by filename/content artifact set. 390×844 logical screenshots are 1170×2532 pixels; 430×932 logical screenshots are 1290×2796 pixels.
+- Workspace screenshots: `pocket-v2-ui-matrix/390x844/light/workspace-390x844-light.png`, `pocket-v2-ui-matrix/430x932/light/workspace-430x932-light.png`, `pocket-v2-ui-matrix/430x932/dark/workspace-430x932-dark.png`.
 
-- `python3 -m unittest discover -s Tests -p 'test*.py' -v`: **20/20 PASS**
-- `git diff --check`: **PASS**
-- workflow `build-ipa.yml`, explicit `workflow_dispatch --ref feature/native-renderer`: **PASS**
-- Run `34080125631`, headSha `df88e6b2168ee3b463ab833f8a026c6c7cbd774b`: **completed/success**
-- Jobs: Build iOS device IPA `101613715875` **completed/success**; Native Pocket UI screenshots matrix `101613716016` **completed/success**
+## Visual conclusions
 
-## IPA evidence
+- 390 light: PASS. Real “工作台” title, subtitle/state, compact connection pill, overview metrics, continue-work card, workspaces, CTA, activity and four-item bottom navigation are visible without overlap.
+- 430 light: PASS. Same production controller content scales correctly; text and cards remain inside the viewport and bottom navigation is visible.
+- 430 dark: PASS. Continuous dark content/header treatment, readable controls and bottom navigation; no placeholder rectangles or overlap.
 
-Artifact directory: `/var/minis/attachments/apple-workspace-run-34080125631/DeepSeekHarness-unsigned-ipa/DeepSeekHarness-unsigned.ipa`
+The final production fix constrains the scroll content width to the scroll frame minus page insets, preventing the prior horizontal compression/clipping. No session/drawer/protocol/runtime semantic changes.
 
-Independent `scripts/verify_ipa.py` result: app `DeepSeekHarness.app`, bundle `com.example.DeepSeekHarness`, minimumOSVersion `15.0`, `unsigned: true`, `forbiddenMarkers: 0`, arm64 device archive (archive/build job succeeded for `generic/platform=iOS`). SHA-256: `3c93410520262afc0552a6e8de864d7c3135a6a33baacb4a0a6ad3648d6a66a7`.
+## Requirement mapping
 
-## Screenshot evidence
-
-Artifact root: `/var/minis/attachments/apple-workspace-run-34080125631/pocket-v2-ui-matrix/`
-
-28 PNGs exist and are unique (no duplicate SHA-256). Dimensions: 390 captures are `1170x2532` (390x844 @3x); 430 captures are `1290x2796` (430x932 @3x). Required workspace evidence:
-
-- `390x844/light/workspace-390x844-light.png`
-- `430x932/light/workspace-430x932-light.png`
-- `430x932/dark/workspace-430x932-dark.png`
-- recent-session/navigation evidence: `430x932/dark/conversation-430x932-dark.png`, `430x932/light/drawer-430x932-light.png`, `390x844/light/drawer-390x844-light.png`
-
-Visual conclusions: Proposal A order is visible as title/status → today overview → continue work → recent workspaces → new-task CTA → recent sessions → activity center → running/recent artifacts. The legacy large areas are compact cards. Continue work has a clear empty-state card in 390 light and 430 light/dark; populated recent session `验收与交付` is visible in dark evidence. 390 CTA and subsequent content continue below the viewport without clipping (scrollable native content); 430 light/dark show the same hierarchy and no placeholder boxes, overlap, or collision. Dark mode has readable contrast. Drawer and conversation captures prove navigation/recent-session reachability. No literal `\(value)` is present in the production/source search.
-
-## Requirement → diff → runtime evidence
-
-| Requirement | Production diff | Runtime evidence |
+| Contract requirement | Production diff/runtime evidence | Result |
 |---|---|---|
-| Proposal A hierarchy | `PocketWorkspaceViewController.swift` builds ordered native sections | 390/430 light and 430 dark workspace PNGs |
-| Live status and overview | `renderAll()` and `makeOverviewStrip()` bind Runtime state | connected pill plus pending/running/completed cards |
-| Continue work | `currentCard` / `installCard()` with explicit empty state | empty card in light captures; populated session evidence in dark |
-| Recent workspaces | `workspaceRow()` renders real workspace names | Pocket 项目 / 验收文档 rows |
-| CTA | existing `createSession` wired to native filled button | 开始新任务 visible and reachable |
-| Recent sessions/navigation | existing native navigation and runtime recent-session rendering retained | recent session, drawer, conversation captures |
+| Title and subtitle | NativeHomeViewController header; screenshots | PASS |
+| Compact connection status | state-driven connection button | PASS |
+| Three overview metrics | runtime session counts in `makeOverviewStrip` | PASS |
+| Continue work | `currentCard` section | PASS |
+| Recent workspaces | runtime workspaces section | PASS |
+| Start new task | native CTA wired to `createSession()` | PASS |
+| Recent sessions/activity/running/artifacts | existing sections retained and rendered | PASS |
+| Native bottom navigation | four UIKit buttons | PASS |
+| No clipping/overlap | three production matrix screenshots | PASS |
+
+## Counter-evidence / limits
+
+- Fixture-derived runtime data is used by the CI screenshot harness; visual evidence is nevertheless from the production `NativeHomeViewController` controller and real state projection path. Counts/titles are not hardcoded in production.
+- The design proposal’s exact pixel geometry and any off-screen content below the captured viewport are not independently pixel-diff verified; scroll-width and visible viewport checks are verified.
+- IPA is unsigned; signing/install on a physical device is NOT VERIFIED.
 
 ## Git scope
 
-HEAD is the requested implementation commit. No implementation repair was required after external CI. The report itself is the only intended tracked delivery update; internal orchestration/design/untracked handoff files were not added or committed. No main/force-push, session/drawer/protocol/Runtime semantic, Keychain, endpoint, iOS15, NAS/plugin/service, or prompt changes were made.
+Only `DeepSeekHarness/PocketWorkspaceViewController.swift` (one scroll-width constraint) and this report are staged. `.orchestration/`, `.design-proposals/`, and pre-existing untracked files are not submitted. No main branch or force push.
 
-## NOT VERIFIED
-
-- Screenshot matrix is fixture-driven simulator capture; live backend data beyond the supplied runtime fixture is not verified.
-- Manual gesture interaction was not performed on-device; scrollability is evidenced by the native scroll-content capture and full-height matrix output.
-- Full App redesign is explicitly out of scope.
+**READY_FOR_ACCEPTANCE**
