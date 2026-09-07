@@ -4,7 +4,7 @@ ROOT="${GITHUB_WORKSPACE:-$(pwd)}"
 BUNDLE_ID="com.example.DeepSeekHarness"
 DEVICE="iPhone 14"
 RUNTIME="18.2"
-CMD_TIMEOUT="${SIMCTL_TIMEOUT_SECONDS:-45}"
+CMD_TIMEOUT="${SIMCTL_TIMEOUT_SECONDS:-180}"
 run_timeout() { perl -e 'alarm shift; exec @ARGV' "$CMD_TIMEOUT" "$@"; }
 find_udid() {
   local name="$1"
