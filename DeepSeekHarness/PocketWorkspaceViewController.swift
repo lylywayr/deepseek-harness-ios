@@ -27,6 +27,7 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
     private let activityButton = UIButton(type: .system)
     private let connectionButton = UIButton(type: .system)
     private let titleLabel = UILabel()
+    private let subtitleLabel = UILabel()
     private let stateLabel = UILabel()
     private let currentCard = UIView()
     private let pendingSection = UIStackView()
@@ -144,7 +145,10 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
         titleLabel.text = "工作台"
         titleLabel.font = DHTheme.font(.title3, weight: .bold)
         titleLabel.textColor = DHTheme.text
-        let identity = UIStackView(arrangedSubviews: [titleLabel, stateLabel])
+        subtitleLabel.text = "你的 Harness 工作空间"
+        subtitleLabel.font = DHTheme.font(.caption1)
+        subtitleLabel.textColor = DHTheme.secondaryText
+        let identity = UIStackView(arrangedSubviews: [titleLabel, subtitleLabel, stateLabel])
         identity.axis = .vertical; identity.spacing = 2
         top.addArrangedSubview(logo); top.addArrangedSubview(identity); top.addArrangedSubview(UIView())
         configurePill(connectionButton, title: "连接中", icon: "circle.fill", color: DHTheme.success)
