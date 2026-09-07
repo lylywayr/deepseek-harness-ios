@@ -1,13 +1,44 @@
-# Apple Conversation Proposal A Implementation
+# Apple Conversation 阶段实现报告
 
-## Requirement → production diff → runtime evidence
-- Title/workspace/status hierarchy: `PocketConversationViewController.swift` adds a three-line native header with workspace path and live run state.
-- Four modes: existing segmented control remains wired to transcript/process/trajectory/artifact data and paging/filtering.
-- Explicit task configuration: native configuration summary card renders model, reasoning, permission, attachment count, and Queue/Steer state; controls remain connected to existing runtime methods.
-- Continuous content and runtime controls: existing table stream, follow-scroll, stop/send, approvals/questions and Markdown cells remain wired; composer is multiline and attached to `keyboardLayoutGuide`.
-- Frozen boundaries: no protocol, network, mux, keychain, endpoint, model, auth, workspace/drawer, or iOS deployment changes.
+> 本报告仅覆盖“全 App 方案 A”的会话页阶段，不宣称全 App 已完成。工作树：`/var/minis/workspace/deepseek-harness-apple-conversation`；分支：`feature/apple-conversation`。
 
-## Validation
-- `git diff --check`: PASS.
-- Source-only structural review: PASS; no WebKit/SwiftUI/legacy additions.
-- CI/artifact/visual evidence: pending external workflow dispatch and device artifact collection.
+## 交付与版本
+- production implementation SHA（本阶段代码基线）：`5fe21206c80ee6683ae1848c228fd4668844bfee`（`fix: declare conversation status button`）。后续仅恢复三个既有校验脚本 executable mode 的修复提交：`36a4912...`；未改变脚本文本。
+- Run：`34076951642`；记录为两个 Job success（本地无法替代 CI 详情）。
+- 分支已推送：`origin/feature/apple-conversation` 指向 `36a4912`。
+- IPA：`/var/minis/attachments/apple-conversation-run-34076951642/DeepSeekHarness-unsigned-ipa/DeepSeekHarness-unsigned.ipa`
+- 独立执行 `python3 scripts/verify_ipa.py <IPA>` 原始 JSON：
+```json
+{"app":"DeepSeekHarness.app","bundleIdentifier":"com.example.DeepSeekHarness","forbiddenMarkers":0,"ipa":"/var/minis/attachments/apple-conversation-run-34076951642/DeepSeekHarness-unsigned-ipa/DeepSeekHarness-unsigned.ipa","minimumOSVersion":"15.0","sha256":"d0f317729d965417eb878ac48206a95dd1979b5ad8616bd8da15cb4e52a32994","unsigned":true}
+```
+结论：SHA、bundle、arm64（IPA 内二进制为 iOS app；需以 verifier 输出为准）、MinimumOSVersion 15.0、unsigned、forbiddenMarkers=0 均满足。
+
+## requirement → production diff → runtime evidence
+1. 标题/工作区/状态副标题 → `PocketConversationViewController.swift` 原生三层 header → **runtime NOT VERIFIED**（截图文件缺失）。
+2. 对话/过程/轨迹/产物四模式 → 原 segmented control 及 transcript/process/trajectory/artifact 数据路径 → **runtime NOT VERIFIED**。
+3. 紧凑配置面板 → model/provider、reasoning、permission、attachment count、Queue/Steer → **runtime NOT VERIFIED**。
+4. 连续内容流 → 原生 table stream、follow-scroll、approval/question/Markdown cells → **runtime NOT VERIFIED**。
+5. 运行状态/停止/底部多行输入 → stop/send 与 multiline composer、`keyboardLayoutGuide` → **runtime NOT VERIFIED**。
+6. 键盘态稳定 → 390×844 keyboard 指定截图应验证无遮挡、裁切、重叠 → **NOT VERIFIED**。
+
+## 指定视觉证据
+契约要求四张：390 light、430 light、430 dark、390 keyboard 会话页。当前 artifact 目录只有：
+- `pocket-v2-ui-matrix/manifest.txt`
+- `DeepSeekHarness-unsigned-ipa/DeepSeekHarness-unsigned.ipa`
+
+manifest 明确列出 `conversation|390x844|light`、`conversation|430x932|light`、`conversation|430x932|dark`、`keyboard|390x844|light`，但对应 PNG/JPEG 截图不存在；因此无法实际打开检查输入区、控制台、键盘遮挡、裁切或重叠，也无法完成逐区视觉对照。430 light 同样未能打开。
+
+## 截图统计与唯一性
+执行：`find /var/minis/attachments/apple-conversation-run-34076951642 -type f | sort`。实际文件总数为 2（IPA 与 manifest），视觉截图数为 0；尺寸统计与 SHA/唯一性统计无法对截图执行，结论 **NOT VERIFIED**。manifest 是清单而非视觉证据，不能替代截图。
+
+## 设计稿对照与反证
+代码结构与契约要求的 header、四模式、配置摘要、连续流、运行控制、多行 composer/keyboardLayoutGuide 对应关系已记录于上方；但没有运行时截图，不能证明颜色、文案、布局密度、keyboard 安全区和设计稿 `conversation.png` 的像素/区域一致。CI 成功、旧功能存在及源码结构审查均不能单独证明会话页完成。
+
+## Git 范围与边界
+- 生产代码范围限会话页阶段；未修改工作台/抽屉、协议、Runtime 业务语义、Keychain、endpoint、数据模型、iOS 15 deployment。
+- 未提交设计稿、内部状态或 mode 内容差异。
+- 三个脚本只发生 executable mode 往返修复；当前本地文件系统仍报告 mode-only 工作树差异（内容无差异），需在验收环境按 Git index 复核，不应把其视为生产代码变更。
+- 尚待：工作台、抽屉、关联页及全 App 集成，均不属于本阶段交付。
+
+## 验收结论
+`NOT_READY`。event_id：`apple-conversation-r1-c2-20260907`。IPA 独立复核 PASS；分支已推送；但四张指定视觉证据实际缺失，390 keyboard 与 430 light 无法检查，截图统计/唯一性/运行时证据未完成。不能返回 `READY_FOR_ACCEPTANCE`。
