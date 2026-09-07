@@ -36,6 +36,7 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
     private let recentSection = UIStackView()
     private let workspacesSection = UIStackView()
     private let emptyLabel = UILabel()
+    private let bottomNavigation = UIStackView()
     private var artifactSection: UIView?
 
     init(appState: AppState, nativeUIStore: NativeUIStore, transport: NativeUITransport, runtime: HarnessRuntime? = nil, onSettings: @escaping (HarnessRuntime) -> Void) {
@@ -53,6 +54,8 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = DHTheme.background
+        overrideUserInterfaceStyle = .unspecified
+        setNeedsStatusBarAppearanceUpdate()
         buildRoot()
         buildDrawer()
         runtime = runtimeOverride ?? HarnessRuntime(baseURL: appState.endpointURL!)
@@ -130,15 +133,36 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
         content.spacing = DHTheme.sectionSpacing
         content.translatesAutoresizingMaskIntoConstraints = false
         rootScroll.addSubview(content)
+        bottomNavigation.axis = .horizontal
+        bottomNavigation.distribution = .fillEqually
+        bottomNavigation.alignment = .center
+        bottomNavigation.translatesAutoresizingMaskIntoConstraints = false
+        bottomNavigation.backgroundColor = DHTheme.surface
+        bottomNavigation.layer.borderColor = DHTheme.separator.cgColor
+        bottomNavigation.layer.borderWidth = 1
+        view.addSubview(bottomNavigation)
+
         NSLayoutConstraint.activate([
-            rootScroll.leadingAnchor.constraint(equalTo: view.leadingAnchor), rootScroll.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            rootScroll.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor), rootScroll.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            rootScroll.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            rootScroll.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            rootScroll.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            rootScroll.bottomAnchor.constraint(equalTo: bottomNavigation.topAnchor),
             content.leadingAnchor.constraint(equalTo: rootScroll.contentLayoutGuide.leadingAnchor, constant: DHTheme.pageHorizontal),
             content.trailingAnchor.constraint(equalTo: rootScroll.contentLayoutGuide.trailingAnchor, constant: -DHTheme.pageHorizontal),
             content.topAnchor.constraint(equalTo: rootScroll.contentLayoutGuide.topAnchor, constant: 8),
-            content.bottomAnchor.constraint(equalTo: rootScroll.contentLayoutGuide.bottomAnchor, constant: 12),
-            content.widthAnchor.constraint(equalTo: rootScroll.frameLayoutGuide.widthAnchor, constant: -DHTheme.pageHorizontal * 2)
+            content.bottomAnchor.constraint(equalTo: rootScroll.contentLayoutGuide.bottomAnchor, constant: 12)
         ])
+        NSLayoutConstraint.activate([
+            bottomNavigation.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            bottomNavigation.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            bottomNavigation.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+            bottomNavigation.heightAnchor.constraint(equalToConstant: 56)
+        ])
+        let navItems: [(String, String, () -> Void)] = [("工作台", "square.grid.2x2", {}), ("会话", "bubble.left.and.bubble.right", { [weak self] in self?.showConversation() }), ("活动", "bell", { [weak self] in self?.showActivityCenter() }), ("设置", "gearshape", { [weak self] in guard let self else { return }; self.onSettings(self.runtime) })]
+        navItems.forEach { title, icon, action in
+            let button = UIButton(type: .system); button.setTitle(title, for: .normal); button.setImage(UIImage(systemName: icon), for: .normal); button.configuration = .plain(); button.configuration?.imagePlacement = .top; button.configuration?.imagePadding = 2; button.configuration?.baseForegroundColor = DHTheme.secondaryText; button.titleLabel?.font = DHTheme.font(.caption2); button.addAction(UIAction { _ in action() }, for: .touchUpInside); button.accessibilityLabel = title; bottomNavigation.addArrangedSubview(button)
+        }
+        view.addSubview(bottomNavigation)
 
         let top = UIStackView()
         top.axis = .horizontal; top.alignment = .center; top.spacing = 10
@@ -230,9 +254,10 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
         view.dhApplyCard(backgroundColor: color, cornerRadius: DHTheme.cornerMedium, borderColor: DHTheme.separator.withAlphaComponent(0.25))
         let row = UIStackView(); row.axis = .horizontal; row.spacing = 8; row.alignment = .center
         let mark = dhIconView(systemName: icon, size: 28, symbolSize: 13)
+        mark.accessibilityLabel = "继续工作状态"
         let labels = UIStackView(); labels.axis = .vertical; labels.spacing = 1
-        let t = UILabel(); t.text = title; t.font = DHTheme.font(.subheadline, weight: .semibold); t.textColor = DHTheme.text; t.numberOfLines = 2
-        let s = UILabel(); s.text = subtitle; s.font = DHTheme.font(.caption2); s.textColor = DHTheme.secondaryText; s.numberOfLines = 2
+        let t = UILabel(); t.text = title; t.font = DHTheme.font(.subheadline, weight: .semibold); t.textColor = DHTheme.text; t.numberOfLines = 0; t.setContentCompressionResistancePriority(.required, for: .horizontal)
+        let s = UILabel(); s.text = subtitle; s.font = DHTheme.font(.caption2); s.textColor = DHTheme.secondaryText; s.numberOfLines = 0; s.setContentCompressionResistancePriority(.required, for: .horizontal)
         labels.addArrangedSubview(t); labels.addArrangedSubview(s); row.addArrangedSubview(mark); row.addArrangedSubview(labels); row.addArrangedSubview(UIImageView(image: UIImage(systemName: "chevron.right"))); view.addSubview(row)
         NSLayoutConstraint.activate([row.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 11), row.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -11), row.topAnchor.constraint(equalTo: view.topAnchor, constant: 7), row.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -7)])
     }
