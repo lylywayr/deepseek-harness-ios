@@ -72,7 +72,7 @@ jobs:
         run: |
           set -euo pipefail
           chmod +x scripts/capture_native_ui.sh
-          SIMCTL_TIMEOUT_SECONDS=45 scripts/capture_native_ui.sh
+          SIMCTL_TIMEOUT_SECONDS=180 scripts/capture_native_ui.sh
       - name: Validate Pocket screenshot artifacts
         run: |
           set -euo pipefail
