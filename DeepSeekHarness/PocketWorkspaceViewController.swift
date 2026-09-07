@@ -36,7 +36,6 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
     private let emptyLabel = UILabel()
     private var artifactSection: UIView?
     private let bottomNavigation = AppleBottomNavigationView()
-    private let bottomNavigation = AppleBottomNavigationView()
 
     init(appState: AppState, nativeUIStore: NativeUIStore, transport: NativeUITransport, runtime: HarnessRuntime? = nil, onSettings: @escaping (HarnessRuntime) -> Void) {
         self.appState = appState
