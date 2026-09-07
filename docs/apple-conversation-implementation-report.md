@@ -41,10 +41,21 @@ manifest 明确列出 `conversation|390x844|light`、`conversation|430x932|light
 - 尚待：工作台、抽屉、关联页及全 App 集成，均不属于本阶段交付。
 
 ## 验收结论
-`NOT_READY`。event_id：`apple-conversation-r1-c2-20260907`。IPA 独立复核 PASS；分支已推送；但四张指定视觉证据实际缺失，390 keyboard 与 430 light 无法检查，截图统计/唯一性/运行时证据未完成。不能返回 `READY_FOR_ACCEPTANCE`。
 
 
-## implementation_round=1 continuation=4 验证（2026-09-07）
+## implementation_round=1 continuation=6 外部收尾（2026-09-07）
+- event_id：`apple-conversation-r1-c6-20260907`
+- 最终 HEAD：`988da5de2b2ab03c0a875d5437e54933e3a2c233`；Run `34080049092`，headSha 同上；两个 Job 均 completed/success：Build iOS device IPA（101613504556）、Native Pocket UI screenshots matrix（101613504683）。
+- 截图附件目录：`/var/minis/attachments/apple-conversation-run-34080049092/`。实际 PNG 共 28 张，390 截图尺寸 1170×2532，430 截图尺寸 1290×2796；SHA-256 唯一数 28/28。`python3 scripts/verify_screenshot_artifacts.py .../pocket-v2-ui-matrix`：PASS（28 PNGs、dimensions valid、keyboard raster gate passed）。
+- IPA：`/var/minis/attachments/apple-conversation-run-34080049092/DeepSeekHarness-unsigned-ipa/DeepSeekHarness-unsigned.ipa`。独立 `verify_ipa.py`：PASS；SHA-256 `5a6576287d360df57dcc7ce404f2b2367a1ec028910078d4ea2c65fe43925fdd`；arm64 由 device IPA 构建门禁通过；MinimumOSVersion `15.0`；unsigned `true`；forbiddenMarkers `0`。
+- 实际视觉抽查：390 light、430 light、430 dark 会话页均显示同一原生会话结构，无旧式回退，header/四模式/配置摘要/连续内容流/底部 composer 可见，未见明显裁切、遮挡或重叠。390 keyboard 输入区保持在键盘上方且未重叠；但截图仍显示系统首次键盘 onboarding 文案 `Speed up your typing... Continue`，未能看到真实键盘按键，因此键盘“真实按键且无 onboarding”验收项 NOT VERIFIED。
+- 设计稿逐区对照：header（标题、工作区/状态）、四模式、配置摘要、连续流、运行控制与 composer 均与方案 A 对应；真实键盘按键区因 onboarding 覆盖无法完成对照。反证：artifact validator 通过不等于按键可见；CI success、IPA verifier 与源码结构不能替代该运行时证据。
+- Git 范围：仅会话页实现及截图流程范围内必要门禁/脚本变更；未修改工作台、抽屉、生产会话 UI 之外页面、协议、Runtime 业务语义、Keychain、endpoint、数据模型或 main；未提交内部报告与设计稿。报告本身随本提交更新。
+- 本阶段准确范围：只完成全 App 方案 A 的会话页阶段；工作台、抽屉、关联页及全 App 集成不在本阶段。
+
+## 验收结论
+`NOT_READY`。原因仅为 390 keyboard 仍有系统 onboarding，真实键盘按键未验证；其余 Run/Jobs、28/28 PNG、截图验证、IPA 验证和视觉抽查均 PASS。可续作状态：在截图流程中完成/关闭 simulator 键盘首次使用引导后重新触发 Run，并保持同一验收门禁。
+
 - event_id：`apple-conversation-r1-c4-20260907`
 - 基线核对：HEAD `b563743dffaaacdb7ee358af2e77aa855a84c46b`；diff 仅 `.github/workflows/build-ipa.yml` 的截图 artifact 校验/上传路径变更，无 UI、工作台/抽屉/协议改动。
 - 本地门禁：`python3 -m unittest discover -s Tests -p 'test_*.py' -v`：16 tests，全部 PASS；fixture/rework 静态门禁全部 PASS；`git diff --check` PASS。
