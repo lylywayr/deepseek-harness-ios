@@ -167,6 +167,7 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
         content.addArrangedSubview(sectionHeading("继续工作", icon: "arrow.forward.circle"))
         currentCard.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([currentCard.heightAnchor.constraint(greaterThanOrEqualToConstant: 66)])
+        content.addArrangedSubview(currentCard)
         content.addArrangedSubview(makeSection("需要你处理", stack: pendingSection, icon: "exclamationmark.bubble"))
         content.addArrangedSubview(makeSection("运行中", stack: runningSection, icon: "bolt.fill"))
         content.addArrangedSubview(makeSection("最近工作", stack: recentSection, icon: "clock"))
