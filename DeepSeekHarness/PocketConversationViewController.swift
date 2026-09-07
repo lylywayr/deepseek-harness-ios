@@ -18,7 +18,9 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
     private let backButton = UIButton(type: .system)
     private let drawerButton = UIButton(type: .system)
     private let titleLabel = UILabel()
-    private let stateButton = UIButton(type: .system)
+    private let workspaceLabel = UILabel()
+    private let configPanel = UIView()
+    private let configSummaryLabel = UILabel()
     private let settingsButton = UIButton(type: .system)
     private let modeControl = UISegmentedControl(items: ["对话", "过程", "轨迹", "产物"])
     private let processControls = UIView()
@@ -136,8 +138,12 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
         stateButton.addTarget(self, action: #selector(showStatus), for: .touchUpInside)
         let left = UIStackView(arrangedSubviews: [backButton, drawerButton])
         left.axis = .horizontal; left.spacing = 0
-        let center = UIStackView(arrangedSubviews: [titleLabel, stateButton])
+        let center = UIStackView(arrangedSubviews: [titleLabel, workspaceLabel, stateButton])
         center.axis = .vertical; center.spacing = 1; center.alignment = .leading
+        workspaceLabel.font = DHTheme.font(.caption2, weight: .medium)
+        workspaceLabel.textColor = DHTheme.secondaryText
+        workspaceLabel.text = "工作区 · 状态"
+        workspaceLabel.numberOfLines = 1
         let row = UIStackView(arrangedSubviews: [left, center, UIView(), settingsButton])
         row.axis = .horizontal; row.alignment = .center; row.spacing = 6; row.translatesAutoresizingMaskIntoConstraints = false
         topBar.addSubview(row)
@@ -155,9 +161,21 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
         modeControl.addTarget(self, action: #selector(modeChanged), for: .valueChanged)
         modeControl.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(modeControl)
+        configPanel.translatesAutoresizingMaskIntoConstraints = false
+        configPanel.dhApplyCard(backgroundColor: DHTheme.surface, cornerRadius: DHTheme.cornerSmall, borderColor: DHTheme.separator.withAlphaComponent(0.5), shadow: false)
+        view.addSubview(configPanel)
+        configSummaryLabel.font = DHTheme.font(.caption1, weight: .medium)
+        configSummaryLabel.textColor = DHTheme.secondaryText
+        configSummaryLabel.numberOfLines = 1
+        configSummaryLabel.translatesAutoresizingMaskIntoConstraints = false
+        configPanel.addSubview(configSummaryLabel)
         NSLayoutConstraint.activate([
             modeControl.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16), modeControl.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            modeControl.topAnchor.constraint(equalTo: topBar.bottomAnchor, constant: 8), modeControl.heightAnchor.constraint(greaterThanOrEqualToConstant: 36)
+            modeControl.topAnchor.constraint(equalTo: topBar.bottomAnchor, constant: 8), modeControl.heightAnchor.constraint(greaterThanOrEqualToConstant: 36),
+            configPanel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12), configPanel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
+            configPanel.topAnchor.constraint(equalTo: modeControl.bottomAnchor, constant: 8), configPanel.heightAnchor.constraint(equalToConstant: 38),
+            configSummaryLabel.leadingAnchor.constraint(equalTo: configPanel.leadingAnchor, constant: 12), configSummaryLabel.trailingAnchor.constraint(equalTo: configPanel.trailingAnchor, constant: -12),
+            configSummaryLabel.centerYAnchor.constraint(equalTo: configPanel.centerYAnchor)
         ])
     }
 
@@ -182,7 +200,7 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
         processControls.addSubview(processSearch)
         NSLayoutConstraint.activate([
             processControls.leadingAnchor.constraint(equalTo: view.leadingAnchor), processControls.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            processControls.topAnchor.constraint(equalTo: modeControl.bottomAnchor, constant: 6), processControlsHeight,
+            processControls.topAnchor.constraint(equalTo: configPanel.bottomAnchor, constant: 6), processControlsHeight,
             buttons.leadingAnchor.constraint(equalTo: processControls.leadingAnchor, constant: 10), buttons.trailingAnchor.constraint(equalTo: processControls.trailingAnchor, constant: -10),
             buttons.topAnchor.constraint(equalTo: processControls.topAnchor, constant: 3), buttons.heightAnchor.constraint(equalToConstant: 34),
             processSearch.leadingAnchor.constraint(equalTo: processControls.leadingAnchor, constant: 6), processSearch.trailingAnchor.constraint(equalTo: processControls.trailingAnchor, constant: -6),
@@ -327,6 +345,8 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
             permissionButton.accessibilityLabel = "权限：\(permissionName(session.permission))"
         } else { titleLabel.text = "Harness Pocket" }
         status.text = [runtime.lastError ?? runtime.statusText, runtime.currentStage.map { "阶段：\($0)" }, runtime.isGenerating ? "运行中" : nil].compactMap { $0 }.joined(separator: " · ")
+        workspaceLabel.text = [runtime.contextDirectory.map { "工作区：\($0)" }, runtime.isGenerating ? "运行中" : "空闲"].compactMap { $0 }.joined(separator: " · ")
+        configSummaryLabel.text = [modelButton.configuration?.title, reasoningButton.configuration?.title, permissionButton.accessibilityLabel, images.isEmpty ? "附件 0" : "附件 \(images.count)", selectedSendMode == "steer" ? "Steer" : "Queue"].compactMap { $0 }.joined(separator: "  ·  ")
         reasoningButton.configuration?.title = runtime.reasoningEffort.map { "推理 \($0)" } ?? "推理"
         status.textColor = runtime.lastError == nil ? DHTheme.secondaryText : DHTheme.danger
         stateButton.configuration?.title = runtime.pendingApprovals.isEmpty && runtime.pendingQuestions.isEmpty ? (runtime.isGenerating ? "运行中" : "状态") : "待处理"
