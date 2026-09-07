@@ -56,13 +56,21 @@ capture() {
     xcrun simctl spawn "$UDID" log show --last 20s --style compact --predicate 'process == "DeepSeekHarness" OR composedMessage CONTAINS[c] "DeepSeekHarness"' >&2 || true
     exit 1
   fi
-  # Finish iOS Simulator's first-use keyboard glide-typing coach before any
-  # keyboard evidence. This is a real UI interaction, never image editing.
+# Finish iOS Simulator's first-use keyboard glide-typing coach before any
+# keyboard evidence. Preferences must be written before keyboardservicesd is
+# first spawned; writing after app launch is ineffective because its cfprefsd
+# cache has already been loaded. Restart the service after changing them.
+prepare_keyboard_scene() {
+  xcrun simctl spawn "$UDID" defaults write com.apple.keyboardservicesd KeyboardContinuousPathIntroductionShown -bool true || true
+  xcrun simctl spawn "$UDID" defaults write com.apple.keyboardservicesd KeyboardAutocorrectionListsShown -bool true || true
+  xcrun simctl spawn "$UDID" defaults write com.apple.keyboardservicesd KeyboardDidShowContinuousPathIntroduction -bool true || true
+  xcrun simctl spawn "$UDID" launchctl kickstart -k system/com.apple.keyboardservicesd >/dev/null 2>&1 || true
+  xcrun simctl spawn "$UDID" launchctl kickstart -k system/com.apple.TextInput >/dev/null 2>&1 || true
+  sleep 1
+}
+
   if [[ "$scene" == "keyboard" ]]; then
-    xcrun simctl spawn "$UDID" defaults write com.apple.keyboardservicesd KeyboardContinuousPathIntroductionShown -bool true || true
-    xcrun simctl spawn "$UDID" defaults write com.apple.keyboardservicesd KeyboardAutocorrectionListsShown -bool true || true
-    xcrun simctl io "$UDID" key press CMD+K >/dev/null 2>&1 || true
-    sleep 1
+    prepare_keyboard_scene
   fi
   xcrun simctl io "$UDID" screenshot "$dir/$scene-$size-$appearance.png"
   test -s "$dir/$scene-$size-$appearance.png"
