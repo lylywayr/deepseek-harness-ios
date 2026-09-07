@@ -24,8 +24,30 @@ find_udid() {
 }
 UDID="$(find_udid "$DEVICE")"
 if [[ -z "$UDID" ]]; then UDID="$(xcrun simctl create "PocketV2Fixture" com.apple.CoreSimulator.SimDeviceType.iPhone-14 com.apple.CoreSimulator.SimRuntime.iOS-18-2)"; fi
-xcrun simctl boot "$UDID" 2>/dev/null || true
-run_timeout bootstatus xcrun simctl bootstatus "$UDID" -b
+boot_simulator() {
+  local target="$1" attempt=1 status_log rc
+  # A clean shutdown avoids carrying a partially migrated CoreSimulator state.
+  xcrun simctl shutdown "$target" >/dev/null 2>&1 || true
+  xcrun simctl boot "$target" 2>/dev/null || true
+  while (( attempt <= 8 )); do
+    status_log="/tmp/pocket-bootstatus-$target.log"
+    set +e
+    run_timeout "bootstatus-$attempt" xcrun simctl bootstatus "$target" -b >"$status_log" 2>&1
+    rc=$?
+    set -e
+    cat "$status_log" >&2 || true
+    if [[ "$rc" -eq 0 ]]; then return 0; fi
+    echo "[diag] bootstatus attempt=$attempt rc=$rc" >&2
+    run_timeout "launchctl-$attempt" xcrun simctl spawn "$target" launchctl print system >"/tmp/pocket-launchctl-$target.log" 2>&1 || true
+    tail -40 "/tmp/pocket-launchctl-$target.log" >&2 || true
+    attempt=$((attempt + 1))
+    xcrun simctl shutdown "$target" >/dev/null 2>&1 || true
+    xcrun simctl boot "$target" 2>/dev/null || true
+  done
+  echo "Simulator failed to reach booted state: $target" >&2
+  return 1
+}
+boot_simulator "$UDID"
 UDID390="$UDID"
 APP_PATH="$ROOT/build/Build/Products/Debug-iphonesimulator/DeepSeekHarness.app"
 run_timeout install xcrun simctl install "$UDID" "$APP_PATH"
@@ -108,8 +130,7 @@ if [[ -z "$UDID430" ]]; then
   UDID430="$(xcrun simctl create "PocketV2Fixture430" com.apple.CoreSimulator.SimDeviceType.iPhone-15-Pro-Max com.apple.CoreSimulator.SimRuntime.iOS-18-2 2>/dev/null || true)"
 fi
 if [[ -n "$UDID430" ]]; then
-  xcrun simctl boot "$UDID430" 2>/dev/null || true
-  xcrun simctl bootstatus "$UDID430" -b
+  boot_simulator "$UDID430"
   xcrun simctl install "$UDID430" "$APP_PATH"
   UDID="$UDID430"
   for scene in workspace drawer flat conversation normal process trajectory artifacts activity settings; do capture "$scene" "430x932" "light" ""; done
@@ -118,13 +139,16 @@ if [[ -n "$UDID430" ]]; then
 else
   printf '430x932 simulator unavailable; 390x844 evidence retained\n'
 fi
-# Keyboard evidence reuses the already-booted, fully migrated devices. Creating a
-# fresh simulator here can block indefinitely in iOS data migration (the failure
-# mode this workflow must avoid). Preferences are seeded immediately before launch.
+# Evidence scenes: workspace drawer flat conversation normal process trajectory artifacts activity settings keyboard.
+# Keyboard evidence gets a clean shutdown and bounded bootstatus retry. Preferences
+# are seeded immediately before launch; this avoids migration hangs without creating
+# a fresh simulator.
 UDID="$UDID390"
+boot_simulator "$UDID"
 capture keyboard "390x844" light ""
 if [[ -n "${UDID430:-}" ]]; then
   UDID="$UDID430"
+  boot_simulator "$UDID"
   capture keyboard "430x932" light ""
 fi
 printf 'Pocket V2 screenshot matrix: %s\n' "$OUT"
