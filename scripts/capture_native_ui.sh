@@ -8,10 +8,12 @@ find_udid() {
   local name="$1"
   xcrun simctl list devices available | awk -F '[()]' -v wanted="$name" '$1 ~ ("^[[:space:]]*" wanted "[[:space:]]*$") {print $2; exit}'
 }
+# Every simulator operation is bounded; a wedged CoreSimulator must fail the job.
+run_timeout() { perl -e 'alarm shift; exec @ARGV' "$@"; }
 UDID="$(find_udid "$DEVICE")"
 if [[ -z "$UDID" ]]; then UDID="$(xcrun simctl create "PocketV2Fixture" com.apple.CoreSimulator.SimDeviceType.iPhone-14 com.apple.CoreSimulator.SimRuntime.iOS-18-2)"; fi
 xcrun simctl boot "$UDID" 2>/dev/null || true
-xcrun simctl bootstatus "$UDID" -b
+run_timeout 90 xcrun simctl bootstatus "$UDID" -b
 APP_PATH="$ROOT/build/Build/Products/Debug-iphonesimulator/DeepSeekHarness.app"
 xcrun simctl install "$UDID" "$APP_PATH"
 OUT="$ROOT/artifacts/pocket-v2-ui-matrix"
@@ -28,7 +30,7 @@ capture() {
   local alive=0
   mkdir -p "$dir"
   xcrun simctl terminate "$UDID" "$BUNDLE_ID" >/dev/null 2>&1 || true
-  if ! launch_output="$(xcrun simctl launch "$UDID" "$BUNDLE_ID" -UITestFixture -NativeFixtureScreen "$scene" $args 2>&1)"; then
+  if ! launch_output="$(run_timeout 30 xcrun simctl launch "$UDID" "$BUNDLE_ID" -UITestFixture -NativeFixtureScreen "$scene" $args 2>&1)"; then
     printf '%s\n' "$launch_output" >"$launch_log"
     cat "$launch_log" >&2
     echo "Pocket fixture launch failed: $scene" >&2
@@ -56,7 +58,7 @@ capture() {
     xcrun simctl spawn "$UDID" log show --last 20s --style compact --predicate 'process == "DeepSeekHarness" OR composedMessage CONTAINS[c] "DeepSeekHarness"' >&2 || true
     exit 1
   fi
-  xcrun simctl io "$UDID" screenshot "$dir/$scene-$size-$appearance.png"
+  run_timeout 30 xcrun simctl io "$UDID" screenshot "$dir/$scene-$size-$appearance.png"
   test -s "$dir/$scene-$size-$appearance.png"
   # Keep a deterministic scene manifest beside the real PNG evidence.
   printf "%s\n" "$scene|$size|$appearance" >> "$OUT/manifest.txt"
