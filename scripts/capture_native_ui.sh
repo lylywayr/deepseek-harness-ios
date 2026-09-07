@@ -56,9 +56,19 @@ rm -rf "$OUT"
 mkdir -p "$OUT"
 
 prepare_keyboard_scene() {
+  # Suppress the "Speed up your typing"/continuous-path onboarding card and any
+  # first-keyboard-appearance overlays so the fixture raises a real system
+  # keyboard.  The onboarding state is split across several preference domains:
+  # keyboardservicesd (observed on the 390x844 evidence) plus the keyboard
+  # preferences / continuous-path domains which gate the "Continue" card.
   run_timeout spawn xcrun simctl spawn "$UDID" defaults write com.apple.keyboardservicesd KeyboardContinuousPathIntroductionShown -bool true
   run_timeout spawn xcrun simctl spawn "$UDID" defaults write com.apple.keyboardservicesd KeyboardAutocorrectionListsShown -bool true
   run_timeout spawn xcrun simctl spawn "$UDID" defaults write com.apple.keyboardservicesd KeyboardDidShowContinuousPathIntroduction -bool true
+  run_timeout spawn xcrun simctl spawn "$UDID" defaults write com.apple.keyboard.preferences IntroductionShown -bool true
+  run_timeout spawn xcrun simctl spawn "$UDID" defaults write com.apple.keyboard.preferences DidShowContinuousPathIntroduction -bool true
+  run_timeout spawn xcrun simctl spawn "$UDID" defaults write com.apple.keyboard.preferences KeyboardContinuousPathIntroductionShown -bool true
+  run_timeout spawn xcrun simctl spawn "$UDID" defaults write com.apple.keyboard.ContinuousPath IntroductionShown -bool true
+  run_timeout spawn xcrun simctl spawn "$UDID" defaults write com.apple.keyboard.ContinuousPath DidShowContinuousPathIntroduction -bool true
   run_timeout spawn xcrun simctl spawn "$UDID" launchctl kickstart -k system/com.apple.keyboardservicesd >/dev/null 2>&1 || true
   run_timeout spawn xcrun simctl spawn "$UDID" launchctl kickstart -k system/com.apple.TextInput >/dev/null 2>&1 || true
   run_timeout sleep sleep 1
@@ -109,9 +119,23 @@ capture() {
     exit 1
   fi
   if [[ "$scene" == "keyboard" ]]; then
-    # Keyboard services are intentionally not restarted after the scene is focused:
-    # doing so can deadlock SpringBoard's screenshot request.
-    :
+    # The continuous-path ("Speed up your typing") onboarding card is a
+    # per-first-keyboard-appearance state in keyboardservicesd.  A single cold
+    # launch can race the daemon reading the seeded "IntroductionShown"
+    # preference, leaving the onboarding card visible instead of a real
+    # keyboard (observed on the 390x844 evidence).  Warm-relaunch once so the
+    # seeded preference is durable before we raise the keyboard again.
+    xcrun simctl terminate "$UDID" "$BUNDLE_ID" >/dev/null 2>&1 || true
+    prepare_keyboard_scene
+    if ! launch_output="$(run_timeout launch xcrun simctl launch "$UDID" "$BUNDLE_ID" -UITestFixture -NativeFixtureScreen "$scene" $args 2>&1)"; then
+      printf '%s\n' "$launch_output" >"$launch_log"
+      cat "$launch_log" >&2
+      echo "Pocket fixture warm relaunch failed: $scene" >&2
+      exit 1
+    fi
+    sleep 2
+    # Keyboard services are intentionally not restarted again after the warm
+    # relaunch: doing so can deadlock SpringBoard's screenshot request.
   fi
   run_timeout screenshot xcrun simctl io "$UDID" screenshot "$dir/$scene-$size-$appearance.png"
   test -s "$dir/$scene-$size-$appearance.png"
