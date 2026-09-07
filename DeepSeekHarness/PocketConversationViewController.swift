@@ -24,6 +24,7 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
     private let settingsButton = UIButton(type: .system)
     private let stateButton = UIButton(type: .system)
     private let modeControl = UISegmentedControl(items: ["对话", "过程", "轨迹", "产物"])
+    private let modeTabs = AppleConversationModeTabs()
     private let processControls = UIView()
     private let processSearch = UISearchBar()
     private let processTurns = UIButton(type: .system)
@@ -160,8 +161,12 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
         modeControl.selectedSegmentIndex = 0
         modeControl.accessibilityLabel = "内容模式：对话、过程、轨迹、产物"
         modeControl.addTarget(self, action: #selector(modeChanged), for: .valueChanged)
+        modeControl.isHidden = true
         modeControl.translatesAutoresizingMaskIntoConstraints = false
+        modeTabs.translatesAutoresizingMaskIntoConstraints = false
+        modeTabs.onSelect = { [weak self] index in self?.modeControl.selectedSegmentIndex = index; self?.modeChanged() }
         view.addSubview(modeControl)
+        view.addSubview(modeTabs)
         configPanel.translatesAutoresizingMaskIntoConstraints = false
         configPanel.dhApplyCard(backgroundColor: DHTheme.surface, cornerRadius: DHTheme.cornerSmall, borderColor: DHTheme.separator.withAlphaComponent(0.5), shadow: false)
         view.addSubview(configPanel)
@@ -171,10 +176,11 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
         configSummaryLabel.translatesAutoresizingMaskIntoConstraints = false
         configPanel.addSubview(configSummaryLabel)
         NSLayoutConstraint.activate([
-            modeControl.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16), modeControl.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            modeControl.topAnchor.constraint(equalTo: topBar.bottomAnchor, constant: 8), modeControl.heightAnchor.constraint(greaterThanOrEqualToConstant: 36),
+            modeControl.leadingAnchor.constraint(equalTo: view.leadingAnchor), modeControl.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            modeTabs.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16), modeTabs.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            modeTabs.topAnchor.constraint(equalTo: topBar.bottomAnchor, constant: 8), modeTabs.heightAnchor.constraint(equalToConstant: 38),
             configPanel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12), configPanel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
-            configPanel.topAnchor.constraint(equalTo: modeControl.bottomAnchor, constant: 8), configPanel.heightAnchor.constraint(equalToConstant: 38),
+            configPanel.topAnchor.constraint(equalTo: modeTabs.bottomAnchor, constant: 8), configPanel.heightAnchor.constraint(equalToConstant: 38),
             configSummaryLabel.leadingAnchor.constraint(equalTo: configPanel.leadingAnchor, constant: 12), configSummaryLabel.trailingAnchor.constraint(equalTo: configPanel.trailingAnchor, constant: -12),
             configSummaryLabel.centerYAnchor.constraint(equalTo: configPanel.centerYAnchor)
         ])
@@ -302,7 +308,7 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
         ]
     }
     @objc private func modifiedEnter() { sendCurrentInput(commandModified: true) }
-    @objc private func modeChanged() { mode = modeControl.selectedSegmentIndex; processControlsHeight.constant = mode == 1 || mode == 2 ? 72 : 0; processControls.isHidden = mode != 1 && mode != 2; render() }
+    @objc private func modeChanged() { mode = modeControl.selectedSegmentIndex; modeTabs.selectedIndex = mode; processControlsHeight.constant = mode == 1 || mode == 2 ? 72 : 0; processControls.isHidden = mode != 1 && mode != 2; render() }
     @objc private func toggleTurns() { showTurns.toggle(); processTurns.configuration?.image = UIImage(systemName: showTurns ? "rectangle.compress.vertical" : "rectangle.expand.vertical"); render() }
     @objc private func toggleCalls() { showCalls.toggle(); processCalls.configuration?.image = UIImage(systemName: showCalls ? "wrench.and.screwdriver" : "rectangle.expand.vertical"); render() }
     @objc private func showDuration() { let a = UIAlertController(title: "过程时长", message: "时间字段来自 Harness 事件；当前按事件实际时间显示。", preferredStyle: .actionSheet); a.addAction(UIAlertAction(title: "实际时间 ✓", style: .default)); a.addAction(UIAlertAction(title: "相对耗时", style: .default)); a.addAction(UIAlertAction(title: "取消", style: .cancel)); presentSheet(a, source: processDuration) }
@@ -584,4 +590,29 @@ private final class PocketInputTextView: UITextView {
             super.insertText(text)
         }
     }
+}
+
+
+private final class AppleConversationModeTabs: UIView {
+    var onSelect: ((Int) -> Void)?
+    var selectedIndex = 0 { didSet { updateSelection() } }
+    private let titles = ["对话", "过程", "轨迹", "产物"]
+    private var buttons: [UIButton] = []
+    private var underline: UIView!
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        let stack = UIStackView(); stack.axis = .horizontal; stack.distribution = .fillEqually; stack.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stack)
+        underline = UIView(); underline.backgroundColor = DHTheme.accent; underline.layer.cornerRadius = 1; underline.translatesAutoresizingMaskIntoConstraints = false; addSubview(underline)
+        NSLayoutConstraint.activate([stack.leadingAnchor.constraint(equalTo: leadingAnchor), stack.trailingAnchor.constraint(equalTo: trailingAnchor), stack.topAnchor.constraint(equalTo: topAnchor), stack.bottomAnchor.constraint(equalTo: bottomAnchor), underline.bottomAnchor.constraint(equalTo: bottomAnchor), underline.heightAnchor.constraint(equalToConstant: 2), underline.widthAnchor.constraint(equalTo: widthAnchor, multiplier: 0.25), underline.leadingAnchor.constraint(equalTo: leadingAnchor)])
+        for (index, title) in titles.enumerated() {
+            let button = UIButton(type: .system); button.setTitle(title, for: .normal); button.titleLabel?.font = DHTheme.font(.subheadline, weight: .semibold); button.tag = index; button.addTarget(self, action: #selector(tapped(_:)), for: .touchUpInside); button.accessibilityLabel = title; stack.addArrangedSubview(button); buttons.append(button)
+        }
+        updateSelection()
+    }
+    @available(*, unavailable) required init?(coder: NSCoder) { fatalError() }
+    @objc private func tapped(_ sender: UIButton) { selectedIndex = sender.tag; onSelect?(sender.tag) }
+    private func updateSelection() { guard !buttons.isEmpty else { return }; for (index, button) in buttons.enumerated() { button.setTitleColor(index == selectedIndex ? DHTheme.accent : DHTheme.secondaryText, for: .normal); button.accessibilityTraits = index == selectedIndex ? [.button, .selected] : [.button] }; underline.transform = CGAffineTransform(translationX: bounds.width * 0.25 * CGFloat(selectedIndex), y: 0) }
+    override func layoutSubviews() { super.layoutSubviews(); updateSelection() }
 }

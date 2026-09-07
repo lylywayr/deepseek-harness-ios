@@ -35,6 +35,8 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
     private let workspacesSection = UIStackView()
     private let emptyLabel = UILabel()
     private var artifactSection: UIView?
+    private let bottomNavigation = AppleBottomNavigationView()
+    private let bottomNavigation = AppleBottomNavigationView()
 
     init(appState: AppState, nativeUIStore: NativeUIStore, transport: NativeUITransport, runtime: HarnessRuntime? = nil, onSettings: @escaping (HarnessRuntime) -> Void) {
         self.appState = appState
@@ -51,6 +53,15 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = DHTheme.background
+        bottomNavigation.translatesAutoresizingMaskIntoConstraints = false
+        bottomNavigation.onSelect = { [weak self] destination in self?.selectBottomDestination(destination) }
+        view.addSubview(bottomNavigation)
+        NSLayoutConstraint.activate([
+            bottomNavigation.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            bottomNavigation.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            bottomNavigation.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+            bottomNavigation.heightAnchor.constraint(equalToConstant: 76)
+        ])
         buildRoot()
         buildDrawer()
         runtime = runtimeOverride ?? HarnessRuntime(baseURL: appState.endpointURL!)
@@ -62,7 +73,7 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
             conversation.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             conversation.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             conversation.view.topAnchor.constraint(equalTo: view.topAnchor),
-            conversation.view.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+            conversation.view.bottomAnchor.constraint(equalTo: bottomNavigation.topAnchor)
         ])
         conversation.didMove(toParent: self)
         conversation.view.isHidden = true
@@ -130,7 +141,7 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
         rootScroll.addSubview(content)
         NSLayoutConstraint.activate([
             rootScroll.leadingAnchor.constraint(equalTo: view.leadingAnchor), rootScroll.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            rootScroll.topAnchor.constraint(equalTo: view.topAnchor), rootScroll.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            rootScroll.topAnchor.constraint(equalTo: view.topAnchor), rootScroll.bottomAnchor.constraint(equalTo: bottomNavigation.topAnchor),
             content.leadingAnchor.constraint(equalTo: rootScroll.contentLayoutGuide.leadingAnchor, constant: DHTheme.pageHorizontal),
             content.trailingAnchor.constraint(equalTo: rootScroll.contentLayoutGuide.trailingAnchor, constant: -DHTheme.pageHorizontal),
             content.topAnchor.constraint(equalTo: rootScroll.contentLayoutGuide.topAnchor, constant: 8),
@@ -185,7 +196,7 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
             let stack = UIStackView(); stack.axis = .vertical; stack.spacing = 3; stack.translatesAutoresizingMaskIntoConstraints = false
             let top = UIStackView(); top.axis = .horizontal; top.addArrangedSubview(UIImageView(image: UIImage(systemName: icon))); top.addArrangedSubview(UIView())
             (top.arrangedSubviews.first as? UIImageView)?.tintColor = color
-            let number = UILabel(); number.text = "\\(value)"; number.font = DHTheme.font(.title2, weight: .bold); number.textColor = DHTheme.text
+            let number = UILabel(); number.text = "\(value)"; number.font = DHTheme.font(.title2, weight: .bold); number.textColor = DHTheme.text
             let label = UILabel(); label.text = title; label.font = DHTheme.font(.caption1); label.textColor = DHTheme.secondaryText
             [top, number, label].forEach(stack.addArrangedSubview); card.addSubview(stack)
             NSLayoutConstraint.activate([stack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 10), stack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -10), stack.topAnchor.constraint(equalTo: card.topAnchor, constant: 9), stack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -9)])
@@ -410,8 +421,18 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
         drawerContent.addArrangedSubview(dhButton(title: "设置", systemName: "gearshape", filled: false) { [weak self] in guard let self else { return }; self.onSettings(self.runtime) })
     }
 
-    private func showConversation() { rootScroll.isHidden = true; conversation.view.isHidden = false }
-    private func showWorkspace() { conversation.view.isHidden = true; rootScroll.isHidden = false; renderAll() }
+    private func showConversation() { bottomNavigation.selected = .conversation; rootScroll.isHidden = true; conversation.view.isHidden = false }
+    private func showWorkspace() { bottomNavigation.selected = .workspace; conversation.view.isHidden = true; rootScroll.isHidden = false; renderAll() }
+    private func selectBottomDestination(_ destination: AppleBottomNavigationView.Destination) {
+        switch destination {
+        case .workspace: showWorkspace()
+        case .conversation:
+            if let id = runtime.selectedSessionID ?? runtime.sessions.first(where: { !$0.blank })?.id { runtime.openSession(id) }
+            showConversation()
+        case .activity: showActivityCenter()
+        case .settings: onSettings(runtime)
+        }
+    }
     private func openWorkspace(_ workspace: HarnessWorkspace) { if let session = runtime.sessions.first(where: { workspace.sessionIDs.contains($0.id) }) { runtime.openSession(session.id); showConversation() } else { showDirectoryPicker() } }
     private func createSession() {
         let requested = appState.settings.defaultWorkspaceID
@@ -468,4 +489,23 @@ private extension NativeHomeViewController {
     /// Compatibility name retained for the production static gate; the actual
     /// menu is the native context drawer and never a web/legacy surface.
     func sessionMenu() { toggleDrawer() }
+}
+
+
+final class AppleBottomNavigationView: UIView {
+    enum Destination { case workspace, conversation, activity, settings }
+    var onSelect: ((Destination) -> Void)?
+    var selected: Destination = .workspace { didSet { updateSelection() } }
+    private let destinations: [(Destination, String, String)] = [(.workspace, "工作台", "house"), (.conversation, "会话", "rectangle.stack"), (.activity, "活动", "bell"), (.settings, "设置", "gearshape")]
+    private var buttons: [(UIButton, Destination)] = []
+    override init(frame: CGRect) {
+        super.init(frame: frame); backgroundColor = DHTheme.surface; layer.borderColor = DHTheme.separator.cgColor; layer.borderWidth = 0.5
+        let stack = UIStackView(); stack.axis = .horizontal; stack.distribution = .fillEqually; stack.translatesAutoresizingMaskIntoConstraints = false; addSubview(stack)
+        NSLayoutConstraint.activate([stack.leadingAnchor.constraint(equalTo: leadingAnchor), stack.trailingAnchor.constraint(equalTo: trailingAnchor), stack.topAnchor.constraint(equalTo: topAnchor, constant: 4), stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -4)])
+        for (destination, title, icon) in destinations { let b = UIButton(type: .system); b.setImage(UIImage(systemName: icon), for: .normal); b.setTitle("\n\(title)", for: .normal); b.titleLabel?.font = DHTheme.font(.caption2); b.titleLabel?.numberOfLines = 2; b.titleLabel?.textAlignment = .center; b.tag = buttons.count; b.addTarget(self, action: #selector(tapped(_:)), for: .touchUpInside); b.accessibilityLabel = title; stack.addArrangedSubview(b); buttons.append((b, destination)) }
+        updateSelection()
+    }
+    @available(*, unavailable) required init?(coder: NSCoder) { fatalError() }
+    @objc private func tapped(_ sender: UIButton) { guard buttons.indices.contains(sender.tag) else { return }; selected = buttons[sender.tag].1; onSelect?(selected) }
+    private func updateSelection() { for (button, destination) in buttons { let active = destination == selected; button.tintColor = active ? DHTheme.accent : DHTheme.secondaryText; button.setTitleColor(active ? DHTheme.accent : DHTheme.secondaryText, for: .normal); button.accessibilityTraits = active ? [.button, .selected] : [.button] } }
 }

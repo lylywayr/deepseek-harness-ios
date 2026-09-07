@@ -44,7 +44,18 @@ class ProductionSwiftContractTests(unittest.TestCase):
         self.assertIn("HarnessWire.directoryListArguments(path: path)", RUNTIME)
         self.assertIn("HarnessWire.directoryCreateArguments(path: path, name: name)", RUNTIME)
 
-    def test_endpoint_canonicalizer_is_shared_and_wired_everywhere(self) -> None:
+    def test_apple_production_layout_contract(self) -> None:
+        workspace = (ROOT / "DeepSeekHarness/PocketWorkspaceViewController.swift").read_text()
+        conversation = (ROOT / "DeepSeekHarness/PocketConversationViewController.swift").read_text()
+        fixture = (ROOT / "DeepSeekHarness/NativeFixtureViewController.swift").read_text()
+        self.assertIn('number.text = "\\(value)"', workspace)
+        self.assertNotIn('number.text = "\\\\(value)"', workspace)
+        for marker in ("AppleBottomNavigationView", "工作台", "会话", "活动", "设置"):
+            self.assertIn(marker, workspace)
+        for marker in ("AppleConversationModeTabs", "underline", "selectedIndex"):
+            self.assertIn(marker, conversation)
+        self.assertTrue(fixture.lstrip().startswith("import UIKit\n\n#if DEBUG"))
+
         self.assertIn("HarnessEndpointCanonicalizer", ENDPOINT)
         self.assertIn("HarnessEndpointCanonicalizer.canonicalize", APPSTATE)
         self.assertIn("HarnessEndpointCanonicalizer.canonicalize", RUNTIME)
