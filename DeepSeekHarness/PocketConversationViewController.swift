@@ -22,6 +22,7 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
     private let configPanel = UIView()
     private let configSummaryLabel = UILabel()
     private let settingsButton = UIButton(type: .system)
+    private let stateButton = UIButton(type: .system)
     private let modeControl = UISegmentedControl(items: ["对话", "过程", "轨迹", "产物"])
     private let processControls = UIView()
     private let processSearch = UISearchBar()
