@@ -51,6 +51,8 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
+    override var preferredStatusBarStyle: UIStatusBarStyle { traitCollection.userInterfaceStyle == .dark ? .lightContent : .darkContent }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = DHTheme.background
@@ -166,7 +168,7 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
         view.addSubview(bottomNavigation)
 
         let top = UIStackView()
-        top.axis = .horizontal; top.alignment = .center; top.spacing = 10
+        top.axis = .vertical; top.alignment = .fill; top.spacing = 8
         let logo = dhIconView(systemName: "sparkles", size: 32, symbolSize: 15)
         titleLabel.text = "工作台"
         titleLabel.font = DHTheme.font(.title3, weight: .bold)
@@ -174,18 +176,23 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
         subtitleLabel.text = "你的 Harness 工作空间"
         subtitleLabel.font = DHTheme.font(.caption1)
         subtitleLabel.textColor = DHTheme.secondaryText
+        subtitleLabel.numberOfLines = 2
         let identity = UIStackView(arrangedSubviews: [titleLabel, subtitleLabel, stateLabel])
-        identity.axis = .vertical; identity.spacing = 2
-        top.addArrangedSubview(logo); top.addArrangedSubview(identity); top.addArrangedSubview(UIView())
+        identity.axis = .vertical; identity.alignment = .leading; identity.spacing = 2
+        let identityRow = UIStackView(arrangedSubviews: [logo, identity, UIView()])
+        identityRow.axis = .horizontal; identityRow.alignment = .center; identityRow.spacing = 10
+        top.addArrangedSubview(identityRow)
+        let actions = UIStackView(); actions.axis = .horizontal; actions.alignment = .center; actions.spacing = 8
         configurePill(connectionButton, title: "连接中", icon: "circle.fill", color: DHTheme.success)
         connectionButton.addAction(UIAction { [weak self] _ in self?.showConnectionDetails() }, for: .touchUpInside)
-        top.addArrangedSubview(connectionButton)
+        actions.addArrangedSubview(connectionButton); actions.addArrangedSubview(UIView())
         let activity = makeIconButton("bell", label: "活动中心")
         activity.addAction(UIAction { [weak self] _ in self?.showActivityCenter() }, for: .touchUpInside)
-        top.addArrangedSubview(activity)
+        actions.addArrangedSubview(activity)
         let menu = makeIconButton("line.3.horizontal", label: "打开上下文抽屉")
         menu.addAction(UIAction { [weak self] _ in self?.toggleDrawer() }, for: .touchUpInside)
-        top.addArrangedSubview(menu)
+        actions.addArrangedSubview(menu)
+        top.addArrangedSubview(actions)
         content.addArrangedSubview(top)
 
         content.addArrangedSubview(sectionHeading("今日概览", icon: "chart.bar.xaxis"))
@@ -251,16 +258,21 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
     }
 
     private func installCard(_ view: UIView, title: String, subtitle: String, icon: String, color: UIColor = DHTheme.surface) {
+        // Re-render only this card's content; never remove the card itself or its constraints.
         view.subviews.forEach { $0.removeFromSuperview() }
         view.dhApplyCard(backgroundColor: color, cornerRadius: DHTheme.cornerMedium, borderColor: DHTheme.separator.withAlphaComponent(0.25))
-        let row = UIStackView(); row.axis = .horizontal; row.spacing = 8; row.alignment = .center
+        view.clipsToBounds = false
+        let row = UIStackView(); row.axis = .horizontal; row.spacing = 8; row.alignment = .center; row.translatesAutoresizingMaskIntoConstraints = false
         let mark = dhIconView(systemName: icon, size: 28, symbolSize: 13)
         mark.accessibilityLabel = "继续工作状态"
-        let labels = UIStackView(); labels.axis = .vertical; labels.spacing = 1
-        let t = UILabel(); t.text = title; t.font = DHTheme.font(.subheadline, weight: .semibold); t.textColor = DHTheme.text; t.numberOfLines = 0; t.setContentCompressionResistancePriority(.required, for: .horizontal)
-        let s = UILabel(); s.text = subtitle; s.font = DHTheme.font(.caption2); s.textColor = DHTheme.secondaryText; s.numberOfLines = 0; s.setContentCompressionResistancePriority(.required, for: .horizontal)
-        labels.addArrangedSubview(t); labels.addArrangedSubview(s); row.addArrangedSubview(mark); row.addArrangedSubview(labels); row.addArrangedSubview(UIImageView(image: UIImage(systemName: "chevron.right"))); view.addSubview(row)
-        NSLayoutConstraint.activate([row.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 11), row.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -11), row.topAnchor.constraint(equalTo: view.topAnchor, constant: 7), row.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -7)])
+        let labels = UIStackView(); labels.axis = .vertical; labels.spacing = 2; labels.alignment = .fill; labels.translatesAutoresizingMaskIntoConstraints = false
+        let t = UILabel(); t.text = title; t.font = DHTheme.font(.subheadline, weight: .semibold); t.textColor = DHTheme.text; t.numberOfLines = 0
+        let s = UILabel(); s.text = subtitle; s.font = DHTheme.font(.caption2); s.textColor = DHTheme.secondaryText; s.numberOfLines = 0
+        labels.addArrangedSubview(t); labels.addArrangedSubview(s)
+        let chevron = UIImageView(image: UIImage(systemName: "chevron.right")); chevron.tintColor = DHTheme.secondaryText
+        row.addArrangedSubview(mark); row.addArrangedSubview(labels); row.addArrangedSubview(chevron)
+        view.addSubview(row)
+        NSLayoutConstraint.activate([row.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 11), row.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -11), row.topAnchor.constraint(equalTo: view.topAnchor, constant: 9), row.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -9), mark.widthAnchor.constraint(equalToConstant: 28), mark.heightAnchor.constraint(equalToConstant: 28), chevron.widthAnchor.constraint(equalToConstant: 16)])
     }
 
     private func clearStack(_ stack: UIStackView) { stack.arrangedSubviews.forEach { $0.removeFromSuperview() } }

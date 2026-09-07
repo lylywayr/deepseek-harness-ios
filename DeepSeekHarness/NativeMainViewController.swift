@@ -1,5 +1,11 @@
 import UIKit
 
+final class DHNavigationController: UINavigationController {
+    override var childForStatusBarStyle: UIViewController? { topViewController }
+    override var preferredStatusBarStyle: UIStatusBarStyle { topViewController?.preferredStatusBarStyle ?? .default }
+    override func viewDidLoad() { super.viewDidLoad(); view.backgroundColor = DHTheme.background }
+}
+
 @main
 final class DeepSeekHarnessAppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
@@ -27,7 +33,7 @@ final class DeepSeekHarnessAppDelegate: UIResponder, UIApplicationDelegate {
         #else
         root = MainViewController(appState: appState, nativeUIStore: nativeUIStore)
         #endif
-        let navigation = UINavigationController(rootViewController: root)
+        let navigation = DHNavigationController(rootViewController: root)
         navigation.navigationBar.prefersLargeTitles = false
         navigation.navigationBar.tintColor = DHTheme.accent
         navigation.navigationBar.standardAppearance = DHNavigationAppearance.make()
