@@ -192,8 +192,7 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
             row.addArrangedSubview(card)
         }; return row
     }
-
-
+    private func makeSection(_ title: String, stack: UIStackView, icon: String) -> UIView {
         let wrapper = UIView(); wrapper.dhApplyCard(backgroundColor: DHTheme.surface, cornerRadius: DHTheme.cornerMedium, borderColor: DHTheme.separator.withAlphaComponent(0.18))
         let body = UIStackView(); body.axis = .vertical; body.spacing = 3; body.translatesAutoresizingMaskIntoConstraints = false
         body.addArrangedSubview(sectionHeading(title, icon: icon))
