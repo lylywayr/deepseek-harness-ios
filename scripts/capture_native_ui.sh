@@ -18,6 +18,15 @@ OUT="$ROOT/artifacts/pocket-v2-ui-matrix"
 rm -rf "$OUT"
 mkdir -p "$OUT"
 
+prepare_keyboard_scene() {
+  xcrun simctl spawn "$UDID" defaults write com.apple.keyboardservicesd KeyboardContinuousPathIntroductionShown -bool true || true
+  xcrun simctl spawn "$UDID" defaults write com.apple.keyboardservicesd KeyboardAutocorrectionListsShown -bool true || true
+  xcrun simctl spawn "$UDID" defaults write com.apple.keyboardservicesd KeyboardDidShowContinuousPathIntroduction -bool true || true
+  xcrun simctl spawn "$UDID" launchctl kickstart -k system/com.apple.keyboardservicesd >/dev/null 2>&1 || true
+  xcrun simctl spawn "$UDID" launchctl kickstart -k system/com.apple.TextInput >/dev/null 2>&1 || true
+  sleep 1
+}
+
 capture() {
   local scene="$1" size="$2" appearance="$3" args="$4"
   local dir="$OUT/$size/$appearance"
@@ -27,6 +36,11 @@ capture() {
   local pid=""
   local alive=0
   mkdir -p "$dir"
+  if [[ "$scene" == "keyboard" ]]; then
+    # Seed preferences before launching the fixture, then kick the services
+    # again after focus in case the keyboard scene was already cached.
+    prepare_keyboard_scene
+  fi
   xcrun simctl terminate "$UDID" "$BUNDLE_ID" >/dev/null 2>&1 || true
   if ! launch_output="$(xcrun simctl launch "$UDID" "$BUNDLE_ID" -UITestFixture -NativeFixtureScreen "$scene" $args 2>&1)"; then
     printf '%s\n' "$launch_output" >"$launch_log"
@@ -56,19 +70,6 @@ capture() {
     xcrun simctl spawn "$UDID" log show --last 20s --style compact --predicate 'process == "DeepSeekHarness" OR composedMessage CONTAINS[c] "DeepSeekHarness"' >&2 || true
     exit 1
   fi
-# Finish iOS Simulator's first-use keyboard glide-typing coach before any
-# keyboard evidence. Preferences must be written before keyboardservicesd is
-# first spawned; writing after app launch is ineffective because its cfprefsd
-# cache has already been loaded. Restart the service after changing them.
-prepare_keyboard_scene() {
-  xcrun simctl spawn "$UDID" defaults write com.apple.keyboardservicesd KeyboardContinuousPathIntroductionShown -bool true || true
-  xcrun simctl spawn "$UDID" defaults write com.apple.keyboardservicesd KeyboardAutocorrectionListsShown -bool true || true
-  xcrun simctl spawn "$UDID" defaults write com.apple.keyboardservicesd KeyboardDidShowContinuousPathIntroduction -bool true || true
-  xcrun simctl spawn "$UDID" launchctl kickstart -k system/com.apple.keyboardservicesd >/dev/null 2>&1 || true
-  xcrun simctl spawn "$UDID" launchctl kickstart -k system/com.apple.TextInput >/dev/null 2>&1 || true
-  sleep 1
-}
-
   if [[ "$scene" == "keyboard" ]]; then
     prepare_keyboard_scene
   fi
