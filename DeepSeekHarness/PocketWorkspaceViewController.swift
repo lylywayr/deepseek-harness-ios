@@ -190,7 +190,7 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
             let stack = UIStackView(); stack.axis = .vertical; stack.spacing = 3; stack.translatesAutoresizingMaskIntoConstraints = false
             let top = UIStackView(); top.axis = .horizontal; top.addArrangedSubview(UIImageView(image: UIImage(systemName: icon))); top.addArrangedSubview(UIView())
             (top.arrangedSubviews.first as? UIImageView)?.tintColor = color
-            let number = UILabel(); number.text = "\\(value)"; number.font = DHTheme.font(.title2, weight: .bold); number.textColor = DHTheme.text
+            let number = UILabel(); number.text = "\(value)"; number.font = DHTheme.font(.title2, weight: .bold); number.textColor = DHTheme.text
             let label = UILabel(); label.text = title; label.font = DHTheme.font(.caption1); label.textColor = DHTheme.secondaryText
             [top, number, label].forEach(stack.addArrangedSubview); card.addSubview(stack)
             NSLayoutConstraint.activate([stack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 10), stack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -10), stack.topAnchor.constraint(equalTo: card.topAnchor, constant: 9), stack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -9)])
