@@ -68,10 +68,11 @@ jobs:
           set -euo pipefail
           xcodebuild build -project DeepSeekHarness.xcodeproj -scheme DeepSeekHarness -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.2' -derivedDataPath build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
       - name: Capture Pocket screenshots
+        timeout-minutes: 15
         run: |
           set -euo pipefail
           chmod +x scripts/capture_native_ui.sh
-          scripts/capture_native_ui.sh
+          SIMCTL_TIMEOUT_SECONDS=45 scripts/capture_native_ui.sh
       - name: Validate Pocket screenshot artifacts
         run: |
           set -euo pipefail

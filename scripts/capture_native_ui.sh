@@ -4,6 +4,8 @@ ROOT="${GITHUB_WORKSPACE:-$(pwd)}"
 BUNDLE_ID="com.example.DeepSeekHarness"
 DEVICE="iPhone 14"
 RUNTIME="18.2"
+CMD_TIMEOUT="${SIMCTL_TIMEOUT_SECONDS:-45}"
+run_timeout() { timeout --signal=TERM --kill-after=5s "${CMD_TIMEOUT}s" "$@"; }
 find_udid() {
   local name="$1"
   xcrun simctl list devices available | awk -F '[()]' -v wanted="$name" '$1 ~ ("^[[:space:]]*" wanted "[[:space:]]*$") {print $2; exit}'
@@ -11,20 +13,20 @@ find_udid() {
 UDID="$(find_udid "$DEVICE")"
 if [[ -z "$UDID" ]]; then UDID="$(xcrun simctl create "PocketV2Fixture" com.apple.CoreSimulator.SimDeviceType.iPhone-14 com.apple.CoreSimulator.SimRuntime.iOS-18-2)"; fi
 xcrun simctl boot "$UDID" 2>/dev/null || true
-xcrun simctl bootstatus "$UDID" -b
+run_timeout xcrun simctl bootstatus "$UDID" -b
 APP_PATH="$ROOT/build/Build/Products/Debug-iphonesimulator/DeepSeekHarness.app"
-xcrun simctl install "$UDID" "$APP_PATH"
+run_timeout xcrun simctl install "$UDID" "$APP_PATH"
 OUT="$ROOT/artifacts/pocket-v2-ui-matrix"
 rm -rf "$OUT"
 mkdir -p "$OUT"
 
 prepare_keyboard_scene() {
-  xcrun simctl spawn "$UDID" defaults write com.apple.keyboardservicesd KeyboardContinuousPathIntroductionShown -bool true || true
-  xcrun simctl spawn "$UDID" defaults write com.apple.keyboardservicesd KeyboardAutocorrectionListsShown -bool true || true
-  xcrun simctl spawn "$UDID" defaults write com.apple.keyboardservicesd KeyboardDidShowContinuousPathIntroduction -bool true || true
-  xcrun simctl spawn "$UDID" launchctl kickstart -k system/com.apple.keyboardservicesd >/dev/null 2>&1 || true
-  xcrun simctl spawn "$UDID" launchctl kickstart -k system/com.apple.TextInput >/dev/null 2>&1 || true
-  sleep 1
+  run_timeout xcrun simctl spawn "$UDID" defaults write com.apple.keyboardservicesd KeyboardContinuousPathIntroductionShown -bool true
+  run_timeout xcrun simctl spawn "$UDID" defaults write com.apple.keyboardservicesd KeyboardAutocorrectionListsShown -bool true
+  run_timeout xcrun simctl spawn "$UDID" defaults write com.apple.keyboardservicesd KeyboardDidShowContinuousPathIntroduction -bool true
+  run_timeout xcrun simctl spawn "$UDID" launchctl kickstart -k system/com.apple.keyboardservicesd >/dev/null 2>&1
+  run_timeout xcrun simctl spawn "$UDID" launchctl kickstart -k system/com.apple.TextInput >/dev/null 2>&1
+  run_timeout sleep 1
 }
 
 capture() {
@@ -42,7 +44,7 @@ capture() {
     prepare_keyboard_scene
   fi
   xcrun simctl terminate "$UDID" "$BUNDLE_ID" >/dev/null 2>&1 || true
-  if ! launch_output="$(xcrun simctl launch "$UDID" "$BUNDLE_ID" -UITestFixture -NativeFixtureScreen "$scene" $args 2>&1)"; then
+  if ! launch_output="$(run_timeout xcrun simctl launch "$UDID" "$BUNDLE_ID" -UITestFixture -NativeFixtureScreen "$scene" $args 2>&1)"; then
     printf '%s\n' "$launch_output" >"$launch_log"
     cat "$launch_log" >&2
     echo "Pocket fixture launch failed: $scene" >&2
@@ -54,13 +56,13 @@ capture() {
   # simctl launch returns the simulator PID.  Verify that PID from inside
   # the simulator instead of assuming a host-side GUI uid; the latter is
   # unavailable on some iOS 18.2 runners and caused false failures.
-  if [[ -n "$pid" ]] && xcrun simctl spawn "$UDID" ps -p "$pid" >"$process_log" 2>&1; then
+  if [[ -n "$pid" ]] && run_timeout xcrun simctl spawn "$UDID" ps -p "$pid" >"$process_log" 2>&1; then
     if awk -v wanted="$pid" '$1 == wanted { found = 1 } END { exit found ? 0 : 1 }' "$process_log"; then
       alive=1
     fi
   fi
   if [[ "$alive" -ne 1 ]]; then
-    xcrun simctl spawn "$UDID" launchctl list >"$process_log" 2>&1 || true
+    run_timeout xcrun simctl spawn "$UDID" launchctl list >"$process_log" 2>&1 || true
     if grep -Eq "$BUNDLE_ID|^[[:space:]]*$pid[[:space:]]" "$process_log"; then alive=1; fi
   fi
   if [[ "$alive" -ne 1 ]]; then
@@ -71,9 +73,11 @@ capture() {
     exit 1
   fi
   if [[ "$scene" == "keyboard" ]]; then
-    prepare_keyboard_scene
+    # Keyboard services are intentionally not restarted after the scene is focused:
+    # doing so can deadlock SpringBoard's screenshot request.
+    :
   fi
-  xcrun simctl io "$UDID" screenshot "$dir/$scene-$size-$appearance.png"
+  run_timeout xcrun simctl io "$UDID" screenshot "$dir/$scene-$size-$appearance.png"
   test -s "$dir/$scene-$size-$appearance.png"
   # Keep a deterministic scene manifest beside the real PNG evidence.
   printf "%s\n" "$scene|$size|$appearance" >> "$OUT/manifest.txt"
