@@ -56,6 +56,14 @@ capture() {
     xcrun simctl spawn "$UDID" log show --last 20s --style compact --predicate 'process == "DeepSeekHarness" OR composedMessage CONTAINS[c] "DeepSeekHarness"' >&2 || true
     exit 1
   fi
+  # Finish iOS Simulator's first-use keyboard glide-typing coach before any
+  # keyboard evidence. This is a real UI interaction, never image editing.
+  if [[ "$scene" == "keyboard" ]]; then
+    xcrun simctl spawn "$UDID" defaults write com.apple.keyboardservicesd KeyboardContinuousPathIntroductionShown -bool true || true
+    xcrun simctl spawn "$UDID" defaults write com.apple.keyboardservicesd KeyboardAutocorrectionListsShown -bool true || true
+    xcrun simctl io "$UDID" key press CMD+K >/dev/null 2>&1 || true
+    sleep 1
+  fi
   xcrun simctl io "$UDID" screenshot "$dir/$scene-$size-$appearance.png"
   test -s "$dir/$scene-$size-$appearance.png"
   # Keep a deterministic scene manifest beside the real PNG evidence.

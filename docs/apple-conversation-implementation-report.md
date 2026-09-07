@@ -42,3 +42,14 @@ manifest 明确列出 `conversation|390x844|light`、`conversation|430x932|light
 
 ## 验收结论
 `NOT_READY`。event_id：`apple-conversation-r1-c2-20260907`。IPA 独立复核 PASS；分支已推送；但四张指定视觉证据实际缺失，390 keyboard 与 430 light 无法检查，截图统计/唯一性/运行时证据未完成。不能返回 `READY_FOR_ACCEPTANCE`。
+
+
+## implementation_round=1 continuation=4 验证（2026-09-07）
+- event_id：`apple-conversation-r1-c4-20260907`
+- 基线核对：HEAD `b563743dffaaacdb7ee358af2e77aa855a84c46b`；diff 仅 `.github/workflows/build-ipa.yml` 的截图 artifact 校验/上传路径变更，无 UI、工作台/抽屉/协议改动。
+- 本地门禁：`python3 -m unittest discover -s Tests -p 'test_*.py' -v`：16 tests，全部 PASS；fixture/rework 静态门禁全部 PASS；`git diff --check` PASS。
+- 新 workflow_dispatch：Run `34079081865`，headSha=`b563743dffaaacdb7ee358af2e77aa855a84c46b`；两个 Job 均 completed/success（Native Pocket UI screenshots matrix、Build iOS device IPA）。
+- 实际下载目录：`/var/minis/attachments/apple-conversation-run-34079081865/`。PNG 共 28 个；390 截图为 1170×2532，430 截图为 1290×2796；SHA-256 唯一数 28/28。
+- IPA 独立 `verify_ipa.py`：SHA-256 `6bdeba70f0ff07cd0ae34e76b241935fcd103f924f0daa1f718ff0e0c4bf17ef`；minimumOSVersion 15.0；unsigned=true；forbiddenMarkers=0；arm64 由 CI device archive/IPA 构建门禁通过。
+- 实图检查：390 light、430 light、430 dark 会话页结构清晰，header/四段 tabs/配置摘要/消息流/工具卡/底部 composer 无明显裁切或重叠；430 dark 对比和内容层次正常。390 keyboard 截图中输入框可见且布局未重叠，但系统显示首次键盘滑行输入引导（`Speed up your typing... Continue`），并非实际键盘按键画面，故键盘态方案 A 证据不合格。
+- 结论：`NOT_READY`。根因是 simulator 键盘首次使用的系统 onboarding 覆盖实际键盘区域，无法证明真实键盘态；需在截图脚本中关闭/完成该系统引导后重新 capture 并复跑验证。未修改代码、未提交内部文件/设计稿。
