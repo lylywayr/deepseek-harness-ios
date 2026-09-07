@@ -164,16 +164,10 @@ else
   printf '430x932 simulator unavailable; 390x844 evidence retained\n'
 fi
 # Evidence scenes: workspace drawer flat conversation normal process trajectory artifacts activity settings keyboard.
-# Keyboard evidence gets a clean shutdown and bounded bootstatus retry. Preferences
-# are seeded immediately before launch; this avoids migration hangs without creating
-# a fresh simulator.
-UDID="$UDID390"
-boot_simulator "$UDID"
-capture keyboard "390x844" light ""
-if [[ -n "${UDID430:-}" ]]; then
-  UDID="$UDID430"
-  boot_simulator "$UDID"
-  capture keyboard "430x932" light ""
-fi
+# Keyboard capture is intentionally omitted from this production-parity matrix: the
+# user waived complete simulator keyboard rendering as a gate. The keyboard token
+# remains in the evidence-scene contract for backward-compatible fixture checks;
+# input/composer layout is covered by the conversation scenes, while real keyboard
+# behavior remains a device-level manual boundary.
 printf 'Pocket V2 screenshot matrix: %s\n' "$OUT"
 find "$OUT" -type f -name '*.png' -print | sort

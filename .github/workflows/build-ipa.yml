@@ -80,7 +80,7 @@ jobs:
           png_count="$(find "$GITHUB_WORKSPACE/artifacts/pocket-v2-ui-matrix" -type f -name '*.png' | wc -l | tr -d ' ')"
           test "$png_count" -gt 0
           python3 scripts/verify_screenshot_artifacts.py artifacts/pocket-v2-ui-matrix
-          echo "Validated 28 unique real simulator PNG files"
+          echo "Validated 26 real simulator PNGs; keyboard rendering is a manual device boundary"
       - name: Upload Pocket screenshots
         uses: actions/upload-artifact@v4
         with:
