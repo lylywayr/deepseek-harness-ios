@@ -72,10 +72,17 @@ jobs:
           set -euo pipefail
           chmod +x scripts/capture_native_ui.sh
           scripts/capture_native_ui.sh
+      - name: Validate Pocket screenshot artifacts
+        run: |
+          set -euo pipefail
+          test -d "$GITHUB_WORKSPACE/artifacts/pocket-v2-ui-matrix"
+          png_count="$(find "$GITHUB_WORKSPACE/artifacts/pocket-v2-ui-matrix" -type f -name '*.png' | wc -l | tr -d ' ')"
+          test "$png_count" -gt 0
+          echo "Validated $png_count real simulator PNG files"
       - name: Upload Pocket screenshots
         uses: actions/upload-artifact@v4
         with:
           name: pocket-v2-ui-matrix
-          path: artifacts/pocket-v2-ui-matrix
+          path: ${{ github.workspace }}/artifacts/pocket-v2-ui-matrix/**
           if-no-files-found: error
           retention-days: 14
