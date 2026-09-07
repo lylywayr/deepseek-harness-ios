@@ -5,7 +5,7 @@ BUNDLE_ID="com.example.DeepSeekHarness"
 DEVICE="iPhone 14"
 RUNTIME="18.2"
 CMD_TIMEOUT="${SIMCTL_TIMEOUT_SECONDS:-45}"
-run_timeout() { timeout --signal=TERM --kill-after=5s "${CMD_TIMEOUT}s" "$@"; }
+run_timeout() { perl -e 'alarm shift; exec @ARGV' "$CMD_TIMEOUT" "$@"; }
 find_udid() {
   local name="$1"
   xcrun simctl list devices available | awk -F '[()]' -v wanted="$name" '$1 ~ ("^[[:space:]]*" wanted "[[:space:]]*$") {print $2; exit}'
