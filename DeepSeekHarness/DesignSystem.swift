@@ -6,51 +6,51 @@ import UIKit
 enum DHTheme {
     static let background = UIColor { traits in
         if traits.userInterfaceStyle == .dark {
-            return UIColor(red: 0.045, green: 0.055, blue: 0.095, alpha: 1)
+            return UIColor(red: 0.055, green: 0.055, blue: 0.060, alpha: 1)
         }
-        return UIColor(red: 0.969, green: 0.974, blue: 0.988, alpha: 1)
+        return UIColor(red: 0.969, green: 0.965, blue: 0.953, alpha: 1) // #F7F6F3
     }
 
     static let surface = UIColor { traits in
         traits.userInterfaceStyle == .dark
-            ? UIColor(red: 0.085, green: 0.105, blue: 0.170, alpha: 1)
-            : UIColor.white
+            ? UIColor(red: 0.115, green: 0.115, blue: 0.125, alpha: 1)
+            : UIColor(red: 1.0, green: 1.0, blue: 0.992, alpha: 1) // #FFFFFD
     }
 
     static let surfaceMuted = UIColor { traits in
         traits.userInterfaceStyle == .dark
-            ? UIColor(red: 0.115, green: 0.140, blue: 0.220, alpha: 1)
-            : UIColor(red: 0.935, green: 0.949, blue: 0.980, alpha: 1)
+            ? UIColor(red: 0.16, green: 0.16, blue: 0.17, alpha: 1)
+            : UIColor(red: 0.925, green: 0.922, blue: 0.914, alpha: 1)
     }
 
     static let surfaceStrong = UIColor { traits in
         traits.userInterfaceStyle == .dark
-            ? UIColor(red: 0.155, green: 0.185, blue: 0.285, alpha: 1)
-            : UIColor(red: 0.885, green: 0.910, blue: 0.970, alpha: 1)
+            ? UIColor(red: 0.22, green: 0.22, blue: 0.23, alpha: 1)
+            : UIColor(red: 0.90, green: 0.89, blue: 0.875, alpha: 1)
     }
 
     static let processSurface = UIColor { traits in
         traits.userInterfaceStyle == .dark
-            ? UIColor(red: 0.075, green: 0.095, blue: 0.150, alpha: 1)
-            : UIColor(red: 0.945, green: 0.955, blue: 0.980, alpha: 1)
+            ? UIColor(red: 0.09, green: 0.14, blue: 0.12, alpha: 1)
+            : UIColor(red: 0.91, green: 0.965, blue: 0.94, alpha: 1)
     }
 
     static let accent = UIColor { traits in
         traits.userInterfaceStyle == .dark
-            ? UIColor(red: 0.46, green: 0.62, blue: 1.0, alpha: 1)
-            : UIColor(red: 0.275, green: 0.400, blue: 0.900, alpha: 1)
+            ? UIColor(red: 0.42, green: 0.62, blue: 1.0, alpha: 1)
+            : UIColor(red: 0.169, green: 0.404, blue: 0.867, alpha: 1) // #2B67DD
     }
 
     static let accentDeep = UIColor { traits in
         traits.userInterfaceStyle == .dark
-            ? UIColor(red: 0.32, green: 0.46, blue: 0.90, alpha: 1)
-            : UIColor(red: 0.157, green: 0.275, blue: 0.725, alpha: 1)
+            ? UIColor(red: 0.55, green: 0.70, blue: 1.0, alpha: 1)
+            : UIColor(red: 0.12, green: 0.31, blue: 0.70, alpha: 1)
     }
 
     static let accentSoft = UIColor { traits in
         traits.userInterfaceStyle == .dark
-            ? UIColor(red: 0.14, green: 0.22, blue: 0.43, alpha: 1)
-            : UIColor(red: 0.885, green: 0.920, blue: 1.0, alpha: 1)
+            ? UIColor(red: 0.12, green: 0.20, blue: 0.38, alpha: 1)
+            : UIColor(red: 0.90, green: 0.93, blue: 1.0, alpha: 1)
     }
 
     static let assistantBubble = UIColor { traits in
@@ -65,12 +65,24 @@ enum DHTheme {
             : UIColor(red: 0.275, green: 0.400, blue: 0.900, alpha: 1)
     }
 
-    static let text = UIColor.label
-    static let secondaryText = UIColor.secondaryLabel
-    static let tertiaryText = UIColor.tertiaryLabel
-    static let separator = UIColor.separator
-    static let success = UIColor.systemGreen
-    static let warning = UIColor.systemOrange
+    static let text = UIColor { traits in
+        traits.userInterfaceStyle == .dark ? UIColor(white: 0.94, alpha: 1) : UIColor(red: 0.137, green: 0.145, blue: 0.16, alpha: 1) // #232529
+    }
+    static let secondaryText = UIColor { traits in
+        traits.userInterfaceStyle == .dark ? UIColor(white: 0.68, alpha: 1) : UIColor(red: 0.455, green: 0.467, blue: 0.486, alpha: 1) // #74777C
+    }
+    static let tertiaryText = UIColor { traits in
+        traits.userInterfaceStyle == .dark ? UIColor(white: 0.52, alpha: 1) : UIColor(red: 0.56, green: 0.56, blue: 0.55, alpha: 1)
+    }
+    static let separator = UIColor { traits in
+        traits.userInterfaceStyle == .dark ? UIColor(white: 0.26, alpha: 1) : UIColor(red: 0.898, green: 0.894, blue: 0.878, alpha: 1) // #E5E4E0
+    }
+    static let success = UIColor { traits in
+        traits.userInterfaceStyle == .dark ? UIColor(red: 0.30, green: 0.75, blue: 0.48, alpha: 1) : UIColor(red: 0.153, green: 0.604, blue: 0.365, alpha: 1) // #279A5D
+    }
+    static let warning = UIColor { traits in
+        traits.userInterfaceStyle == .dark ? UIColor(red: 0.95, green: 0.68, blue: 0.25, alpha: 1) : UIColor(red: 0.773, green: 0.518, blue: 0.137, alpha: 1) // #C58423
+    }
     static let danger = UIColor.systemRed
     static let purple = UIColor.systemPurple
 

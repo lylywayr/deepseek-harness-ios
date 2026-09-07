@@ -151,6 +151,7 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
 
     private func buildModes() {
         modeControl.selectedSegmentIndex = 0
+        modeControl.accessibilityLabel = "内容模式：对话、过程、轨迹、产物"
         modeControl.addTarget(self, action: #selector(modeChanged), for: .valueChanged)
         modeControl.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(modeControl)

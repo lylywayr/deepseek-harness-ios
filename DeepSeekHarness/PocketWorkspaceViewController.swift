@@ -158,6 +158,8 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
         top.addArrangedSubview(menu)
         content.addArrangedSubview(top)
 
+        content.addArrangedSubview(sectionHeading("今日概览", icon: "chart.bar.xaxis"))
+        content.addArrangedSubview(makeOverviewStrip())
         content.addArrangedSubview(sectionHeading("继续工作", icon: "arrow.forward.circle"))
         currentCard.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([currentCard.heightAnchor.constraint(greaterThanOrEqualToConstant: 66)])
@@ -173,7 +175,25 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
         content.addArrangedSubview(emptyLabel)
     }
 
-    private func makeSection(_ title: String, stack: UIStackView, icon: String) -> UIView {
+    private func makeOverviewStrip() -> UIView {
+        let row = UIStackView(); row.axis = .horizontal; row.spacing = 8; row.distribution = .fillEqually
+        let pending = runtime?.sessions.filter { !$0.blank && !$0.running }.count ?? 0
+        let running = runtime?.sessions.filter { $0.running }.count ?? 0
+        let completed = runtime?.sessions.filter { !$0.blank }.count ?? 0
+        [("待处理", pending, DHTheme.warning, "clock"), ("运行中", running, DHTheme.accent, "bolt.fill"), ("本周完成", completed, DHTheme.success, "checkmark.circle")].forEach { title, value, color, icon in
+            let card = UIView(); card.dhApplyCard(backgroundColor: DHTheme.surface, cornerRadius: DHTheme.cornerMedium)
+            let stack = UIStackView(); stack.axis = .vertical; stack.spacing = 3; stack.translatesAutoresizingMaskIntoConstraints = false
+            let top = UIStackView(); top.axis = .horizontal; top.addArrangedSubview(UIImageView(image: UIImage(systemName: icon))); top.addArrangedSubview(UIView())
+            (top.arrangedSubviews.first as? UIImageView)?.tintColor = color
+            let number = UILabel(); number.text = "\\(value)"; number.font = DHTheme.font(.title2, weight: .bold); number.textColor = DHTheme.text
+            let label = UILabel(); label.text = title; label.font = DHTheme.font(.caption1); label.textColor = DHTheme.secondaryText
+            [top, number, label].forEach(stack.addArrangedSubview); card.addSubview(stack)
+            NSLayoutConstraint.activate([stack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 10), stack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -10), stack.topAnchor.constraint(equalTo: card.topAnchor, constant: 9), stack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -9)])
+            row.addArrangedSubview(card)
+        }; return row
+    }
+
+
         let wrapper = UIView(); wrapper.dhApplyCard(backgroundColor: DHTheme.surface, cornerRadius: DHTheme.cornerMedium, borderColor: DHTheme.separator.withAlphaComponent(0.18))
         let body = UIStackView(); body.axis = .vertical; body.spacing = 3; body.translatesAutoresizingMaskIntoConstraints = false
         body.addArrangedSubview(sectionHeading(title, icon: icon))
