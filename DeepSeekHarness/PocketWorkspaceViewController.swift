@@ -149,6 +149,7 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
             rootScroll.bottomAnchor.constraint(equalTo: bottomNavigation.topAnchor),
             content.leadingAnchor.constraint(equalTo: rootScroll.contentLayoutGuide.leadingAnchor, constant: DHTheme.pageHorizontal),
             content.trailingAnchor.constraint(equalTo: rootScroll.contentLayoutGuide.trailingAnchor, constant: -DHTheme.pageHorizontal),
+            content.widthAnchor.constraint(equalTo: rootScroll.frameLayoutGuide.widthAnchor, constant: -2 * DHTheme.pageHorizontal),
             content.topAnchor.constraint(equalTo: rootScroll.contentLayoutGuide.topAnchor, constant: 8),
             content.bottomAnchor.constraint(equalTo: rootScroll.contentLayoutGuide.bottomAnchor, constant: 12)
         ])
