@@ -32,6 +32,7 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
     private let currentCard = UIView()
     private let pendingSection = UIStackView()
     private let runningSection = UIStackView()
+    private let activitySection = UIStackView()
     private let recentSection = UIStackView()
     private let workspacesSection = UIStackView()
     private let emptyLabel = UILabel()
@@ -131,7 +132,7 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
         rootScroll.addSubview(content)
         NSLayoutConstraint.activate([
             rootScroll.leadingAnchor.constraint(equalTo: view.leadingAnchor), rootScroll.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            rootScroll.topAnchor.constraint(equalTo: view.topAnchor), rootScroll.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            rootScroll.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor), rootScroll.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             content.leadingAnchor.constraint(equalTo: rootScroll.contentLayoutGuide.leadingAnchor, constant: DHTheme.pageHorizontal),
             content.trailingAnchor.constraint(equalTo: rootScroll.contentLayoutGuide.trailingAnchor, constant: -DHTheme.pageHorizontal),
             content.topAnchor.constraint(equalTo: rootScroll.contentLayoutGuide.topAnchor, constant: 8),
@@ -168,14 +169,15 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
         currentCard.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([currentCard.heightAnchor.constraint(greaterThanOrEqualToConstant: 66)])
         content.addArrangedSubview(currentCard)
-        content.addArrangedSubview(makeSection("需要你处理", stack: pendingSection, icon: "exclamationmark.bubble"))
-        content.addArrangedSubview(makeSection("运行中", stack: runningSection, icon: "bolt.fill"))
-        content.addArrangedSubview(makeSection("最近工作", stack: recentSection, icon: "clock"))
         content.addArrangedSubview(makeSection("最近工作区", stack: workspacesSection, icon: "folder"))
         let start = dhButton(title: "开始新任务", systemName: "plus", filled: true) { [weak self] in self?.createSession() }
         start.accessibilityLabel = "开始新任务"
         content.addArrangedSubview(start)
-        emptyLabel.text = "连接后，这里会显示真实工作区和会话。"
+        content.addArrangedSubview(makeSection("最近会话", stack: recentSection, icon: "clock"))
+        content.addArrangedSubview(makeSection("活动中心", stack: activitySection, icon: "bell"))
+        content.addArrangedSubview(makeSection("运行中", stack: runningSection, icon: "bolt.fill"))
+        if let artifactSection { content.addArrangedSubview(artifactSection) }
+        emptyLabel.text = "暂无任务。开始新任务后，标题、工作区和状态会显示在这里。"
         emptyLabel.textColor = DHTheme.secondaryText; emptyLabel.font = DHTheme.font(.subheadline); emptyLabel.numberOfLines = 0; emptyLabel.textAlignment = .center
         content.addArrangedSubview(emptyLabel)
     }
@@ -284,11 +286,14 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
         if let selected { stateLabel.text = runtime.connected ? (selected.running ? "正在执行" : "已连接") : runtime.statusText } else { stateLabel.text = runtime.connected ? "已连接" : runtime.statusText }
         stateLabel.textColor = runtime.lastError == nil ? DHTheme.secondaryText : DHTheme.danger
         configurePill(connectionButton, title: runtime.connected ? "已连接" : (runtime.lastError == nil ? "连接中" : "连接异常"), icon: "circle.fill", color: runtime.connected ? DHTheme.success : DHTheme.danger)
-        clearStack(pendingSection); clearStack(runningSection); clearStack(recentSection); clearStack(workspacesSection)
+        clearStack(pendingSection); clearStack(runningSection); clearStack(recentSection); clearStack(workspacesSection); clearStack(activitySection)
         if runtime.pendingApprovals.isEmpty && runtime.pendingQuestions.isEmpty { pendingSection.isHidden = true } else { pendingSection.isHidden = false; runtime.pendingApprovals.forEach { addActivity($0, to: pendingSection) }; runtime.pendingQuestions.forEach { addActivity($0, to: pendingSection) } }
+        if !pendingSection.isHidden { activitySection.addArrangedSubview(pendingSection) }
         let running = runtime.sessions.filter { $0.running || $0.status == "running" }
         runningSection.isHidden = running.isEmpty
         running.forEach { session in addSession(session, to: runningSection, icon: "bolt.fill", tint: DHTheme.accent) }
+        if !runningSection.isHidden { activitySection.addArrangedSubview(runningSection) }
+        activitySection.isHidden = pendingSection.isHidden && runningSection.isHidden
         let recent = HarnessPresentationPolicy.ordered(runtime.sessions.filter { !$0.blank && !$0.running }, archived: runtime.archivedSessionIDsForPresentation, preferences: appState.viewPreferences).prefix(5)
         recentSection.isHidden = recent.isEmpty
         recent.forEach { addSession($0, to: recentSection, icon: "message", tint: DHTheme.secondaryText) }
