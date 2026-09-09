@@ -1,0 +1,13 @@
+/* dsh-market v1.41.0 rendering budget. This changes rendering work only. */
+@media (max-width: 600px) {
+  .nUhMVa_root .nUhMVa_themeCard,
+  .nUhMVa_root .nUhMVa_card {
+    content-visibility: auto;
+    contain-intrinsic-size: 1px 96px;
+  }
+
+  .nUhMVa_root .nUhMVa_themeCover img,
+  .nUhMVa_root .nUhMVa_cardShots img {
+    content-visibility: auto;
+  }
+}

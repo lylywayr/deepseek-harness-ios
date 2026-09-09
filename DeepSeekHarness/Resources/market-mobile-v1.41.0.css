@@ -1,0 +1,1174 @@
+/*
+ dsh-market v1.41.0 mobile override; only responsive layout and touch sizing.
+ Read-only DOM evidence: /var/minis/offloads/browser_use_1788912237_call_2hw.txt
+ Search nodes: .nUhMVa_tabSearchRow, .nUhMVa_tabSearch, ._wrap_1g6ru_1,
+ ._icon_1g6ru_16, ._input_1g6ru_25 (the INPUT node is i47).
+ Category nodes: .nUhMVa_cats, .nUhMVa_catsRow, .nUhMVa_catsWrap,
+ ._pill_e3ygd_1, ._interactive_e3ygd_15, ._active_e3ygd_23,
+ .nUhMVa_catsToggle.
+ Filter evidence: ._root_1aoad_1 wraps
+ ._button_cfgyt_4._outline_cfgyt_56._sm_cfgyt_30 (nodes i60-i64).
+ These selectors are taken from the v1.41.0 offload; no page text or DOM is added.
+*/
+
+@media (max-width: 600px) {
+  .nUhMVa_root,
+  .nUhMVa_root *,
+  .nUhMVa_root *::before,
+  .nUhMVa_root *::after {
+    box-sizing: border-box;
+  }
+
+  .nUhMVa_root {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    height: auto;
+    min-height: 0;
+    padding-inline: clamp(8px, 2.8vw, 12px);
+    overflow-x: hidden;
+  }
+
+  .nUhMVa_root img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* SVGs keep their intrinsic icon dimensions rather than being stretched. */
+  .nUhMVa_root svg {
+    flex: 0 0 auto;
+  }
+
+  .nUhMVa_head {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    height: auto;
+    min-height: 0;
+    flex: 0 0 auto;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .nUhMVa_titleRow {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    grid-template-rows: auto auto;
+    align-items: center;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    height: auto;
+    min-height: 0;
+    gap: 6px 4px;
+  }
+
+  .nUhMVa_titleRow > svg:first-child {
+    grid-column: 1 / span 1;
+    grid-row: 1;
+    width: 22px;
+    height: 22px;
+  }
+
+  .nUhMVa_title {
+    grid-column: 2 / span 4;
+    grid-row: 1;
+    min-width: 0;
+    max-width: 100%;
+    margin: 0;
+    white-space: nowrap;
+    writing-mode: horizontal-tb;
+    overflow-wrap: normal;
+    word-break: keep-all;
+  }
+
+  .nUhMVa_repoLink {
+    grid-column: 6 / span 3;
+    grid-row: 1;
+    min-width: 0;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow-wrap: normal;
+  }
+
+  .nUhMVa_version {
+    grid-column: 9 / -1;
+    grid-row: 1;
+    min-width: 0;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow-wrap: normal;
+  }
+
+  .nUhMVa_titleRow > button {
+    grid-row: 2;
+    min-width: 44px;
+    min-height: 44px;
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    padding: 10px 8px;
+    justify-self: start;
+    align-self: stretch;
+    white-space: normal;
+    line-height: 1.25;
+    text-align: center;
+    overflow-wrap: anywhere;
+  }
+
+  .nUhMVa_titleRow > button:nth-of-type(1) {
+    grid-column: 1 / span 4;
+  }
+
+  .nUhMVa_titleRow > button:nth-of-type(2) {
+    grid-column: 5 / span 4;
+  }
+
+  .nUhMVa_titleRow > button:nth-of-type(3) {
+    grid-column: 9 / -1;
+  }
+
+  .nUhMVa_sub {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "intro intro"
+      "submit export";
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    height: auto;
+    min-height: 0;
+    align-items: center;
+    column-gap: 12px;
+    row-gap: 4px;
+  }
+
+  .nUhMVa_sub > span:first-child {
+    grid-area: intro;
+    min-width: 0;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .nUhMVa_submitLink {
+    grid-area: submit;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    max-width: 100%;
+    min-height: 44px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .nUhMVa_exportLogBtn {
+    grid-area: export;
+    justify-self: end;
+    min-width: 44px;
+    min-height: 44px;
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    padding: 10px 12px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .nUhMVa_tabs {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 4px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    height: auto;
+    min-height: 44px;
+    padding-inline-end: 22px;
+    overflow-x: auto;
+    overflow-y: visible;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 22px), transparent 100%);
+    mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 22px), transparent 100%);
+  }
+
+  /* 430px real injection computed wrap; !important is limited to this property. */
+  .nUhMVa_root .nUhMVa_tabs {
+    flex-wrap: nowrap !important;
+  }
+
+  .nUhMVa_root .nUhMVa_grow {
+    flex: 0 0 0;
+    width: 0;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+  }
+
+  .nUhMVa_root .nUhMVa_tabs .nUhMVa_opWrap,
+  .nUhMVa_root .nUhMVa_tabs .nUhMVa_opEntry {
+    flex: 0 0 auto;
+    height: 44px;
+    min-height: 44px;
+  }
+
+  .nUhMVa_tabs::-webkit-scrollbar,
+  .nUhMVa_catsRow::-webkit-scrollbar,
+  .nUhMVa_cardShots::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+
+  .nUhMVa_tab {
+    flex: 0 0 auto;
+    min-width: 44px;
+    min-height: 44px;
+    height: auto;
+    padding: 10px 12px;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .nUhMVa_opWrap {
+    position: static;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    min-width: 44px;
+    min-height: 44px;
+    width: auto;
+    height: auto;
+    max-width: none;
+  }
+
+  .nUhMVa_opEntry {
+    position: static;
+    flex: 0 0 auto;
+    min-width: 44px;
+    min-height: 44px;
+    width: auto;
+    height: auto;
+    padding: 10px 12px;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .nUhMVa_body,
+  .nUhMVa_stickyHead,
+  .nUhMVa_tabSearchRow,
+  .nUhMVa_cats {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .nUhMVa_body {
+    min-height: 0;
+    overflow-x: hidden;
+  }
+
+  .nUhMVa_stickyHead {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .nUhMVa_tabSearchRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 52px;
+    height: auto;
+  }
+
+  .nUhMVa_tabSearch._wrap_1g6ru_1 {
+    display: flex;
+    align-items: center;
+    flex: 1 1 100%;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    height: auto;
+    overflow: hidden;
+  }
+
+  .nUhMVa_tabSearch ._icon_1g6ru_16 {
+    flex: 0 0 auto;
+    min-width: 16px;
+  }
+
+  .nUhMVa_tabSearch ._input_1g6ru_25 {
+    flex: 1 1 auto;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    height: auto;
+    box-sizing: border-box;
+  }
+
+  .nUhMVa_tabSearch button {
+    flex: 0 0 auto;
+    min-width: 44px;
+    min-height: 44px;
+    width: auto;
+    height: auto;
+  }
+
+  .nUhMVa_cats {
+    height: auto;
+    min-height: 56px;
+  }
+
+  .nUhMVa_catsRow {
+    position: static;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 8px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    min-height: 56px;
+    height: auto;
+    overflow: visible;
+  }
+
+  .nUhMVa_catsWrap {
+    position: static;
+    display: flex;
+    flex: 0 1 auto;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    height: auto;
+    min-height: 44px;
+    overflow-x: auto;
+    overflow-y: visible;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 22px), transparent 100%);
+    mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 22px), transparent 100%);
+  }
+
+  .nUhMVa_catsWrap > ._pill_e3ygd_1._interactive_e3ygd_15 {
+    position: static;
+    flex: 0 0 auto;
+    min-width: 44px;
+    min-height: 44px;
+    width: auto;
+    height: auto;
+    white-space: nowrap;
+    padding: 10px 12px;
+  }
+
+  .nUhMVa_catsToggle {
+    position: static;
+    flex: 0 0 auto;
+    min-width: 44px;
+    min-height: 44px;
+    width: auto;
+    height: 44px !important;
+    padding: 10px;
+  }
+
+  .nUhMVa_catsRow ._root_1aoad_1 {
+    position: static;
+    grid-column: 2;
+    flex: 0 0 auto;
+    width: auto;
+    max-width: none;
+    min-width: 44px;
+  }
+
+  .nUhMVa_catsRow ._root_1aoad_1 > ._button_cfgyt_4._outline_cfgyt_56._sm_cfgyt_30 {
+    position: static;
+    min-width: 44px;
+    min-height: 44px;
+    width: auto;
+    height: auto;
+    max-width: none;
+    padding: 10px 12px;
+    white-space: nowrap;
+  }
+
+  .nUhMVa_masonry,
+  .nUhMVa_masonryCol {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .nUhMVa_masonryCol {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .nUhMVa_card {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    height: auto;
+    min-height: 0;
+    flex: 0 0 auto;
+    margin-block: 0;
+    padding: 14px 16px;
+  }
+
+  .nUhMVa_row1 {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 12px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    height: auto;
+    min-height: 0;
+  }
+
+  .nUhMVa_row1 > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .nUhMVa_row1 > :first-child {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .nUhMVa_row1 .nUhMVa_cardAction {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .nUhMVa_nm,
+  .nUhMVa_nmLink {
+    display: block;
+    min-width: 0;
+    max-width: 100%;
+    white-space: normal;
+    overflow: visible;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .nUhMVa_nmLink > svg {
+    flex: 0 0 auto;
+    max-width: none;
+  }
+
+  .nUhMVa_byline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: 4px;
+    row-gap: 2px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    height: auto;
+    white-space: normal;
+    overflow: visible;
+    overflow-wrap: anywhere;
+  }
+
+  .nUhMVa_byline .nUhMVa_av {
+    flex: 0 0 auto;
+    max-width: none;
+  }
+
+  .nUhMVa_owner,
+  .nUhMVa_star {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .nUhMVa_cardAction {
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-end;
+    flex: 0 0 auto;
+    min-width: 44px;
+    min-height: 44px;
+    width: auto;
+    max-width: 100%;
+    height: auto;
+    position: static;
+  }
+
+  .nUhMVa_installBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    min-width: 44px;
+    min-height: 44px;
+    width: auto;
+    max-width: 100%;
+    height: auto;
+    padding: 10px 12px;
+    white-space: normal;
+    line-height: 1.25;
+    text-align: center;
+    overflow-wrap: anywhere;
+  }
+
+  .nUhMVa_desc,
+  .nUhMVa_descClamp {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .nUhMVa_descClamp {
+    overflow-x: hidden;
+  }
+
+  .nUhMVa_cardShots {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: flex-start;
+    gap: 8px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .nUhMVa_cardShots > * {
+    flex: 0 0 auto;
+    min-width: 0;
+  }
+
+  .nUhMVa_cardShots img {
+    flex: 0 0 auto;
+    width: auto;
+    max-width: none;
+    height: auto;
+  }
+
+  .nUhMVa_foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    height: auto;
+    min-height: 0;
+  }
+
+  .nUhMVa_hostRequirement,
+  .nUhMVa_tag {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .nUhMVa_footActions {
+    position: static;
+    inset: auto;
+    display: flex;
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    min-width: 98px;
+    max-width: 100%;
+    width: auto;
+    margin-inline-start: auto;
+  }
+
+  .nUhMVa_favoriteBtn,
+  .nUhMVa_commentsLink {
+    position: static;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    min-width: 44px;
+    min-height: 44px;
+    width: auto;
+    max-width: 100%;
+    height: auto;
+    padding: 10px;
+    white-space: normal;
+    text-align: center;
+    overflow-wrap: anywhere;
+  }
+
+  .nUhMVa_commentsLink {
+    padding-inline: 10px;
+  }
+}
+@media (max-width: 600px) {
+  .nUhMVa_title { font-size: 18px; line-height: 1.25; }
+  .nUhMVa_repoLink,
+  .nUhMVa_version { font-size: 14px; line-height: 20px; }
+
+  .nUhMVa_titleRow > button {
+    min-height: 44px;
+    padding: 6px 8px;
+    font-size: 14px;
+    line-height: 18px;
+    border-radius: 14px;
+  }
+
+  .nUhMVa_sub { column-gap: 8px; row-gap: 2px; }
+  .nUhMVa_sub > span:first-child,
+  .nUhMVa_submitLink { font-size: 14px; line-height: 20px; }
+  .nUhMVa_exportLogBtn {
+    min-height: 44px;
+    padding: 6px 10px;
+    font-size: 14px;
+    line-height: 18px;
+    border-radius: 14px;
+  }
+
+  .nUhMVa_tabs { min-height: 44px; }
+  .nUhMVa_tab,
+  .nUhMVa_opEntry {
+    min-height: 44px;
+    padding: 6px 8px;
+    font-size: 14px;
+    line-height: 18px;
+  }
+
+  .nUhMVa_tabSearchRow { min-height: 48px; }
+  .nUhMVa_tabSearch._wrap_1g6ru_1 { min-height: 44px; }
+  .nUhMVa_tabSearch ._input_1g6ru_25 {
+    min-height: 44px;
+    font-size: 16px;
+    line-height: 20px;
+  }
+
+  .nUhMVa_catsWrap > ._pill_e3ygd_1._interactive_e3ygd_15 {
+    min-height: 44px;
+    padding: 6px 9px;
+    font-size: 14px;
+    line-height: 18px;
+  }
+  .nUhMVa_catsRow ._root_1aoad_1 > ._button_cfgyt_4._outline_cfgyt_56._sm_cfgyt_30 {
+    min-height: 44px;
+    padding: 6px 10px;
+    font-size: 14px;
+    line-height: 18px;
+  }
+
+  .nUhMVa_masonryCol { gap: 8px; }
+  .nUhMVa_card {
+    padding: 12px;
+    border-radius: 14px;
+  }
+  .nUhMVa_row1 { gap: 8px; }
+  .nUhMVa_nm,
+  .nUhMVa_nmLink {
+    font-size: 17px;
+    line-height: 22px;
+  }
+  .nUhMVa_byline {
+    column-gap: 3px;
+    row-gap: 1px;
+    font-size: 13px;
+    line-height: 18px;
+  }
+  .nUhMVa_byline .nUhMVa_av {
+    width: 16px;
+    height: 16px;
+  }
+  .nUhMVa_installBtn {
+    min-width: 44px;
+    min-height: 44px;
+    max-width: 68px;
+    padding: 6px 12px;
+    font-size: 14px;
+    line-height: 18px;
+    border-radius: 14px;
+  }
+  .nUhMVa_desc,
+  .nUhMVa_descClamp {
+    font-size: 14px;
+    line-height: 20px;
+  }
+  .nUhMVa_foot {
+    gap: 6px 8px;
+    font-size: 13px;
+    line-height: 18px;
+  }
+  .nUhMVa_hostRequirement,
+  .nUhMVa_tag {
+    padding: 3px 7px;
+    line-height: 18px;
+  }
+  .nUhMVa_footActions { gap: 8px; }
+  .nUhMVa_favoriteBtn,
+  .nUhMVa_commentsLink {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 6px;
+    font-size: 13px;
+    line-height: 18px;
+  }
+}
+
+@media (max-width: 600px) {
+  .nUhMVa_title { font-size: 17px; line-height: 21px; }
+  .nUhMVa_repoLink,
+  .nUhMVa_version { font-size: 13px; line-height: 18px; }
+  .nUhMVa_titleRow > button,
+  .nUhMVa_exportLogBtn {
+    font-size: 13px;
+    line-height: 17px;
+    padding-inline: 7px;
+  }
+  .nUhMVa_sub > span:first-child,
+  .nUhMVa_submitLink { font-size: 13px; line-height: 18px; }
+
+  .nUhMVa_tab,
+  .nUhMVa_opEntry {
+    font-size: 13px;
+    line-height: 17px;
+    padding-inline: 7px;
+  }
+
+  .nUhMVa_tabSearchRow {
+    min-height: 48px;
+    padding-top: 2px;
+    padding-bottom: 8px;
+  }
+  .nUhMVa_cats {
+    min-height: 50px;
+    padding-top: 6px;
+    padding-bottom: 0;
+  }
+  .nUhMVa_catsRow {
+    min-height: 44px;
+    height: 44px;
+  }
+  .nUhMVa_catsWrap > ._pill_e3ygd_1._interactive_e3ygd_15,
+  .nUhMVa_catsRow ._root_1aoad_1 > ._button_cfgyt_4._outline_cfgyt_56._sm_cfgyt_30 {
+    font-size: 13px;
+    line-height: 17px;
+    padding-inline: 8px;
+  }
+
+  .nUhMVa_masonry,
+  .nUhMVa_masonryCol { gap: 6px; }
+  .nUhMVa_card {
+    padding: 10px;
+    border-radius: 13px;
+  }
+  .nUhMVa_row1 { gap: 6px; }
+  .nUhMVa_nm,
+  .nUhMVa_nmLink {
+    font-size: 16px;
+    line-height: 20px;
+  }
+  .nUhMVa_byline {
+    font-size: 12px;
+    line-height: 16px;
+  }
+  .nUhMVa_installBtn {
+    max-width: 62px;
+    padding-inline: 10px;
+    font-size: 13px;
+    line-height: 17px;
+    border-radius: 13px;
+  }
+  .nUhMVa_desc,
+  .nUhMVa_descClamp {
+    font-size: 13px;
+    line-height: 18px;
+  }
+  .nUhMVa_foot {
+    gap: 4px 6px;
+    font-size: 12px;
+    line-height: 16px;
+  }
+  .nUhMVa_hostRequirement,
+  .nUhMVa_tag {
+    padding: 2px 6px;
+    line-height: 16px;
+  }
+  .nUhMVa_favoriteBtn,
+  .nUhMVa_commentsLink {
+    font-size: 12px;
+    line-height: 16px;
+  }
+}
+@media (max-width: 600px) {
+  .nUhMVa_root { padding-inline: 8px; }
+  .nUhMVa_head { gap: 4px; }
+  .nUhMVa_titleRow { gap: 3px 4px; }
+  .nUhMVa_title { font-size: 16px; line-height: 20px; }
+  .nUhMVa_repoLink,
+  .nUhMVa_version { font-size: 12px; line-height: 16px; }
+
+  .nUhMVa_titleRow > button {
+    min-height: 30px;
+    height: 30px;
+    padding: 2px 5px;
+    font-size: 11.5px;
+    line-height: 15px;
+    border-radius: 8px;
+  }
+  .nUhMVa_titleRow > button:nth-of-type(3) {
+    min-height: 30px;
+    height: 30px;
+    padding-inline: 4px;
+    background: transparent;
+    color: inherit;
+    border-color: transparent;
+  }
+
+  .nUhMVa_sub { column-gap: 6px; row-gap: 0; }
+  .nUhMVa_sub > span:first-child,
+  .nUhMVa_submitLink { font-size: 12px; line-height: 16px; }
+  .nUhMVa_submitLink { min-height: 36px; }
+  .nUhMVa_exportLogBtn {
+    min-height: 36px;
+    padding: 4px 8px;
+    font-size: 12px;
+    line-height: 16px;
+    border-radius: 10px;
+  }
+
+  .nUhMVa_tabs { min-height: 40px; }
+  .nUhMVa_tab,
+  .nUhMVa_opEntry {
+    min-height: 40px;
+    height: 40px;
+    padding: 4px 6px;
+    font-size: 12px;
+    line-height: 16px;
+  }
+  .nUhMVa_root .nUhMVa_tabs .nUhMVa_opWrap,
+  .nUhMVa_root .nUhMVa_tabs .nUhMVa_opEntry {
+    min-height: 40px;
+    height: 40px;
+  }
+
+  .nUhMVa_tabSearchRow {
+    min-height: 42px;
+    padding-top: 0;
+    padding-bottom: 4px;
+  }
+  .nUhMVa_tabSearch._wrap_1g6ru_1 { min-height: 38px; }
+  .nUhMVa_tabSearch ._input_1g6ru_25 {
+    min-height: 38px;
+    font-size: 16px;
+    line-height: 18px;
+  }
+
+  .nUhMVa_cats {
+    min-height: 42px;
+    padding-top: 2px;
+  }
+  .nUhMVa_catsRow {
+    min-height: 40px;
+    height: 40px;
+    column-gap: 6px;
+  }
+  .nUhMVa_catsWrap { min-height: 40px; gap: 5px; }
+  .nUhMVa_catsWrap > ._pill_e3ygd_1._interactive_e3ygd_15,
+  .nUhMVa_catsToggle,
+  .nUhMVa_catsRow ._root_1aoad_1 > ._button_cfgyt_4._outline_cfgyt_56._sm_cfgyt_30 {
+    min-height: 40px;
+    height: 40px;
+    padding: 4px 7px;
+    font-size: 12px;
+    line-height: 16px;
+  }
+
+  .nUhMVa_masonry,
+  .nUhMVa_masonryCol { gap: 4px; }
+  .nUhMVa_card {
+    padding: 8px;
+    border-radius: 11px;
+  }
+  .nUhMVa_row1 { gap: 4px; }
+  .nUhMVa_nm,
+  .nUhMVa_nmLink {
+    font-size: 15px;
+    line-height: 19px;
+  }
+  .nUhMVa_byline {
+    font-size: 11px;
+    line-height: 15px;
+  }
+  .nUhMVa_installBtn {
+    min-width: 48px;
+    min-height: 36px;
+    height: 36px;
+    max-width: 56px;
+    padding: 4px 8px;
+    font-size: 12px;
+    line-height: 16px;
+    border-radius: 10px;
+  }
+  .nUhMVa_desc,
+  .nUhMVa_descClamp {
+    font-size: 12px;
+    line-height: 17px;
+  }
+  .nUhMVa_foot {
+    gap: 3px 5px;
+    font-size: 11px;
+    line-height: 15px;
+  }
+  .nUhMVa_hostRequirement,
+  .nUhMVa_tag {
+    padding: 2px 5px;
+    line-height: 15px;
+  }
+  .nUhMVa_footActions { gap: 4px; }
+  .nUhMVa_favoriteBtn,
+  .nUhMVa_commentsLink {
+    min-width: 40px;
+    min-height: 40px;
+    padding: 4px;
+    font-size: 11px;
+    line-height: 15px;
+  }
+}
+
+@media (max-width: 600px) {
+  .nUhMVa_stickyHead { margin-top: 0; }
+  .nUhMVa_tabSearchRow {
+    min-height: 38px;
+    height: 38px;
+    padding-top: 0;
+    padding-bottom: 2px;
+  }
+  .nUhMVa_tabSearch._wrap_1g6ru_1 {
+    min-height: 34px;
+    height: 34px;
+    border-radius: 9px;
+  }
+  .nUhMVa_tabSearch ._input_1g6ru_25 {
+    min-height: 34px;
+    height: 34px;
+    font-size: 16px;
+    line-height: 18px;
+  }
+  .nUhMVa_tabSearch ._icon_1g6ru_16 svg {
+    width: 13px;
+    height: 13px;
+  }
+
+  .nUhMVa_cats {
+    min-height: 36px;
+    height: 36px;
+    padding-top: 0;
+    padding-bottom: 0;
+    margin-bottom: 0;
+  }
+  .nUhMVa_catsRow {
+    min-height: 36px;
+    height: 36px;
+    column-gap: 4px;
+  }
+  .nUhMVa_catsWrap {
+    min-height: 36px;
+    height: 36px;
+    gap: 4px;
+  }
+  .nUhMVa_catsWrap > ._pill_e3ygd_1._interactive_e3ygd_15,
+  .nUhMVa_catsToggle,
+  .nUhMVa_catsRow ._root_1aoad_1 > ._button_cfgyt_4._outline_cfgyt_56._sm_cfgyt_30 {
+    min-height: 34px;
+    height: 34px;
+    padding: 3px 6px;
+    font-size: 11px;
+    line-height: 14px;
+    border-radius: 9px;
+  }
+
+  .nUhMVa_masonry,
+  .nUhMVa_masonryCol { gap: 3px; }
+  .nUhMVa_card {
+    padding: 6px;
+    gap: 6px;
+    border-radius: 9px;
+  }
+  .nUhMVa_row1 { gap: 3px; }
+  .nUhMVa_nm,
+  .nUhMVa_nmLink {
+    font-size: 14px;
+    line-height: 18px;
+  }
+  .nUhMVa_nmLink > svg {
+    width: 11px;
+    height: 11px;
+  }
+  .nUhMVa_byline {
+    column-gap: 2px;
+    row-gap: 0;
+    font-size: 10px;
+    line-height: 14px;
+  }
+  .nUhMVa_byline .nUhMVa_av {
+    width: 14px;
+    height: 14px;
+  }
+  .nUhMVa_installBtn {
+    min-width: 46px;
+    min-height: 32px;
+    height: 32px;
+    max-width: 52px;
+    padding: 3px 7px;
+    font-size: 11px;
+    line-height: 14px;
+    border-radius: 9px;
+  }
+  .nUhMVa_desc,
+  .nUhMVa_descClamp {
+    font-size: 11px;
+    line-height: 15px;
+  }
+  .nUhMVa_cardShots { gap: 5px; }
+  .nUhMVa_foot {
+    gap: 2px 4px;
+    font-size: 10px;
+    line-height: 14px;
+  }
+  .nUhMVa_hostRequirement,
+  .nUhMVa_tag {
+    padding: 1px 4px;
+    line-height: 14px;
+    border-radius: 5px;
+  }
+  .nUhMVa_footActions { gap: 2px; }
+  .nUhMVa_favoriteBtn,
+  .nUhMVa_commentsLink {
+    min-width: 34px;
+    min-height: 34px;
+    padding: 2px;
+    font-size: 10px;
+    line-height: 14px;
+  }
+  .nUhMVa_favoriteBtn svg {
+    width: 13px;
+    height: 13px;
+  }
+}
+
+@media (max-width: 600px) {
+  /* Unified compact scale after 390px real-page boundary verification. */
+  .nUhMVa_root {
+    zoom: 0.9;
+    width: 100%;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+}
+
+/* Restart banner: undo the tabs-only spacer treatment for banner text. */
+@media (max-width: 600px) {
+  .nUhMVa_banner {
+    display: grid;
+    grid-template-columns: 14px minmax(0, 1fr) auto auto;
+    align-items: center;
+    column-gap: 5px;
+    width: 100%;
+    min-height: 34px;
+    padding: 5px 7px;
+    box-sizing: border-box;
+    border-radius: 9px;
+  }
+  .nUhMVa_banner > .nUhMVa_grow {
+    display: block;
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    font-size: 11px;
+    line-height: 15px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .nUhMVa_bannerIcon,
+  .nUhMVa_bannerHint svg {
+    width: 12px;
+    height: 12px;
+  }
+  .nUhMVa_bannerHint,
+  .nUhMVa_banner button {
+    min-width: 30px;
+    min-height: 30px;
+    padding: 2px 4px;
+    font-size: 10px;
+    line-height: 14px;
+  }
+}
+
+/* Task panel: escape the horizontally scrolling tabs only while open. */
+@media (max-width: 600px) {
+  .nUhMVa_tabs:has(.nUhMVa_opPanel) {
+    overflow: visible;
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+  .nUhMVa_opPanel {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    right: auto;
+    bottom: auto;
+    transform: translate(-50%, -50%);
+    width: min(310px, calc(100vw - 32px));
+    max-height: 60vh;
+    z-index: 2147483647;
+    padding: 12px;
+    border-radius: 14px;
+    overflow: auto;
+  }
+  .nUhMVa_opHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .nUhMVa_opCloseBtn {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    min-height: 32px;
+  }
+  .nUhMVa_opEmpty { padding: 14px 6px; }
+  .nUhMVa_opEmptyHint {
+    font-size: 12px;
+    line-height: 17px;
+  }
+}
