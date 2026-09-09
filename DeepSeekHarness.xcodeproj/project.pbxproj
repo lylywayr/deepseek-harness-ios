@@ -34,6 +34,11 @@
 		A10000000000000000000021 /* PocketV2Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000021 /* PocketV2Tests.swift */; };
 		A10000000000000000000013 /* HarnessWire.swift in Tests */ = {isa = PBXBuildFile; fileRef = B10000000000000000000012 /* HarnessWire.swift */; };
 		A10000000000000000000014 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B10000000000000000000015 /* XCTest.framework */; };
+		FAD7E876AFEF8D94DEAE7F72 /* HarnessPluginMarketViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EFD7745946AFFF4B790608E; };
+		645358540BE7141FC802DB8D /* MarketBootstrapClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F184C345175FDDB359C3C79; };
+		A28A534AE88B7002A2BA5A7D /* market-mobile-v1.41.0.css in Resources */ = {isa = PBXBuildFile; fileRef = 29ECCF98E39C8C4BB7ABB42B; };
+		9C48F819E1FBC55FB113E360 /* market-rendering-v1.41.0.css in Resources */ = {isa = PBXBuildFile; fileRef = 90E2BDAE86B1DB4144E09B1D; };
+		3F2F0EAE65533F9BBA34C824 /* theme-mobile-v1.41.0.css in Resources */ = {isa = PBXBuildFile; fileRef = 3C8779B32A3A996E22697081; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -73,6 +78,11 @@
 		B10000000000000000000021 /* PocketV2Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PocketV2Tests.swift; sourceTree = "<group>"; };
 		B10000000000000000000014 /* HarnessWireTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HarnessWireTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B10000000000000000000015 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
+		9EFD7745946AFFF4B790608E = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarnessPluginMarketViewController.swift; sourceTree = "<group>"; };
+		3F184C345175FDDB359C3C79 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarketBootstrapClient.swift; sourceTree = "<group>"; };
+		29ECCF98E39C8C4BB7ABB42B = {isa = PBXFileReference; lastKnownFileType = text.css; path = market-mobile-v1.41.0.css; sourceTree = "<group>"; };
+		90E2BDAE86B1DB4144E09B1D = {isa = PBXFileReference; lastKnownFileType = text.css; path = market-rendering-v1.41.0.css; sourceTree = "<group>"; };
+		3C8779B32A3A996E22697081 = {isa = PBXFileReference; lastKnownFileType = text.css; path = theme-mobile-v1.41.0.css; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -125,9 +135,22 @@
 				B1000000000000000000001E /* PocketWorkspaceViewController.swift */,
 				B1000000000000000000001F /* PocketConversationViewController.swift */,
 				B10000000000000000000020 /* PocketActivityViewController.swift */,
+				9EFD7745946AFFF4B790608E /* HarnessPluginMarketViewController.swift */,
+				3F184C345175FDDB359C3C79 /* MarketBootstrapClient.swift */,
 				B10000000000000000000011 /* Assets.xcassets */,
+				1E362C365FBAC4858B082AE7 /* Resources */,
 			);
 			path = DeepSeekHarness;
+			sourceTree = "<group>";
+		};
+		1E362C365FBAC4858B082AE7 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				29ECCF98E39C8C4BB7ABB42B /* market-mobile-v1.41.0.css */,
+				90E2BDAE86B1DB4144E09B1D /* market-rendering-v1.41.0.css */,
+				3C8779B32A3A996E22697081 /* theme-mobile-v1.41.0.css */,
+			);
+			path = Resources;
 			sourceTree = "<group>";
 		};
 		D10000000000000000000002 /* Products */ = {
@@ -221,6 +244,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				A10000000000000000000010 /* Assets.xcassets in Resources */,
+				A28A534AE88B7002A2BA5A7D /* market-mobile-v1.41.0.css in Resources */,
+				9C48F819E1FBC55FB113E360 /* market-rendering-v1.41.0.css in Resources */,
+				3F2F0EAE65533F9BBA34C824 /* theme-mobile-v1.41.0.css in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -271,6 +297,8 @@
 				A1000000000000000000001A /* HarnessEndpoint.swift in Sources */,
 				A1000000000000000000000F /* HarnessSettingsCenterViewController.swift in Sources */,
 				A10000000000000000000011 /* HarnessWire.swift in Sources */,
+				FAD7E876AFEF8D94DEAE7F72 /* HarnessPluginMarketViewController.swift in Sources */,
+				645358540BE7141FC802DB8D /* MarketBootstrapClient.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
