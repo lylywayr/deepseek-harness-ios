@@ -8,6 +8,9 @@ enum MarketBootstrapContract {
     static let productID = "dsh-market"
     static let displayName = "dsh-market"
     static let verifiedPageVersion = "v1.41.0"
+    // Verified against the official dsh-market v1.41.0 tag package.json.
+    // Package and page versions remain separate contract fields.
+    static let verifiedPackageVersion = "1.41.0"
     static let statusPath = "mobile-bootstrap/market/status"
     static let installPath = "mobile-bootstrap/market/install"
     static let jobsPath = "mobile-bootstrap/jobs"

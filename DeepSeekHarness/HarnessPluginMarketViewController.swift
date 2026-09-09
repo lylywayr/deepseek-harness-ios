@@ -133,13 +133,33 @@ final class HarnessPluginMarketViewController: UIViewController {
             guard let self else { return }
             do {
                 try Task.checkCancellation()
-                // The optional client is intentionally unused until an
-                // integration supplies a fixed verifiedPackageVersion. No
-                // configuration means no POST can be constructed.
-                _ = self.bootstrapClient
+                if let client = self.bootstrapClient {
+                    let status = try await client.fetchStatus()
+                    switch MarketInstallationPolicy(
+                        verifiedPackageVersion: client.verifiedPackageVersion
+                    ).decision(for: status) {
+                    case .skipInstalledCompatible:
+                        break
+                    case .installMissing:
+                        let response = try await client.install(
+                            MarketInstallRequest(version: client.verifiedPackageVersion)
+                        )
+                        let job = try await client.pollInstallJob(jobID: response.jobID)
+                        guard job.state == .succeeded else {
+                            throw MarketBootstrapError.transport(
+                                job.error?.message ?? job.message ?? "插件市场安装未成功。"
+                            )
+                        }
+                    case .needsDecision:
+                        throw MarketBootstrapError.noInstallDecision
+                    }
+                }
+                try Task.checkCancellation()
                 self.hasRequestedMarketRoute = false
                 self.hasLoadedDocument = false
                 self.webView.load(URLRequest(url: self.marketURL))
+            } catch is CancellationError {
+                return
             } catch {
                 self.showError(error.localizedDescription)
             }

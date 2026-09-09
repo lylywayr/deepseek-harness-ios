@@ -211,7 +211,10 @@ class MarketIntegrationContractTests(unittest.TestCase):
     def test_mutation_observer_reapplies_only_on_relevant_dom_changes(self) -> None:
         for marker in (
             "const observer = new MutationObserver",
-            "observer.observe(root, { childList: true, subtree: true, characterData: true });",
+            "root.ownerDocument.documentElement",
+            "root.ownerDocument.head",
+            "root.ownerDocument.body",
+            "observed.forEach(node => observer.observe(node, { childList: true, subtree: true, characterData: true }));",
             "root.__dshMarketObserver = observer",
             "requestAnimationFrame(() =>",
             "const relevant = (record) =>",

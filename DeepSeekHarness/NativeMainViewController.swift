@@ -147,8 +147,13 @@ final class MainViewController: UIViewController {
         }
         let marketURL = endpoint.standardized
         do {
+            let bootstrapClient = try MarketBootstrapClient(
+                baseURL: marketURL,
+                verifiedPackageVersion: MarketBootstrapContract.verifiedPackageVersion
+            )
             let market = try HarnessPluginMarketViewController(
                 marketURL: marketURL,
+                bootstrapClient: bootstrapClient,
                 externalNavigationHandler: { url in
                     UIApplication.shared.open(url, options: [:])
                 },
