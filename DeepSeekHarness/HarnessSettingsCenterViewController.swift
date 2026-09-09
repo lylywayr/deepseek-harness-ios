@@ -328,6 +328,7 @@ final class HarnessSettingsCenterViewController: UIViewController, UITableViewDa
     private func generalRows() -> [(String, [SettingRow])] {
         let s = appState.settings
         let appearance = [
+            SettingRow(title: "语言", subtitle: "跟随系统；当前客户端没有可变语言模型或持久化语言接口，不可在此配置。", value: "跟随系统", action: nil),
             SettingRow(title: "外观", subtitle: "系统、浅色或深色；颜色会随系统动态调整。", value: themeName(s.theme), action: { [weak self] in self?.chooseTheme() }),
             SettingRow(title: "正文字号", subtitle: "支持 Dynamic Type；代码字号独立调整。", value: "\(s.fontSize) pt", action: { [weak self] in self?.chooseFontSize() }),
             SettingRow(title: "代码字号", subtitle: "等宽工具调用、命令与日志。", value: "\(s.codeFontSize) pt", action: { [weak self] in self?.chooseCodeFontSize() }),
@@ -555,14 +556,10 @@ final class HarnessSettingsCenterViewController: UIViewController, UITableViewDa
             onPluginMarket()
             return
         }
+        // The observer owns presentation and any user-facing status.  Posting
+        // without presenting keeps this fallback side-effect free and avoids
+        // an alert that could contradict an observer that handled the route.
         NotificationCenter.default.post(name: .harnessPluginMarketRouteRequested, object: self)
-        let alert = UIAlertController(
-            title: "插件市场",
-            message: "插件市场路由尚未接入当前客户端。此处不会打开网页或生成市场内容。",
-            preferredStyle: .alert
-        )
-        alert.addAction(UIAlertAction(title: "知道了", style: .default))
-        present(alert, animated: true)
     }
 
     @objc private func refreshPluginList() {
