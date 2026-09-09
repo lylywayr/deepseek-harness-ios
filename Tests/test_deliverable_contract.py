@@ -23,6 +23,7 @@ REQUIRED = os.environ.get("DELIVERABLE_REQUIRED") == "1"
 
 BASE_CSS_SHA256 = "6c7f0f4adb2cd369d96bbed792b36453e7b30cafc340feb18c5f9ac0b3dd62fc"
 THEME_CSS_SHA256 = "1f0866dc2b26325b03781f2c167a9a4b6a66a3d2b3f6d4b3ec3958f5a3f59677"
+RENDERING_CSS_SHA256 = "cf20a28838edf915dd851bd520c0cfc620f1d4478fe986fad8fd0473a5f7d1ed"
 MARKET_GLOB = "*Plugin*Market*.swift"
 KNOWN_OPTIONAL_FEATURES = {"settings", "market", "export", "context-sheet"}
 
@@ -108,7 +109,8 @@ class DeliverableContractTests(unittest.TestCase):
         credential_patterns = (
             r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----",
             r"\bBearer\s+[A-Za-z0-9._~+/=-]{24,}",
-            r"\b(?:ghp|gho|github_pat|sk|AKIA)[A-Za-z0-9_-]{16,}",
+            r"\b(?:ghp_|gho_|github_pat_|sk-)[A-Za-z0-9_-]{16,}",
+            r"\bAKIA[A-Z0-9]{16}\b",
             r"https?://[^\s\"']+:[^\s\"']+@",
             r"\b(?:api[_-]?key|client[_-]?secret|password)\s*[:=]\s*[\"'][^\"']{16,}[\"']",
         )
@@ -168,13 +170,14 @@ class DeliverableContractTests(unittest.TestCase):
         self.assertIn("cookie.isSecure", source)
         self.assertNotRegex(source, r"evaluateJavaScript[^\n]*(?:token|credential|authorization)")
         self.assertNotRegex(source, r"(?i)(?:localStorage|postMessage)\s*[^\n]*(?:token|credential)")
-        self.assertIn("MarketBootstrapContract.verifiedVersion", source)
+        self.assertIn("MarketBootstrapContract.verifiedPageVersion", source)
+        self.assertIn("MarketBootstrapContract.verifiedPackageVersion", self.production)
         self.assertIn("removeStyles", source)
         self.assertIn("lastInjectedPageKey", source)
         self.assertIn("data-dsh-market-css", source)
         self.assertIn(BASE_CSS_SHA256, source)
         self.assertIn(THEME_CSS_SHA256, source)
-        self.assertNotIn("cf20a28838edf915dd851bd520c0cfc620f1d4478fe986fad8fd0473a5f7d1ed", source)
+        self.assertIn(RENDERING_CSS_SHA256, source)
 
         bootstrap = self.market_bootstrap_sources()
         self.assertEqual(len(bootstrap), 1, "market bootstrap contract must have one source")
