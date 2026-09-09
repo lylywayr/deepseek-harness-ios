@@ -8,11 +8,13 @@ import WebKit
 final class HarnessPluginMarketViewController: UIViewController {
     typealias ExternalNavigationHandler = (URL) -> Void
     typealias VerificationHandler = (String) -> Void
+    typealias RouteFailureHandler = (String) -> Void
 
     private let marketURL: URL
     private let marketOrigin: MarketOrigin
     private let externalNavigationHandler: ExternalNavigationHandler
     private let verificationHandler: VerificationHandler?
+    private let routeFailureHandler: RouteFailureHandler?
     private let bootstrapClient: MarketBootstrapClient?
     private let webView: WKWebView
     private let configuration: WKWebViewConfiguration
@@ -23,6 +25,7 @@ final class HarnessPluginMarketViewController: UIViewController {
     private var lastInjectedPageKey: String?
     private var currentMarketVersion: String?
     private var lastReportedVersion: String?
+    private var hasRequestedMarketRoute = false
 
     init(
         marketURL: URL,
@@ -31,6 +34,7 @@ final class HarnessPluginMarketViewController: UIViewController {
             UIApplication.shared.open(url, options: [:])
         },
         verificationHandler: VerificationHandler? = nil,
+        routeFailureHandler: RouteFailureHandler? = nil,
         bundle: Bundle = .main
     ) throws {
         guard let origin = MarketOrigin(url: marketURL) else {
@@ -53,6 +57,7 @@ final class HarnessPluginMarketViewController: UIViewController {
         self.marketOrigin = origin
         self.externalNavigationHandler = externalNavigationHandler
         self.verificationHandler = verificationHandler
+        self.routeFailureHandler = routeFailureHandler
         self.bootstrapClient = bootstrapClient
         self.configuration = configuration
         self.webView = WKWebView(frame: .zero, configuration: configuration)
@@ -132,6 +137,8 @@ final class HarnessPluginMarketViewController: UIViewController {
                 // integration supplies a fixed verifiedPackageVersion. No
                 // configuration means no POST can be constructed.
                 _ = self.bootstrapClient
+                self.hasRequestedMarketRoute = false
+                self.hasLoadedDocument = false
                 self.webView.load(URLRequest(url: self.marketURL))
             } catch {
                 self.showError(error.localizedDescription)
@@ -145,12 +152,35 @@ final class HarnessPluginMarketViewController: UIViewController {
             guard self.marketOrigin.matches(url) else { return }
             self.hasLoadedDocument = true
             self.lastInjectedPageKey = nil
-            self.injectVerifiedCSSIfNeeded()
         }
     }
 
-    private func injectVerifiedCSSIfNeeded() {
+    private func routeToPluginMarketIfNeeded() {
+        guard hasLoadedDocument, !hasRequestedMarketRoute else { return }
+        hasRequestedMarketRoute = true
+        evaluateRouteAttempt(remainingAttempts: 50)
+    }
+
+    private func evaluateRouteAttempt(remainingAttempts: Int) {
         guard hasLoadedDocument else { return }
+        webView.evaluateJavaScript(Self.pluginMarketRouteScript) { [weak self] result, error in
+            guard let self else { return }
+            if error == nil, let routed = result as? Bool, routed {
+                self.verifyPageAndInjectCSS()
+                return
+            }
+            guard remainingAttempts > 0 else {
+                self.hasRequestedMarketRoute = false
+                self.routeFailureHandler?("未找到插件市场入口，页面路由失败。")
+                return
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                self?.evaluateRouteAttempt(remainingAttempts: remainingAttempts - 1)
+            }
+        }
+    }
+
+    private func verifyPageAndInjectCSS() {
         webView.evaluateJavaScript(Self.versionDetectionScript) { [weak self] result, _ in
             guard let self else { return }
             let version = result as? String
@@ -185,6 +215,36 @@ final class HarnessPluginMarketViewController: UIViewController {
         alert.addAction(UIAlertAction(title: "知道了", style: .default))
         present(alert, animated: true)
     }
+
+    private static let pluginMarketRouteScript = """
+    (() => {
+      const stateKey = '__dshMarketNativeRoute';
+      const state = window[stateKey] || (window[stateKey] = {
+        openedSettings: false,
+        clickedMarket: false
+      });
+      const marketRoot = document.querySelector('.nUhMVa_root');
+      const versionNode = document.querySelector('.nUhMVa_version');
+      if (state.clickedMarket && (marketRoot || versionNode)) return true;
+      if (!state.openedSettings) {
+        const trigger = document.querySelector('.VOzbGW_trigger');
+        if (!trigger) return false;
+        state.openedSettings = true;
+        trigger.click();
+        return false;
+      }
+      if (!state.clickedMarket) {
+        const button = Array.from(document.querySelectorAll('button')).find(
+          node => (node.textContent || '').trim() === '插件市场'
+        );
+        if (!button) return false;
+        state.clickedMarket = true;
+        button.click();
+        return false;
+      }
+      return false;
+    })()
+    """
 
     private static let versionDetectionScript = """
     (() => {
@@ -352,7 +412,9 @@ private struct MarketCSSBundle {
                 || Array.from(record.removedNodes || []).some(node => node.nodeType !== 1 || node.tagName !== 'STYLE');
             };
             const observer = new MutationObserver(records => { if (records.some(relevant)) schedule(); });
-            observer.observe(root, { childList: true, subtree: true, characterData: true });
+            const observed = [root.ownerDocument.documentElement, root.ownerDocument.head, root.ownerDocument.body]
+              .filter((node, index, values) => node && values.indexOf(node) === index);
+            observed.forEach(node => observer.observe(node, { childList: true, subtree: true, characterData: true }));
             root.__dshMarketObserver = observer;
           }
         })();
@@ -404,7 +466,7 @@ extension HarnessPluginMarketViewController: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         hasLoadedDocument = true
         lastInjectedPageKey = nil
-        injectVerifiedCSSIfNeeded()
+        routeToPluginMarketIfNeeded()
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {

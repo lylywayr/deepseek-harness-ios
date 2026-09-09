@@ -1,3 +1,4 @@
+import Foundation
 import UIKit
 
 @main
@@ -44,6 +45,7 @@ final class MainViewController: UIViewController {
     private let appState: AppState
     private let nativeUIStore: NativeUIStore
     private var currentChild: UIViewController?
+    private var isPresentingPluginMarket = false
 
     init(appState: AppState, nativeUIStore: NativeUIStore) {
         self.appState = appState
@@ -57,7 +59,21 @@ final class MainViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = DHTheme.background
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(pluginMarketRouteRequested),
+            name: Notification.Name("HarnessPluginMarketRouteRequested"),
+            object: nil
+        )
         render()
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(
+            self,
+            name: Notification.Name("HarnessPluginMarketRouteRequested"),
+            object: nil
+        )
     }
 
     private func render() {
@@ -113,6 +129,59 @@ final class MainViewController: UIViewController {
         child.view.removeFromSuperview()
         child.removeFromParent()
         currentChild = nil
+    }
+
+    @objc private func pluginMarketRouteRequested() {
+        presentPluginMarket()
+    }
+
+    private func presentPluginMarket() {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in self?.presentPluginMarket() }
+            return
+        }
+        guard !isPresentingPluginMarket,
+              presentedViewController == nil,
+              let endpoint = appState.endpointURL else {
+            return
+        }
+        let marketURL = endpoint.standardized
+        do {
+            let market = try HarnessPluginMarketViewController(
+                marketURL: marketURL,
+                externalNavigationHandler: { url in
+                    UIApplication.shared.open(url, options: [:])
+                },
+                verificationHandler: { [weak self] version in
+                    self?.showMarketAlert("页面版本未验证（\(version)）。")
+                },
+                routeFailureHandler: { [weak self] message in
+                    self?.showMarketAlert(message)
+                }
+            )
+            let cookies = HTTPCookieStorage.shared.cookies(for: endpoint) ?? []
+            isPresentingPluginMarket = true
+            market.syncSameOriginCookies(cookies) { [weak self] in
+                guard let self else { return }
+                let navigation = UINavigationController(rootViewController: market)
+                navigation.navigationBar.tintColor = DHTheme.text
+                navigation.navigationBar.standardAppearance = DHNavigationAppearance.make()
+                navigation.modalPresentationStyle = .fullScreen
+                self.present(navigation, animated: true) { [weak self] in
+                    self?.isPresentingPluginMarket = false
+                }
+            }
+        } catch {
+            showMarketAlert(error.localizedDescription)
+        }
+    }
+
+    private func showMarketAlert(_ message: String) {
+        let presenter = presentedViewController ?? self
+        guard presenter.presentedViewController == nil else { return }
+        let alert = UIAlertController(title: "插件市场", message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "知道了", style: .default))
+        presenter.present(alert, animated: true)
     }
 
     @objc private func openSettings() {
