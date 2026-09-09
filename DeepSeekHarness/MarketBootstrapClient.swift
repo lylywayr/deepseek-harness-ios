@@ -51,7 +51,7 @@ struct MarketPluginStatus: Codable, Equatable {
         installedVersion = try container.decodeIfPresent(String.self, forKey: .installedVersion)
             ?? container.decodeIfPresent(String.self, forKey: .version)
         installed = try container.decodeIfPresent(Bool.self, forKey: .installed)
-            ?? installedVersion != nil
+            ?? (installedVersion != nil)
         compatible = try container.decodeIfPresent(Bool.self, forKey: .compatible)
     }
 
@@ -109,7 +109,7 @@ struct MarketStatusResponse: Codable, Equatable {
                 ? MarketPluginStatus(
                     pluginID: pluginID ?? MarketBootstrapContract.packageID,
                     installedVersion: installedVersion,
-                    installed: installed ?? installedVersion != nil,
+                    installed: installed ?? (installedVersion != nil),
                     compatible: compatible
                 )
                 : nil

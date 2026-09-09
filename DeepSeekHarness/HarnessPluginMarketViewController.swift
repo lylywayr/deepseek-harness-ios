@@ -113,10 +113,17 @@ final class HarnessPluginMarketViewController: UIViewController {
             let transportMatches = marketOrigin.scheme != "https" || cookie.isSecure
             return domainMatches && transportMatches
         }
-        guard !accepted.isEmpty else { completion?(); return }
-        configuration.websiteDataStore.httpCookieStore.setCookies(accepted) {
-            DispatchQueue.main.async { completion?() }
+        let cookieStore = configuration.websiteDataStore.httpCookieStore
+        func setCookie(at index: Int) {
+            guard index < accepted.count else {
+                DispatchQueue.main.async { completion?() }
+                return
+            }
+            cookieStore.setCookie(accepted[index]) {
+                setCookie(at: index + 1)
+            }
         }
+        setCookie(at: 0)
     }
 
     func cancelLoading() {

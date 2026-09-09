@@ -69,7 +69,21 @@ class MarketIntegrationContractTests(unittest.TestCase):
         self.assertIn("url.port == port", MARKET)
         self.assertIn("let domainMatches = cookieDomain == marketHost", MARKET)
         self.assertIn("let transportMatches = marketOrigin.scheme != \"https\" || cookie.isSecure", MARKET)
-        self.assertIn("configuration.websiteDataStore.httpCookieStore.setCookies(accepted)", MARKET)
+        sync_start = MARKET.index("    func syncSameOriginCookies(")
+        sync_end = MARKET.index("\n    func cancelLoading", sync_start)
+        sync_body = MARKET[sync_start:sync_end]
+        self.assertNotIn("setCookies", sync_body)
+        self.assertNotIn("httpCookieStore.setCookies", MARKET)
+        self.assertIn("let cookieStore = configuration.websiteDataStore.httpCookieStore", sync_body)
+        self.assertIn("func setCookie(at index: Int)", sync_body)
+        self.assertIn("guard index < accepted.count else", sync_body)
+        self.assertIn("cookieStore.setCookie(accepted[index])", sync_body)
+        self.assertIn("setCookie(at: index + 1)", sync_body)
+        self.assertIn("setCookie(at: 0)", sync_body)
+        self.assertEqual(sync_body.count("cookieStore.setCookie("), 1)
+        self.assertEqual(sync_body.count("DispatchQueue.main.async"), 1)
+        self.assertEqual(sync_body.count("completion?()"), 1)
+        self.assertEqual(BOOTSTRAP.count("?? (installedVersion != nil)"), 2)
         self.assertNotIn("document.cookie", MARKET.lower())
 
     def test_market_javascript_has_no_credential_or_message_bridge_surface(self) -> None:
