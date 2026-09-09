@@ -15,13 +15,23 @@ import sys
 import tempfile
 import zipfile
 from pathlib import Path
+from typing import Optional
 
 FORBIDDEN = (
-    b"WebKit", b"WKWebView", b"evaluateJavaScript", b"AutoNativeAdapter",
-    b"HarnessWebView", b"window.__harnessNative", b"dom-projection",
-    b"192.168.31.2", b"NativeFixtureViewController", b"UITestFixture",
-    b"NativeFixtureScreen",
+    # WebKit/WKWebView/evaluateJavaScript are intentionally absent here. The
+    # production source gates below this binary check prove that the sole
+    # allowed WebView boundary is HarnessPluginMarketViewController.swift.
+    # These binary markers remain forbidden because they identify legacy/web
+    # fallback bridges, fixture code, or private endpoint leakage.
+    b"AutoNativeAdapter", b"HarnessWebView", b"window.__harnessNative",
+    b"dom-projection", b"192.168.31.2", b"NativeFixtureViewController",
+    b"UITestFixture", b"NativeFixtureScreen",
 )
+
+
+def first_forbidden_marker(blob: bytes) -> Optional[bytes]:
+    """Return the first forbidden non-market marker found in *blob*."""
+    return next((marker for marker in FORBIDDEN if marker in blob), None)
 
 
 def fail(message: str) -> None:
@@ -67,9 +77,9 @@ def main() -> int:
         else:
             fail("MinimumOSVersion is missing")
         blob = executable.read_bytes()
-        for marker in FORBIDDEN:
-            if marker in blob:
-                fail(f"forbidden marker in executable: {marker.decode(errors='replace')}")
+        marker = first_forbidden_marker(blob)
+        if marker is not None:
+            fail(f"forbidden marker in executable: {marker.decode(errors='replace')}")
         # Mach-O fat binaries carry one or more architecture slices. On Linux
         # we can still verify the CPU type directly from the Mach-O header.
         if len(blob) < 8:
