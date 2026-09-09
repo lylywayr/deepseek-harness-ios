@@ -1,39 +1,43 @@
 # Deliverable Gap Report
 
-## Audit baseline
+## Integrated baseline
 
-- Branch: `feature/deliverable-audit`
+- Branch: `feature/apple-conversation`
+- Integration HEAD before CI documentation update: `3a896ab2fd456f6a2a37776b973c306cbc046d50`
 - Base: `003cd29b3f610a2565ea4c540019a93c0b281fe2`
-- Scope: static and contract gates only; no production Swift changes.
-- Required mode: `DELIVERABLE_REQUIRED=1`.
-- Screenshot gate: NA — no artifact generated from this audit HEAD.
+- Scope: native settings, isolated plugin market, market bootstrap, static delivery gates.
 
 ## Requirement matrix
 
-| Requirement | Baseline status | Default gate | Required gate |
-|---|---|---|---|
-| Native UIKit entry and constrained renderer | Implemented structurally | PASS | PASS |
-| Legacy/web fallback | Must remain unsupported, never required | PASS | PASS |
-| Native settings/plugin hierarchy | Separate settings branch, absent here | SKIP | FAIL until merged |
-| Unique isolated market WebView | Separate market branch, absent here | SKIP | FAIL until merged |
-| Market CSS byte integrity | Gate checks approved base/theme SHA when resources exist | SKIP with market | FAIL until merged |
-| Official server export to temporary file and system share | Not implemented on baseline | SKIP | FAIL until implemented |
-| Model/reasoning/permission/context controls | Existing native entry markers accepted | PASS | PASS |
-| Dynamic plugin values | Hard-coded sampled counts prohibited | PASS | PASS |
-| Release fixture and credential boundaries | Existing static controls retained | PASS | PASS |
-| iOS 15, arm64, unsigned IPA | CI scripts exist; no artifact from this HEAD | static only | artifact required later |
+| Requirement | Integrated status | Evidence |
+|---|---|---|
+| Native UIKit settings and plugin hierarchy | PASS_LOCAL_STATIC | `test_settings_native_contract.py` |
+| Unique isolated market WebView | PASS_LOCAL_STATIC | sole `HarnessPluginMarketViewController.swift` WebKit boundary |
+| Market CSS byte integrity | PASS | SHA-256 checks for all versioned resources |
+| Market root-SPA route | PASS_LOCAL_STATIC | controlled `.VOzbGW_trigger` then exact `插件市场` button script; no guessed URL |
+| Authentication boundary | PASS_LOCAL_STATIC | same-origin secure Cookie copy to non-persistent store; no token URL/JS bridge |
+| Bootstrap policy | PASS_LOCAL_STATIC | package `dshmarket` fixed at verified `1.41.0`; page contract remains `v1.41.0` |
+| Install behavior | PASS_LOCAL_STATIC | compatible install skips; missing install posts once and polls; mismatch/unknown blocks |
+| Official session-log export | BLOCKED_NOT_VERIFIED | no callable export route/RPC/CLI contract found in current official source or targeted history search |
+| Protocol/native regression gates | PASS_LOCAL_STATIC | both native verifier scripts pass |
+| Xcode build and unsigned IPA | PENDING_CI | iSH has no Xcode toolchain |
 
-## Gate semantics
+## Test results
 
-Default mode preserves the historical suite while reporting known unmerged integration work as explicit skips. Required mode converts settings, market and export gaps into deterministic failures. Security violations—non-whitelisted WebViews or credential-like literals—fail in every mode.
+- Standard discovery: 44 tests, OK, one expected export skip.
+- `MARKET_WIRING_REQUIRED=1`: 44 tests, OK, one expected export skip.
+- `DELIVERABLE_REQUIRED=1`: exactly one failure, official export.
+- No SyntaxError or unittest ERROR.
+- `git diff --check`: PASS.
+
+## Export decision
+
+The client does not synthesize or locally reconstruct an export. A native implementation requires a documented server response or generated remote contract defining the operation, payload, response bytes, filename/content type, authentication and failure semantics. Until that exists, the UI capability must remain unavailable rather than claim an official export.
 
 ## NOT VERIFIED
 
-- Xcode compilation and linkage.
-- Current integrated Release archive and unsigned IPA.
-- Real Harness endpoint behavior.
-- Signed physical-device installation.
-- Dynamic Type, VoiceOver and market touch coordinates on device.
+- macOS/Xcode compilation and linkage for this integration HEAD.
+- Integrated Release archive and unsigned arm64 IPA.
+- Real Harness endpoint bootstrap, root-SPA DOM contract and export behavior.
+- Signed physical-device installation, Dynamic Type and VoiceOver interaction.
 - iPhone 17 Pro Max and iOS 27.
-
-This gate must be rerun on the integration branch after settings, market and export implementations are merged. Historical screenshots, historical IPA files and sibling worktrees are not evidence for this audit HEAD.
