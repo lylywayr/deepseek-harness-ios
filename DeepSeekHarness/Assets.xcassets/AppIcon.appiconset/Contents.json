@@ -3,6 +3,7 @@
     {
       "filename" : "AppIcon-Light-1024.png",
       "idiom" : "universal",
+      "platform" : "ios",
       "scale" : "1x",
       "size" : "1024x1024"
     },
@@ -15,6 +16,7 @@
       ],
       "filename" : "AppIcon-Dark-1024.png",
       "idiom" : "universal",
+      "platform" : "ios",
       "scale" : "1x",
       "size" : "1024x1024"
     }

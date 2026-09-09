@@ -60,6 +60,7 @@ class AppIconContractTests(unittest.TestCase):
         for mode, contract in SOURCE_OUTPUT_CONTRACT.items():
             entry = by_filename[contract["filename"]]
             self.assertEqual(entry.get("idiom"), "universal", mode)
+            self.assertEqual(entry.get("platform"), "ios", mode)
             self.assertEqual(entry.get("scale"), "1x", mode)
             self.assertEqual(entry.get("size"), "1024x1024", mode)
             if contract["appearance"] is None:
