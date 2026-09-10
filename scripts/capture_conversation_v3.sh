@@ -62,33 +62,13 @@ find_udid() {
     '$1 ~ ("^[[:space:]]*" wanted "[[:space:]]*$") { print $2; exit }'
 }
 
-device_state() {
-  local target="$1"
-  xcrun simctl list devices | awk -F '[()]' -v wanted="$target" '
-    $2 == wanted {
-      value=$3
-      gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
-      print value
-      exit
-    }'
-}
-
 boot_simulator() {
   local target="$1"
-  local state attempt rc
-  state="$(device_state "$target")"
-  case "$state" in
-    Booted|Booting)
-      run_timeout shutdown-before-boot xcrun simctl shutdown "$target"
-      ;;
-    Shutdown)
-      ;;
-    *)
-      echo "Simulator $target has unknown state: ${state:-<missing>}" >&2
-      return 1
-      ;;
-  esac
+  local attempt rc
 
+  # Start from a known state without parsing human-formatted `simctl list`
+  # output. Shutdown may legitimately report that the device is already off.
+  run_timeout shutdown-before-boot xcrun simctl shutdown "$target" || true
   run_timeout boot xcrun simctl boot "$target"
   for attempt in 1 2 3 4 5 6 7 8; do
     set +e
@@ -98,9 +78,9 @@ boot_simulator() {
     if [[ "$rc" -eq 0 ]]; then
       return 0
     fi
-    state="$(device_state "$target")"
-    echo "[diag] simulator=${target} bootstatus attempt=${attempt} rc=${rc} state=${state:-<missing>}" >&2
-    if [[ "$state" == "Shutdown" && "$attempt" -lt 8 ]]; then
+    echo "[diag] simulator=${target} bootstatus attempt=${attempt} rc=${rc}" >&2
+    if [[ "$attempt" -lt 8 ]]; then
+      run_timeout "shutdown-retry-${attempt}" xcrun simctl shutdown "$target" || true
       run_timeout "reboot-${attempt}" xcrun simctl boot "$target"
     fi
   done
