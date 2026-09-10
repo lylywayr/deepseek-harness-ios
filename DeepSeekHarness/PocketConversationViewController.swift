@@ -350,7 +350,7 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
             statusControl.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             statusControl.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
             statusControl.bottomAnchor.constraint(equalTo: composer.topAnchor, constant: -8),
-            statusControl.heightAnchor.constraint(greaterThanOrEqualToConstant: 40),
+            statusControl.heightAnchor.constraint(equalToConstant: 40),
             statusIcon.leadingAnchor.constraint(equalTo: statusControl.leadingAnchor, constant: 8),
             statusIcon.centerYAnchor.constraint(equalTo: statusControl.centerYAnchor),
             statusIcon.widthAnchor.constraint(equalToConstant: 22),
