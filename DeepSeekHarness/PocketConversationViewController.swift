@@ -34,6 +34,7 @@ struct ConversationScreenState: Equatable {
     var mode: Mode
     var events: [Event]
     var guidanceAvailable: Bool
+    var guidanceDisabled: Bool = false
 
     static let unavailable = "不可用"
 }
@@ -71,6 +72,16 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
     private let statusIcon = UIImageView()
     private let statusLabel = UILabel()
     private let statusHint = UILabel()
+    private let guidanceBanner = UIView()
+    private let guidanceIcon = UIImageView()
+    private let guidanceTitle = UILabel()
+    private let guidanceDetail = UILabel()
+    private var guidanceBannerHeight: NSLayoutConstraint!
+    private var guidanceTableTopToConfigConstraint: NSLayoutConstraint!
+    private var guidanceTableTopToBannerConstraint: NSLayoutConstraint!
+    #if DEBUG
+    private var fixtureThinkingStateInitialized = false
+    #endif
 
     private let composer = UIView()
     private let composerStack = UIStackView()
@@ -120,6 +131,7 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
         buildModesAndConfig()
         buildComposer()
         buildStatus()
+        buildGuidanceBanner()
         buildTimeline()
         buildMenuOverlay()
         stopObserving = runtime.observeChanges { [weak self] in
@@ -129,6 +141,9 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
             DispatchQueue.main.async { self?.render() }
         }
         NotificationCenter.default.addObserver(self, selector: #selector(settingsDidChange), name: .harnessClientSettingsDidChange, object: appState)
+        #if DEBUG
+        initializeFixtureThinkingStateIfNeeded()
+        #endif
         render()
     }
 
@@ -253,6 +268,50 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
         ])
     }
 
+    private func buildGuidanceBanner() {
+        guidanceBanner.translatesAutoresizingMaskIntoConstraints = false
+        guidanceBanner.dhApplyCard(backgroundColor: .tertiarySystemGroupedBackground, cornerRadius: 12, borderColor: UIColor.systemOrange.withAlphaComponent(0.45), shadow: false)
+        guidanceBanner.isHidden = true
+        view.addSubview(guidanceBanner)
+
+        guidanceIcon.translatesAutoresizingMaskIntoConstraints = false
+        guidanceIcon.image = UIImage(systemName: "info.circle")
+        guidanceIcon.tintColor = .systemOrange
+        guidanceIcon.contentMode = .scaleAspectFit
+        guidanceIcon.isAccessibilityElement = false
+        guidanceTitle.font = DHTheme.font(.subheadline, weight: .semibold)
+        guidanceTitle.textColor = .label
+        guidanceTitle.text = "引导不可用"
+        guidanceTitle.isAccessibilityElement = false
+        guidanceDetail.font = DHTheme.font(.caption2)
+        guidanceDetail.textColor = .secondaryLabel
+        guidanceDetail.numberOfLines = 2
+        guidanceDetail.text = "当前会话未提供 guidance 能力；不会显示示例引导。"
+        guidanceDetail.isAccessibilityElement = false
+        [guidanceIcon, guidanceTitle, guidanceDetail].forEach {
+            $0.translatesAutoresizingMaskIntoConstraints = false
+            guidanceBanner.addSubview($0)
+        }
+        guidanceBannerHeight = guidanceBanner.heightAnchor.constraint(equalToConstant: 0)
+        NSLayoutConstraint.activate([
+            guidanceBanner.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            guidanceBanner.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            guidanceBanner.topAnchor.constraint(equalTo: configPanel.bottomAnchor, constant: 10),
+            guidanceBannerHeight,
+            guidanceIcon.leadingAnchor.constraint(equalTo: guidanceBanner.leadingAnchor, constant: 12),
+            guidanceIcon.topAnchor.constraint(equalTo: guidanceBanner.topAnchor, constant: 13),
+            guidanceIcon.widthAnchor.constraint(equalToConstant: 22),
+            guidanceIcon.heightAnchor.constraint(equalToConstant: 22),
+            guidanceTitle.leadingAnchor.constraint(equalTo: guidanceIcon.trailingAnchor, constant: 9),
+            guidanceTitle.trailingAnchor.constraint(equalTo: guidanceBanner.trailingAnchor, constant: -12),
+            guidanceTitle.topAnchor.constraint(equalTo: guidanceBanner.topAnchor, constant: 9),
+            guidanceDetail.leadingAnchor.constraint(equalTo: guidanceTitle.leadingAnchor),
+            guidanceDetail.trailingAnchor.constraint(equalTo: guidanceTitle.trailingAnchor),
+            guidanceDetail.topAnchor.constraint(equalTo: guidanceTitle.bottomAnchor, constant: 2),
+            guidanceDetail.bottomAnchor.constraint(lessThanOrEqualTo: guidanceBanner.bottomAnchor, constant: -8)
+        ])
+    }
+
     private func buildTimeline() {
         table.backgroundColor = .clear
         table.separatorStyle = .none
@@ -266,10 +325,12 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
         table.register(ConversationArtifactCell.self, forCellReuseIdentifier: "conversation.artifact")
         table.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(table)
+        guidanceTableTopToConfigConstraint = table.topAnchor.constraint(equalTo: configPanel.bottomAnchor, constant: 16)
+        guidanceTableTopToBannerConstraint = table.topAnchor.constraint(equalTo: guidanceBanner.bottomAnchor, constant: 16)
+        guidanceTableTopToConfigConstraint.isActive = true
         NSLayoutConstraint.activate([
             table.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             table.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            table.topAnchor.constraint(equalTo: configPanel.bottomAnchor, constant: 16),
             table.bottomAnchor.constraint(equalTo: statusControl.topAnchor, constant: -3)
         ])
     }
@@ -473,6 +534,7 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
         let nextIDs = mode == .artifacts ? visibleArtifacts.map(\.id) : visibleEvents.map(\.id)
         previousVisibleIDs = nextIDs
         updateHeader()
+        updateGuidanceBanner()
         table.reloadData()
         renderAttachments()
         if oldIDs != nextIDs && wasNearBottom {
@@ -536,23 +598,30 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
     }
 
     #if DEBUG
+    private func initializeFixtureThinkingStateIfNeeded() {
+        guard !fixtureThinkingStateInitialized,
+              let scene = runtime.fixtureScene,
+              scene.hasPrefix("conversation-v3") else { return }
+        thinkingExpanded = scene == "conversation-v3-thinking-expanded"
+        fixtureThinkingStateInitialized = true
+    }
+
     private func makeDebugFixtureState(_ scene: String, base: ConversationScreenState) -> ConversationScreenState {
-        let expanded = scene.contains("expanded")
         let thinking = ConversationScreenState.Event(
             id: "fixture-thinking",
             kind: .thinking,
-            title: expanded ? "思考摘要 · balanced" : "正在思考 · balanced",
-            detail: expanded ? "服务端过程摘要" : "正在整理下一步操作 · 3.8 秒",
+            title: thinkingExpanded ? "思考摘要 · balanced" : "正在思考 · balanced",
+            detail: thinkingExpanded ? "服务端过程摘要" : "正在整理下一步操作 · 3.8 秒",
             body: nil,
             status: .running,
-            summary: expanded ? ["整理工作区结构", "比较方案文件", "准备下一步操作"] : [],
-            expanded: expanded,
+            summary: thinkingExpanded ? ["整理工作区结构", "比较方案文件", "准备下一步操作"] : [],
+            expanded: thinkingExpanded,
             isMarkdown: false
         )
         let tool = ConversationScreenState.Event(id: "fixture-tool", kind: .tool, title: "读取工作区 · workspace.list", detail: "已完成 · 12 项", body: nil, status: .completed, summary: [], expanded: false, isMarkdown: false)
         let answer = ConversationScreenState.Event(id: "fixture-answer", kind: .assistant, title: "Harness 回复", detail: nil, body: "工作区已就绪，我会先整理 Pocket 项目结构，再准备下一步操作。", status: .completed, summary: [], expanded: false, isMarkdown: false)
         var result = base
-        result.events = [thinking, tool, answer]
+        result.events = scene == "conversation-v3-running-empty" ? [] : [thinking, tool, answer]
         result.mode = mode
         result.statusText = "运行中"
         result.statusHint = "轻点停止本次运行"
@@ -561,9 +630,29 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
         result.model = "DeepSeek V4"
         result.permission = "工作区可写"
         result.attachmentSummary = "2"
+        result.guidanceDisabled = scene == "conversation-v3-guidance-disabled"
         return result
     }
     #endif
+
+    private func updateGuidanceBanner() {
+        guard let screenState else { return }
+        let showBanner = screenState.guidanceDisabled
+        guidanceBanner.isHidden = !showBanner
+        guidanceBanner.accessibilityElementsHidden = !showBanner
+        guidanceBanner.isAccessibilityElement = showBanner
+        guidanceBanner.accessibilityLabel = showBanner ? "引导不可用。当前会话未提供 guidance 能力；不会显示示例引导。" : nil
+        guidanceBanner.accessibilityValue = nil
+        guidanceBanner.accessibilityTraits = showBanner ? [.staticText] : []
+        guidanceBannerHeight.constant = showBanner ? 68 : 0
+        if showBanner {
+            guidanceTableTopToConfigConstraint.isActive = false
+            guidanceTableTopToBannerConstraint.isActive = true
+        } else {
+            guidanceTableTopToBannerConstraint.isActive = false
+            guidanceTableTopToConfigConstraint.isActive = true
+        }
+    }
 
     private func updateHeader() {
         guard let screenState else { return }

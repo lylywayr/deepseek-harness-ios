@@ -121,6 +121,15 @@ final class NativeHomeViewController: UIViewController, UISearchBarDelegate {
     }
     func fixtureSelectMode(_ index: Int) { fixtureOpenConversation(); conversation.fixtureSelectMode(index) }
     func fixtureFocusComposer() { fixtureOpenConversation(); conversation.fixtureFocusComposer() }
+    func fixtureOpenConversationV3() { fixtureCloseDrawer(); showConversation() }
+    func fixtureShowConversationV3PlusMenu() {
+        fixtureOpenConversationV3()
+        DispatchQueue.main.async { [weak self] in self?.conversation.fixtureShowPlusMenu() }
+    }
+    func fixtureShowConversationV3ReferenceMenu() {
+        fixtureOpenConversationV3()
+        DispatchQueue.main.async { [weak self] in self?.conversation.fixtureShowReferenceMenu() }
+    }
     func fixtureShowActivity() { showActivityCenter() }
     func fixtureShowSettings() {
         let center = HarnessSettingsCenterViewController(appState: appState, runtime: runtime) { }

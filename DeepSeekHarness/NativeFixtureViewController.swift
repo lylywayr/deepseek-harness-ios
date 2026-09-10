@@ -47,7 +47,9 @@ final class NativeFixtureViewController: UIViewController {
 
     private func normalizedScene(_ value: String) -> String {
         switch value {
-        case "workspace", "drawer", "flat", "conversation", "normal", "process", "trajectory", "artifacts", "activity", "settings", "keyboard": return value
+        case "workspace", "drawer", "flat", "conversation", "normal", "process", "trajectory", "artifacts", "activity", "settings", "keyboard",
+             "conversation-v3-running-empty", "conversation-v3-thinking-collapsed", "conversation-v3-thinking-expanded",
+             "conversation-v3-plus-menu", "conversation-v3-reference-menu", "conversation-v3-guidance-disabled": return value
         default: return "workspace"
         }
     }
@@ -64,6 +66,12 @@ final class NativeFixtureViewController: UIViewController {
         case "activity": home.fixtureShowActivity()
         case "settings": home.fixtureShowSettings()
         case "keyboard": home.fixtureFocusComposer()
+        case "conversation-v3-running-empty", "conversation-v3-thinking-collapsed", "conversation-v3-thinking-expanded", "conversation-v3-guidance-disabled":
+            home.fixtureOpenConversationV3()
+        case "conversation-v3-plus-menu":
+            home.fixtureShowConversationV3PlusMenu()
+        case "conversation-v3-reference-menu":
+            home.fixtureShowConversationV3ReferenceMenu()
         default: home.fixtureCloseDrawer()
         }
     }
