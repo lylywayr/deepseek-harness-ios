@@ -537,6 +537,20 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
         updateGuidanceBanner()
         table.reloadData()
         renderAttachments()
+        #if DEBUG
+        if let fixtureScene = runtime.fixtureScene,
+           ["conversation-v3-running-empty", "conversation-v3-thinking-collapsed", "conversation-v3-thinking-expanded"].contains(fixtureScene) {
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.table.layoutIfNeeded()
+                self.table.setContentOffset(
+                    CGPoint(x: 0, y: -self.table.adjustedContentInset.top),
+                    animated: false
+                )
+            }
+            return
+        }
+        #endif
         if oldIDs != nextIDs && wasNearBottom {
             DispatchQueue.main.async { [weak self] in self?.scrollBottom() }
         }
