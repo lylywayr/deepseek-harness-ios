@@ -1027,7 +1027,13 @@ private final class ConversationEventCell: UITableViewCell {
         contentView.addSubview(card)
         cardTop = card.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 4)
         cardBottom = card.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -4)
-        NSLayoutConstraint.activate([card.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20), card.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20), cardTop, cardBottom])
+        NSLayoutConstraint.activate([
+            card.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            card.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+            cardTop,
+            cardBottom,
+            card.heightAnchor.constraint(greaterThanOrEqualToConstant: 72)
+        ])
         icon.translatesAutoresizingMaskIntoConstraints = false
         icon.contentMode = .scaleAspectFit
         titleLabel.font = DHTheme.font(.body, weight: .semibold)
