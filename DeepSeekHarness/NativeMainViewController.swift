@@ -12,6 +12,15 @@ final class DeepSeekHarnessAppDelegate: UIResponder, UIApplicationDelegate {
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         let window = UIWindow(frame: UIScreen.main.bounds)
+        #if DEBUG
+        // Fixture captures must own the complete app window appearance.  A
+        // child override is not sufficient for a subsequently presented
+        // Settings navigation controller, which can otherwise resolve the
+        // dynamic Settings colors from the simulator's previous appearance.
+        if ProcessInfo.processInfo.arguments.contains("-UITestFixture") {
+            window.overrideUserInterfaceStyle = ProcessInfo.processInfo.arguments.contains("-PocketDark") ? .dark : .light
+        }
+        #endif
         let root: UIViewController
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("-UITestFixture") {

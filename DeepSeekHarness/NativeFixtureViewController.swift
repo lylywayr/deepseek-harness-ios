@@ -36,7 +36,6 @@ final class NativeFixtureViewController: UIViewController {
             home.view.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
         home.didMove(toParent: self)
-        if ProcessInfo.processInfo.arguments.contains("-PocketDark") { overrideUserInterfaceStyle = .dark }
     }
 
     override func viewDidAppear(_ animated: Bool) {

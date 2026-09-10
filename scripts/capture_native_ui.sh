@@ -75,13 +75,15 @@ prepare_keyboard_scene() {
 }
 
 capture() {
-  local scene="$1" size="$2" appearance="$3" args="$4"
+  local scene="$1" size="$2" appearance="$3"
   local dir="$OUT/$size/$appearance"
   local launch_log="/tmp/pocket-fixture-launch.log"
   local process_log="/tmp/pocket-fixture-process.log"
   local launch_output=""
   local pid=""
   local alive=0
+  local launch_args=(-UITestFixture -NativeFixtureScreen "$scene")
+  if [[ "$appearance" == "dark" ]]; then launch_args+=(-PocketDark); fi
   mkdir -p "$dir"
   CURRENT_SCENE="$scene"
   if [[ "$scene" == "keyboard" ]]; then
@@ -90,7 +92,7 @@ capture() {
     prepare_keyboard_scene
   fi
   xcrun simctl terminate "$UDID" "$BUNDLE_ID" >/dev/null 2>&1 || true
-  if ! launch_output="$(run_timeout launch xcrun simctl launch "$UDID" "$BUNDLE_ID" -UITestFixture -NativeFixtureScreen "$scene" $args 2>&1)"; then
+  if ! launch_output="$(run_timeout launch xcrun simctl launch "$UDID" "$BUNDLE_ID" "${launch_args[@]}" 2>&1)"; then
     printf '%s\n' "$launch_output" >"$launch_log"
     cat "$launch_log" >&2
     echo "Pocket fixture launch failed: $scene" >&2
@@ -127,7 +129,7 @@ capture() {
     # seeded preference is durable before we raise the keyboard again.
     xcrun simctl terminate "$UDID" "$BUNDLE_ID" >/dev/null 2>&1 || true
     prepare_keyboard_scene
-    if ! launch_output="$(run_timeout launch xcrun simctl launch "$UDID" "$BUNDLE_ID" -UITestFixture -NativeFixtureScreen "$scene" $args 2>&1)"; then
+    if ! launch_output="$(run_timeout launch xcrun simctl launch "$UDID" "$BUNDLE_ID" "${launch_args[@]}" 2>&1)"; then
       printf '%s\n' "$launch_output" >"$launch_log"
       cat "$launch_log" >&2
       echo "Pocket fixture warm relaunch failed: $scene" >&2
@@ -146,8 +148,8 @@ capture() {
 
 # iPhone 14 is the 390x844 evidence target. 430x932 is produced with a
 # second simulator when the runtime is available; all scenes remain real Pocket.
-for scene in workspace drawer flat conversation normal process trajectory artifacts activity settings; do capture "$scene" "390x844" "light" ""; done
-capture workspace "390x844" "dark" "-PocketDark"
+for scene in workspace drawer flat conversation normal process trajectory artifacts activity settings; do capture "$scene" "390x844" "light"; done
+capture workspace "390x844" "dark"
 
 UDID430="$(find_udid "iPhone 15 Pro Max")"
 if [[ -z "$UDID430" ]]; then
@@ -157,9 +159,9 @@ if [[ -n "$UDID430" ]]; then
   boot_simulator "$UDID430"
   xcrun simctl install "$UDID430" "$APP_PATH"
   UDID="$UDID430"
-  for scene in workspace drawer flat conversation normal process trajectory artifacts activity settings; do capture "$scene" "430x932" "light" ""; done
-  capture workspace "430x932" "dark" "-PocketDark"
-  for scene in drawer conversation artifacts settings; do capture "$scene" "430x932" "dark" "-PocketDark"; done
+  for scene in workspace drawer flat conversation normal process trajectory artifacts activity settings; do capture "$scene" "430x932" "light"; done
+  capture workspace "430x932" "dark"
+  for scene in drawer conversation artifacts settings; do capture "$scene" "430x932" "dark"; done
 else
   printf '430x932 simulator unavailable; 390x844 evidence retained\n'
 fi

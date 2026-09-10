@@ -38,6 +38,13 @@ if 'SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG"' not in PROJECT:
 for marker in ("workspace drawer flat conversation normal process trajectory artifacts activity settings keyboard", "390x844", "430x932", "PocketDark", "pocket-v2-ui-matrix", "UITestFixture", "-NativeFixtureScreen", "iPhone 14", "iPhone 15 Pro Max"):
     if marker not in LAUNCH + SCRIPT + WORKFLOW:
         raise SystemExit(f"FAIL: missing screenshot marker {marker}")
+if 'window.overrideUserInterfaceStyle = ProcessInfo.processInfo.arguments.contains("-PocketDark") ? .dark : .light' not in LAUNCH:
+    raise SystemExit("FAIL: fixture appearance is not owned by the app window")
+if 'local launch_args=(-UITestFixture -NativeFixtureScreen "$scene")' not in SCRIPT or 'launch_args+=(-PocketDark)' not in SCRIPT:
+    raise SystemExit("FAIL: capture appearance is not mapped to launch arguments")
+if 'overrideUserInterfaceStyle = .dark' in SOURCE:
+    raise SystemExit("FAIL: fixture child must not own dark appearance")
 print("ok: Pocket fixture scenes 11")
 print("ok: real Pocket controllers and Runtime are fixture-backed")
+print("ok: fixture light/dark appearance is window-owned")
 print("ok: native fixture is DEBUG-only and workflow-covered")
