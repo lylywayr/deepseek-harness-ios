@@ -827,18 +827,20 @@ final class HarnessRuntime: NSObject {
         guard let object = value as? [String: Any] else { return }
         if object["type"] as? String == "baseline", let body = object["value"] as? [String: Any] {
             if let projections = body["projections"] as? [String: Any] {
+                let previousSessionIDs = Set(controlProjection.keys)
+                var replacement: [String: [String: Any]] = [:]
                 for (id, block) in projections {
                     let values = (block as? [String: Any])?["values"] as? [String: Any] ?? [:]
-                    controlProjection[id] = values
+                    replacement[id] = values
                     replaceTypedProjectionState(id, values: values)
                     if id == selectedSessionID {
                         for (key, value) in values { applyRuntimeProjection(id, key: key, value: value) }
                     }
                 }
-                if let id = selectedSessionID, projections[id] == nil {
-                    controlProjection[id] = [:]
+                for id in previousSessionIDs.subtracting(replacement.keys) {
                     replaceTypedProjectionState(id, values: [:])
                 }
+                controlProjection = replacement
             }
             updateGeneration(body["jobs"] as? [String: Any], queues: body["queues"] as? [String: Any])
         } else if object["type"] as? String == "projection", let id = object["sessionId"] as? String, let key = object["key"] as? String {
