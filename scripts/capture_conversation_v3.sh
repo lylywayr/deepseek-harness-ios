@@ -91,10 +91,27 @@ boot_simulator() {
 prepare_device() {
   local device_name="$1"
   local logical_size="$2"
-  local target
+  local target device_type fixture_name
   target="$(find_udid "$device_name")"
   if [[ -z "$target" ]]; then
-    echo "Required available simulator not found: $device_name" >&2
+    case "$logical_size" in
+      390x844)
+        device_type="com.apple.CoreSimulator.SimDeviceType.iPhone-14"
+        fixture_name="ConversationV3Fixture390"
+        ;;
+      430x932)
+        device_type="com.apple.CoreSimulator.SimDeviceType.iPhone-15-Pro-Max"
+        fixture_name="ConversationV3Fixture430"
+        ;;
+      *)
+        echo "Unsupported simulator logical size: $logical_size" >&2
+        return 1
+        ;;
+    esac
+    target="$(xcrun simctl create "$fixture_name" "$device_type" com.apple.CoreSimulator.SimRuntime.iOS-18-2)"
+  fi
+  if [[ -z "$target" ]]; then
+    echo "Required simulator could not be found or created: $device_name" >&2
     return 1
   fi
   echo "[diag] preparing device=${device_name} logical_size=${logical_size} udid=${target}" >&2
