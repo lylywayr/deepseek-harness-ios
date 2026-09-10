@@ -253,6 +253,8 @@ for filename, scene, device, logical_size, appearance, expected_width, expected_
     json.dumps({"schemaVersion": 1, "artifacts": items}, indent=2) + "\n",
     encoding="utf-8",
 )
+for item in items:
+    print(f"[sha256] {item['sha256']}  {item['filename']}")
 PY
 python3 "$SCRIPT_DIR/verify_conversation_v3_artifacts.py" "$OUT"
 printf 'Conversation-v3 screenshot bundle: %s\n' "$OUT"

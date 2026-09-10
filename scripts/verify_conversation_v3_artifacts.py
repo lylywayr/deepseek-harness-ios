@@ -332,7 +332,19 @@ def _validate_manifest(root: pathlib.Path) -> List[Mapping[str, Any]]:
         _fail(f"{MANIFEST_NAME}: filenames do not cover the fixed eight PNGs")
     digests = [items_by_filename[spec.filename]["sha256"] for spec in EXPECTED_ARTIFACTS]
     if len(set(digests)) != len(digests):
-        _fail(f"{MANIFEST_NAME}: the eight sha256 values must all be unique")
+        duplicate_groups = []
+        for digest in sorted(set(digests)):
+            names = [
+                spec.filename
+                for spec in EXPECTED_ARTIFACTS
+                if items_by_filename[spec.filename]["sha256"] == digest
+            ]
+            if len(names) > 1:
+                duplicate_groups.append(f"{digest}: {', '.join(names)}")
+        _fail(
+            f"{MANIFEST_NAME}: the eight sha256 values must all be unique; "
+            f"duplicates: {'; '.join(duplicate_groups)}"
+        )
     return [items_by_filename[spec.filename] for spec in EXPECTED_ARTIFACTS]
 
 
