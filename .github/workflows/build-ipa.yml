@@ -88,3 +88,22 @@ jobs:
           path: ${{ github.workspace }}/artifacts/pocket-v2-ui-matrix/**
           if-no-files-found: error
           retention-days: 14
+      - name: Capture conversation v3 screenshots
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          APP_PATH="$GITHUB_WORKSPACE/build/Build/Products/Debug-iphonesimulator/DeepSeekHarness.app"
+          OUT="$GITHUB_WORKSPACE/artifacts/p4-conversation-v3"
+          test -d "$APP_PATH"
+          bash scripts/capture_conversation_v3.sh "$APP_PATH" "$OUT"
+      - name: Validate conversation v3 artifacts
+        run: |
+          set -euo pipefail
+          python3 scripts/verify_conversation_v3_artifacts.py "$GITHUB_WORKSPACE/artifacts/p4-conversation-v3"
+      - name: Upload conversation v3 artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: p4-conversation-v3
+          path: ${{ github.workspace }}/artifacts/p4-conversation-v3/**
+          if-no-files-found: error
+          retention-days: 14
