@@ -118,9 +118,9 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
         view.backgroundColor = .systemGroupedBackground
         buildTopBar()
         buildModesAndConfig()
-        buildTimeline()
-        buildStatus()
         buildComposer()
+        buildStatus()
+        buildTimeline()
         buildMenuOverlay()
         stopObserving = runtime.observeChanges { [weak self] in
             DispatchQueue.main.async { self?.render() }
