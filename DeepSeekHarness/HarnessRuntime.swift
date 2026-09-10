@@ -3,15 +3,6 @@ import Network
 import Security
 import UIKit
 
-struct HarnessModelOption {
-    let provider: String
-    let providerName: String
-    let model: String
-    let modelName: String
-    let reasoning: [[String: String]]
-    var key: String { "\(provider)/\(model)" }
-}
-
 struct HarnessDirectoryEntry {
     let name: String
     let path: String
@@ -259,6 +250,9 @@ final class HarnessRuntime: NSObject {
     private var workspaceOrder: [String] = []
     private var archivedSessionIDs = Set<String>()
     private var controlProjection: [String: [String: Any]] = [:]
+    private var modelSelectionsBySessionID: [String: HarnessModelSelectionProjection] = [:]
+    private var permissionSelectionsBySessionID: [String: HarnessPermissionSelect] = [:]
+    private var contextSnapshotsBySessionID: [String: HarnessContextSnapshot] = [:]
     private var artifactsByID: [String: HarnessArtifact] = [:]
     private var isStarted = false
     private var isRefreshing = false
@@ -271,8 +265,12 @@ final class HarnessRuntime: NSObject {
     private(set) var sessions: [HarnessSessionSummary] = []
     private(set) var workspaces: [HarnessWorkspace] = []
     private(set) var models: [HarnessModelOption] = []
+    private(set) var modelCatalog: HarnessModelCatalog?
     private(set) var items: [HarnessConversationItem] = []
     private(set) var selectedSessionID: String?
+    private(set) var modelSelection: HarnessModelSelectionProjection?
+    private(set) var permissionSelection: HarnessPermissionSelect?
+    private(set) var contextSnapshot: HarnessContextSnapshot?
     private(set) var isLoading = true
     private(set) var isGenerating = false
     private(set) var hasMore = false
@@ -362,7 +360,23 @@ final class HarnessRuntime: NSObject {
         runtime.archivedSessionIDs = ["session-research"]
         runtime.isGenerating = scene == "workspace" || scene == "conversation" || scene == "process" || scene == "trajectory" || scene == "keyboard"
         runtime.reasoningEffort = "balanced"
-        runtime.models = [HarnessModelOption(provider: "deepseek", providerName: "DeepSeek", model: "deepseek-v4", modelName: "DeepSeek V4", reasoning: [["id": "balanced", "name": "均衡"], ["id": "deep", "name": "深入"]])]
+        runtime.models = [HarnessModelOption(
+            provider: "deepseek",
+            providerName: "DeepSeek",
+            model: "deepseek-v4",
+            modelName: "DeepSeek V4",
+            reasoning: [
+                HarnessReasoningEffort(id: "balanced", name: "均衡"),
+                HarnessReasoningEffort(id: "deep", name: "深入")
+            ],
+            defaultEffort: "balanced"
+        )]
+        runtime.modelCatalog = HarnessModelCatalog(
+            defaultSelection: HarnessModelSelection(provider: "deepseek", model: "deepseek-v4", reasoningEffort: "balanced"),
+            routableProviders: ["deepseek"],
+            groups: [HarnessModelProviderGroup(id: "deepseek", name: "DeepSeek", models: runtime.models)],
+            failures: []
+        )
         runtime.items = [
             HarnessConversationItem(id: "u1", kind: .user, text: "请继续检查这个 Pocket 工作区。", subtitle: "刚刚", seq: 1, time: 1),
             HarnessConversationItem(id: "a1", kind: .assistant, text: "我会先读取工作区状态，再汇总可以验证的结果。\n\n内联 `session/list` 与 [Harness 文档](https://harness.example.com/docs) 均可原生渲染。", subtitle: "回答", seq: 2, time: 2, isMarkdown: true),
@@ -666,19 +680,25 @@ final class HarnessRuntime: NSObject {
     }
 
     private func applyModels(_ value: Any?) {
-        guard let object = value as? [String: Any], let groups = object["groups"] as? [[String: Any]] else { return }
-        models = groups.flatMap { (group: [String: Any]) -> [HarnessModelOption] in
-            let provider = group["id"] as? String ?? ""
-            let providerName = group["name"] as? String ?? provider
-            return (group["models"] as? [[String: Any]] ?? []).compactMap { (model: [String: Any]) -> HarnessModelOption? in
-                guard let id = model["id"] as? String else { return nil }
-                let efforts: [[String: String]] = ((model["reasoning"] as? [String: Any])?["efforts"] as? [[String: Any]] ?? []).compactMap { effort -> [String: String]? in
-                    guard let effortID = effort["id"] as? String else { return nil }
-                    return ["id": effortID, "name": effort["name"] as? String ?? effortID]
-                }
-                return HarnessModelOption(provider: provider, providerName: providerName, model: id, modelName: model["name"] as? String ?? id, reasoning: efforts)
-            }
-        }
+        guard let catalog = HarnessProjectionParser.modelCatalog(value) else { return }
+        modelCatalog = catalog
+        models = catalog.groups.flatMap(\.models)
+    }
+
+    /// Returns only the efforts advertised for this exact provider/model route.
+    /// Provider and model IDs are wire identifiers; display names are never used
+    /// for lookup or request construction.
+    func reasoningEfforts(provider: String, model: String) -> [HarnessReasoningEffort] {
+        catalogModel(provider: provider, model: model)?.reasoning ?? []
+    }
+
+    func defaultReasoningEffort(provider: String, model: String) -> String? {
+        catalogModel(provider: provider, model: model)?.defaultEffort
+    }
+
+    private func catalogModel(provider: String, model: String) -> HarnessModelOption? {
+        guard let group = modelCatalog?.groups.first(where: { $0.id == provider }) else { return nil }
+        return group.models.first(where: { $0.model == model })
     }
 
     private func refreshWorkspace(_ value: Any?) {
@@ -810,7 +830,12 @@ final class HarnessRuntime: NSObject {
                 for (id, block) in projections { controlProjection[id] = (block as? [String: Any])?["values"] as? [String: Any] ?? [:] }
             }
             updateGeneration(body["jobs"] as? [String: Any], queues: body["queues"] as? [String: Any])
-            if let id = selectedSessionID, let projection = controlProjection[id] { for (key, value) in projection { applyRuntimeProjection(id, key: key, value: value) } }
+            if let id = selectedSessionID, let projection = controlProjection[id] {
+                for (key, value) in projection {
+                    applyProjection(id, key: key, value: value)
+                    applyRuntimeProjection(id, key: key, value: value)
+                }
+            }
         } else if object["type"] as? String == "projection", let id = object["sessionId"] as? String, let key = object["key"] as? String {
             var values = controlProjection[id] ?? [:]
             values[key] = object["value"]
@@ -989,34 +1014,95 @@ final class HarnessRuntime: NSObject {
         artifacts = []
         currentStage = nil
         contextDirectory = nil
-        reasoningEffort = nil
         seenEventIDs.removeAll()
         selectedCursor = -1
         oldestSeq = -1
         hasMore = false
         isGenerating = false
+
+        // These values belong to the selected Session's projection namespace.
+        // Rehydrate them after every switch/reset instead of carrying the
+        // previous Session's selected controls into the new conversation.
+        if let id = selectedSessionID {
+            modelSelection = modelSelectionsBySessionID[id]
+            permissionSelection = permissionSelectionsBySessionID[id]
+            contextSnapshot = contextSnapshotsBySessionID[id]
+            reasoningEffort = modelSelection?.next?.reasoningEffort
+                ?? modelSelection?.lastUsed?.reasoningEffort
+        } else {
+            modelSelection = nil
+            permissionSelection = nil
+            contextSnapshot = nil
+            reasoningEffort = nil
+        }
     }
 
     private func applyAllProjections(_ id: String) {
-        for (key, value) in controlProjection[id] ?? [:] { applyProjection(id, key: key, value: value) }
+        for (key, value) in controlProjection[id] ?? [:] {
+            applyProjection(id, key: key, value: value)
+            applyRuntimeProjection(id, key: key, value: value)
+        }
     }
 
     private func applyProjection(_ id: String, key: String, value: Any?) {
         guard let index = sessions.firstIndex(where: { $0.id == id }) else { return }
         var session = sessions[index]
         switch key {
-        case "title": session.title = value as? String ?? session.title
-        case "agentPreset": session.preset = value as? String ?? session.preset
-        case "permissions": session.permission = (value as? [String: Any])?["currentValue"] as? String ?? session.permission
+        case "title":
+            session.title = value as? String ?? session.title
+        case "agentPreset":
+            session.preset = value as? String ?? session.preset
+        case "permissions":
+            let permission = HarnessProjectionParser.permissionSelect(value)
+            if let permission {
+                permissionSelectionsBySessionID[id] = permission
+                session.permission = permission.currentValue
+                if id == selectedSessionID { permissionSelection = permission }
+            } else {
+                permissionSelectionsBySessionID.removeValue(forKey: id)
+                if id == selectedSessionID { permissionSelection = nil }
+            }
         case "sessionStats":
-            if let v = value as? [String: Any] { session.turns = (v["turns"] as? NSNumber)?.intValue ?? session.turns; session.steps = (v["steps"] as? NSNumber)?.intValue ?? session.steps }
+            if let v = value as? [String: Any] {
+                if let turns = v["turns"] as? NSNumber { session.turns = turns.intValue }
+                if let steps = v["steps"] as? NSNumber { session.steps = steps.intValue }
+            }
         case "contextPressure":
-            if let v = value as? [String: Any], let window = (v["contextWindow"] as? NSNumber)?.doubleValue, window > 0 { session.contextUsed = ((v["pressureTokens"] as? NSNumber)?.doubleValue ?? 0) / window }
+            let pressure = HarnessProjectionParser.contextPressure(value)
+            let oldBreakdown = contextSnapshotsBySessionID[id]?.breakdown
+            let snapshot = HarnessContextSnapshot(sessionID: id, pressure: pressure, breakdown: oldBreakdown)
+            contextSnapshotsBySessionID[id] = snapshot
+            session.contextUsed = snapshot.contextUsed
+            if id == selectedSessionID { contextSnapshot = snapshot }
+        case "contextBreakdown":
+            let breakdown = HarnessProjectionParser.contextBreakdown(value)
+            let oldPressure = contextSnapshotsBySessionID[id]?.pressure
+            let snapshot = HarnessContextSnapshot(sessionID: id, pressure: oldPressure, breakdown: breakdown)
+            contextSnapshotsBySessionID[id] = snapshot
+            session.contextUsed = snapshot.contextUsed
+            if id == selectedSessionID { contextSnapshot = snapshot }
         case "modelSelection":
-            let selected = (value as? [String: Any])?["next"] as? [String: Any] ?? (value as? [String: Any])?["lastUsed"] as? [String: Any] ?? [:]
-            session.provider = selected["provider"] as? String ?? session.provider
-            session.model = selected["model"] as? String ?? session.model
-        default: break
+            let selection = HarnessProjectionParser.modelSelectionProjection(value)
+            if let selection {
+                modelSelectionsBySessionID[id] = selection
+                let selected = selection.next ?? selection.lastUsed
+                if let selected {
+                    session.provider = selected.provider
+                    session.model = selected.model
+                }
+                if id == selectedSessionID {
+                    modelSelection = selection
+                    reasoningEffort = selection.next?.reasoningEffort ?? selection.lastUsed?.reasoningEffort
+                }
+            } else {
+                modelSelectionsBySessionID.removeValue(forKey: id)
+                if id == selectedSessionID {
+                    modelSelection = nil
+                    reasoningEffort = nil
+                }
+            }
+        default:
+            break
         }
         sessions[index] = session
     }
@@ -1030,7 +1116,10 @@ final class HarnessRuntime: NSObject {
         guard id == selectedSessionID else { return }
         switch key {
         case "currentStage", "stage", "phase": currentStage = value as? String ?? currentStage
-        case "reasoningEffort": reasoningEffort = value as? String ?? reasoningEffort
+        case "reasoningEffort":
+            // Legacy hosts may expose this separate key. Keep the value for
+            // existing surfaces without replacing a complete modelSelection.
+            reasoningEffort = value as? String ?? reasoningEffort
         case "contextDirectory", "cwd": contextDirectory = value as? String ?? contextDirectory
         case "artifacts", "outputs":
             let rows = (value as? [[String: Any]] ?? []).compactMap { Self.artifact(data: $0, eventID: UUID().uuidString) }

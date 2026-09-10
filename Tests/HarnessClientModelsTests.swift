@@ -93,4 +93,85 @@ final class HarnessClientModelsTests: XCTestCase {
         XCTAssertEqual(pending.clientID, "client")
         XCTAssertEqual(pending.eventID, "event")
     }
+
+    func testTypedCatalogPreservesServerMetadataAndSkipsInvalidRows() {
+        let catalog = HarnessProjectionParser.modelCatalog([
+            "default": ["provider": "deepseek", "model": "v4", "reasoningEffort": "deep"],
+            "routableProviders": ["deepseek"],
+            "groups": [[
+                "id": "deepseek", "name": "DeepSeek", "models": [[
+                    "id": "v4", "name": "V4", "description": "Fast model",
+                    "reasoning": ["defaultEffort": "balanced", "efforts": [
+                        ["id": "balanced", "name": "Balanced", "description": "Normal"],
+                        ["id": "   ", "name": "Invalid"]
+                    ]]
+                ]]
+            ], ["id": " ", "models": []]],
+            "failures": [["id": "offline", "name": "Offline", "message": "Unavailable"],
+                         ["id": "", "name": "Invalid", "message": "Ignored"]]
+        ])
+        XCTAssertEqual(catalog?.defaultSelection, HarnessModelSelection(provider: "deepseek", model: "v4", reasoningEffort: "deep"))
+        XCTAssertEqual(catalog?.routableProviders, ["deepseek"])
+        XCTAssertEqual(catalog?.groups.count, 1)
+        XCTAssertEqual(catalog?.groups.first?.models.first?.defaultEffort, "balanced")
+        XCTAssertEqual(catalog?.groups.first?.models.first?.reasoning,
+                       [HarnessReasoningEffort(id: "balanced", name: "Balanced", description: "Normal")])
+        XCTAssertEqual(catalog?.failures, [HarnessModelCatalogFailure(id: "offline", name: "Offline", message: "Unavailable")])
+    }
+
+    func testModelSelectionSupportsNestedAndLegacyShapes() {
+        let nested = HarnessProjectionParser.modelSelectionProjection([
+            "next": ["provider": "p", "model": "new", "reasoningEffort": "deep"],
+            "lastUsed": ["provider": "p", "model": "old", "reasoningEffort": "quick"]
+        ])
+        XCTAssertEqual(nested?.next, HarnessModelSelection(provider: "p", model: "new", reasoningEffort: "deep"))
+        XCTAssertEqual(nested?.lastUsed, HarnessModelSelection(provider: "p", model: "old", reasoningEffort: "quick"))
+        let legacy = HarnessProjectionParser.modelSelectionProjection(["provider": "p", "model": "legacy"])
+        XCTAssertEqual(legacy?.next, HarnessModelSelection(provider: "p", model: "legacy"))
+        XCTAssertEqual(legacy?.lastUsed, legacy?.next)
+        XCTAssertNil(HarnessProjectionParser.modelSelection(["provider": " ", "model": "x"]))
+    }
+
+    func testPermissionOptionsRemainServerOwnedCapability() {
+        let permission = HarnessProjectionParser.permissionSelect([
+            "currentValue": "workspace-write",
+            "options": [["value": "read-only", "name": "Read only", "description": "Safe"],
+                        ["value": " ", "name": "Invalid"]]
+        ])
+        XCTAssertEqual(permission, HarnessPermissionSelect(
+            options: [HarnessPermissionOption(value: "read-only", name: "Read only", description: "Safe")],
+            currentValue: "workspace-write"
+        ))
+        XCTAssertNil(HarnessProjectionParser.permissionSelect(["currentValue": "read-only"]))
+    }
+
+    func testContextPressureKeepsNilAndZeroAndRejectsInvalidNumbers() {
+        let projected = HarnessProjectionParser.contextPressure([
+            "pressureTokens": 25, "projectedTokens": 50, "contextWindow": 100
+        ])
+        XCTAssertEqual(projected?.contextUsed, 0.5)
+        let fallback = HarnessProjectionParser.contextPressure(["pressureTokens": 25, "contextWindow": 100])
+        XCTAssertEqual(fallback?.contextUsed, 0.25)
+        let zero = HarnessProjectionParser.contextPressure(["pressureTokens": 0, "contextWindow": 100])
+        XCTAssertEqual(zero?.pressureTokens, 0)
+        XCTAssertEqual(zero?.contextUsed, 0)
+        XCTAssertNil(HarnessProjectionParser.contextPressure(["pressureTokens": 1])?.contextUsed)
+        XCTAssertNil(HarnessProjectionParser.contextPressure(["pressureTokens": 1, "contextWindow": 0])?.contextUsed)
+        let invalid = HarnessProjectionParser.contextPressure([
+            "pressureTokens": -1, "projectedTokens": 1.5, "contextWindow": true
+        ])
+        XCTAssertNil(invalid?.pressureTokens)
+        XCTAssertNil(invalid?.projectedTokens)
+        XCTAssertNil(invalid?.contextWindow)
+        XCTAssertNil(invalid?.contextUsed)
+    }
+
+    func testContextBreakdownPreservesPartialAndUnknownFields() {
+        let breakdown = HarnessProjectionParser.contextBreakdown([
+            "systemTokens": 0, "toolsTokens": 12, "messageTokens": 34, "future": "ignored"
+        ])
+        XCTAssertEqual(breakdown, HarnessContextBreakdown(systemTokens: 0, toolsTokens: 12, messageTokens: 34))
+        XCTAssertEqual(HarnessProjectionParser.contextBreakdown(["systemTokens": 4]),
+                       HarnessContextBreakdown(systemTokens: 4, toolsTokens: nil, messageTokens: nil))
+    }
 }
