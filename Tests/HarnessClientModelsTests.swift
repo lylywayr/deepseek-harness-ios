@@ -157,13 +157,25 @@ final class HarnessClientModelsTests: XCTestCase {
         XCTAssertEqual(zero?.contextUsed, 0)
         XCTAssertNil(HarnessProjectionParser.contextPressure(["pressureTokens": 1])?.contextUsed)
         XCTAssertNil(HarnessProjectionParser.contextPressure(["pressureTokens": 1, "contextWindow": 0])?.contextUsed)
-        let invalid = HarnessProjectionParser.contextPressure([
+        XCTAssertNil(HarnessProjectionParser.contextPressure([
             "pressureTokens": -1, "projectedTokens": 1.5, "contextWindow": true
+        ]))
+        XCTAssertNil(HarnessProjectionParser.contextPressure([
+            "contextWindow": NSNumber(value: UInt64.max)
+        ]))
+        XCTAssertNil(HarnessProjectionParser.contextPressure([
+            "contextWindow": NSNumber(value: UInt64(1) << 63)
+        ]))
+        XCTAssertEqual(HarnessProjectionParser.contextPressure([
+            "pressureTokens": NSNumber(value: Int.max), "contextWindow": NSNumber(value: Int.max)
+        ])?.contextUsed, 1)
+        let explicitlyUnknown = HarnessProjectionParser.contextPressure([
+            "pressureTokens": NSNull(), "contextWindow": NSNull()
         ])
-        XCTAssertNil(invalid?.pressureTokens)
-        XCTAssertNil(invalid?.projectedTokens)
-        XCTAssertNil(invalid?.contextWindow)
-        XCTAssertNil(invalid?.contextUsed)
+        XCTAssertNotNil(explicitlyUnknown)
+        XCTAssertNil(explicitlyUnknown?.pressureTokens)
+        XCTAssertNil(explicitlyUnknown?.contextWindow)
+        XCTAssertNil(explicitlyUnknown?.contextUsed)
     }
 
     func testContextBreakdownPreservesPartialAndUnknownFields() {

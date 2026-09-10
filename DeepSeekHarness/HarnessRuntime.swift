@@ -827,15 +827,20 @@ final class HarnessRuntime: NSObject {
         guard let object = value as? [String: Any] else { return }
         if object["type"] as? String == "baseline", let body = object["value"] as? [String: Any] {
             if let projections = body["projections"] as? [String: Any] {
-                for (id, block) in projections { controlProjection[id] = (block as? [String: Any])?["values"] as? [String: Any] ?? [:] }
-            }
-            updateGeneration(body["jobs"] as? [String: Any], queues: body["queues"] as? [String: Any])
-            if let id = selectedSessionID, let projection = controlProjection[id] {
-                for (key, value) in projection {
-                    applyProjection(id, key: key, value: value)
-                    applyRuntimeProjection(id, key: key, value: value)
+                for (id, block) in projections {
+                    let values = (block as? [String: Any])?["values"] as? [String: Any] ?? [:]
+                    controlProjection[id] = values
+                    replaceTypedProjectionState(id, values: values)
+                    if id == selectedSessionID {
+                        for (key, value) in values { applyRuntimeProjection(id, key: key, value: value) }
+                    }
+                }
+                if let id = selectedSessionID, projections[id] == nil {
+                    controlProjection[id] = [:]
+                    replaceTypedProjectionState(id, values: [:])
                 }
             }
+            updateGeneration(body["jobs"] as? [String: Any], queues: body["queues"] as? [String: Any])
         } else if object["type"] as? String == "projection", let id = object["sessionId"] as? String, let key = object["key"] as? String {
             var values = controlProjection[id] ?? [:]
             values[key] = object["value"]
@@ -867,10 +872,12 @@ final class HarnessRuntime: NSObject {
             resetConversation()
             selectedCursor = (object["cursor"] as? NSNumber)?.intValue ?? -1
             hasMore = object["hasMore"] as? Bool ?? false
-            if let id = selectedSessionID { sessionCursors[id] = (selectedCursor, -1) }
-            if let projections = object["projections"] as? [String: Any], let id = selectedSessionID {
-                controlProjection[id] = projections["values"] as? [String: Any] ?? [:]
-                applyAllProjections(id)
+            if let id = selectedSessionID {
+                sessionCursors[id] = (selectedCursor, -1)
+                let values = (object["projections"] as? [String: Any])?["values"] as? [String: Any] ?? [:]
+                controlProjection[id] = values
+                replaceTypedProjectionState(id, values: values)
+                for (key, value) in values { applyRuntimeProjection(id, key: key, value: value) }
             }
             parseRecords(object["records"] as? [Any] ?? [], prepend: false)
             if let id = selectedSessionID { sessionCursors[id] = (selectedCursor, oldestSeq) }
@@ -1037,6 +1044,61 @@ final class HarnessRuntime: NSObject {
         }
     }
 
+    private func replaceTypedProjectionState(_ id: String, values: [String: Any]) {
+        let typedKeys = ["modelSelection", "permissions", "contextPressure", "contextBreakdown"]
+        for key in typedKeys {
+            if let value = values[key] {
+                // A present but malformed authoritative value is ignored by
+                // applyProjection, preserving the last valid observation.
+                // NSNull is an explicit capability removal.
+                applyProjection(id, key: key, value: value)
+            } else {
+                clearTypedProjection(id, key: key)
+            }
+        }
+    }
+
+    private func clearTypedProjection(_ id: String, key: String) {
+        switch key {
+        case "modelSelection":
+            modelSelectionsBySessionID.removeValue(forKey: id)
+            if id == selectedSessionID {
+                modelSelection = nil
+                reasoningEffort = nil
+            }
+        case "permissions":
+            permissionSelectionsBySessionID.removeValue(forKey: id)
+            if id == selectedSessionID { permissionSelection = nil }
+        case "contextPressure":
+            let breakdown = contextSnapshotsBySessionID[id]?.breakdown
+            updateContextSnapshot(id, pressure: nil, breakdown: breakdown)
+        case "contextBreakdown":
+            let pressure = contextSnapshotsBySessionID[id]?.pressure
+            updateContextSnapshot(id, pressure: pressure, breakdown: nil)
+        default:
+            break
+        }
+    }
+
+    private func updateContextSnapshot(
+        _ id: String,
+        pressure: HarnessContextPressure?,
+        breakdown: HarnessContextBreakdown?
+    ) {
+        let snapshot: HarnessContextSnapshot? = pressure == nil && breakdown == nil
+            ? nil
+            : HarnessContextSnapshot(sessionID: id, pressure: pressure, breakdown: breakdown)
+        if let snapshot {
+            contextSnapshotsBySessionID[id] = snapshot
+        } else {
+            contextSnapshotsBySessionID.removeValue(forKey: id)
+        }
+        if let index = sessions.firstIndex(where: { $0.id == id }) {
+            sessions[index].contextUsed = snapshot?.contextUsed
+        }
+        if id == selectedSessionID { contextSnapshot = snapshot }
+    }
+
     private func applyAllProjections(_ id: String) {
         for (key, value) in controlProjection[id] ?? [:] {
             applyProjection(id, key: key, value: value)
@@ -1053,14 +1115,13 @@ final class HarnessRuntime: NSObject {
         case "agentPreset":
             session.preset = value as? String ?? session.preset
         case "permissions":
-            let permission = HarnessProjectionParser.permissionSelect(value)
-            if let permission {
+            if value is NSNull {
+                permissionSelectionsBySessionID.removeValue(forKey: id)
+                if id == selectedSessionID { permissionSelection = nil }
+            } else if let permission = HarnessProjectionParser.permissionSelect(value) {
                 permissionSelectionsBySessionID[id] = permission
                 session.permission = permission.currentValue
                 if id == selectedSessionID { permissionSelection = permission }
-            } else {
-                permissionSelectionsBySessionID.removeValue(forKey: id)
-                if id == selectedSessionID { permissionSelection = nil }
             }
         case "sessionStats":
             if let v = value as? [String: Any] {
@@ -1068,22 +1129,27 @@ final class HarnessRuntime: NSObject {
                 if let steps = v["steps"] as? NSNumber { session.steps = steps.intValue }
             }
         case "contextPressure":
-            let pressure = HarnessProjectionParser.contextPressure(value)
-            let oldBreakdown = contextSnapshotsBySessionID[id]?.breakdown
-            let snapshot = HarnessContextSnapshot(sessionID: id, pressure: pressure, breakdown: oldBreakdown)
-            contextSnapshotsBySessionID[id] = snapshot
-            session.contextUsed = snapshot.contextUsed
-            if id == selectedSessionID { contextSnapshot = snapshot }
+            if value is NSNull {
+                clearTypedProjection(id, key: key)
+                session.contextUsed = contextSnapshotsBySessionID[id]?.contextUsed
+            } else if let pressure = HarnessProjectionParser.contextPressure(value) {
+                updateContextSnapshot(id, pressure: pressure, breakdown: contextSnapshotsBySessionID[id]?.breakdown)
+                session.contextUsed = pressure.contextUsed
+            }
         case "contextBreakdown":
-            let breakdown = HarnessProjectionParser.contextBreakdown(value)
-            let oldPressure = contextSnapshotsBySessionID[id]?.pressure
-            let snapshot = HarnessContextSnapshot(sessionID: id, pressure: oldPressure, breakdown: breakdown)
-            contextSnapshotsBySessionID[id] = snapshot
-            session.contextUsed = snapshot.contextUsed
-            if id == selectedSessionID { contextSnapshot = snapshot }
+            if value is NSNull {
+                clearTypedProjection(id, key: key)
+            } else if let breakdown = HarnessProjectionParser.contextBreakdown(value) {
+                updateContextSnapshot(id, pressure: contextSnapshotsBySessionID[id]?.pressure, breakdown: breakdown)
+            }
         case "modelSelection":
-            let selection = HarnessProjectionParser.modelSelectionProjection(value)
-            if let selection {
+            if value is NSNull {
+                modelSelectionsBySessionID.removeValue(forKey: id)
+                if id == selectedSessionID {
+                    modelSelection = nil
+                    reasoningEffort = nil
+                }
+            } else if let selection = HarnessProjectionParser.modelSelectionProjection(value) {
                 modelSelectionsBySessionID[id] = selection
                 let selected = selection.next ?? selection.lastUsed
                 if let selected {
@@ -1093,12 +1159,6 @@ final class HarnessRuntime: NSObject {
                 if id == selectedSessionID {
                     modelSelection = selection
                     reasoningEffort = selection.next?.reasoningEffort ?? selection.lastUsed?.reasoningEffort
-                }
-            } else {
-                modelSelectionsBySessionID.removeValue(forKey: id)
-                if id == selectedSessionID {
-                    modelSelection = nil
-                    reasoningEffort = nil
                 }
             }
         default:

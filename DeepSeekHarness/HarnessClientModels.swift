@@ -249,7 +249,8 @@ enum HarnessProjectionParser {
     }
 
     static func contextPressure(_ value: Any?) -> HarnessContextPressure? {
-        guard let object = dictionary(value) else { return nil }
+        guard let object = dictionary(value),
+              validIntegerFields(in: object, keys: ["pressureTokens", "projectedTokens", "contextWindow"]) else { return nil }
         return HarnessContextPressure(
             pressureTokens: integer(object["pressureTokens"]),
             projectedTokens: integer(object["projectedTokens"]),
@@ -258,7 +259,8 @@ enum HarnessProjectionParser {
     }
 
     static func contextBreakdown(_ value: Any?) -> HarnessContextBreakdown? {
-        guard let object = dictionary(value) else { return nil }
+        guard let object = dictionary(value),
+              validIntegerFields(in: object, keys: ["systemTokens", "toolsTokens", "messageTokens"]) else { return nil }
         return HarnessContextBreakdown(
             systemTokens: integer(object["systemTokens"]),
             toolsTokens: integer(object["toolsTokens"]),
@@ -331,12 +333,31 @@ enum HarnessProjectionParser {
         return values.compactMap { nonEmptyString($0) }
     }
 
+    private static func validIntegerFields(in object: [String: Any], keys: [String]) -> Bool {
+        keys.allSatisfy { key in
+            guard object.keys.contains(key) else { return true }
+            return object[key] is NSNull || integer(object[key]) != nil
+        }
+    }
+
     private static func integer(_ value: Any?) -> Int? {
-        guard !(value is Bool), let number = value as? NSNumber else { return nil }
-        let double = number.doubleValue
-        guard double.isFinite, double >= 0, double.rounded(.towardZero) == double,
-              double <= Double(Int.max) else { return nil }
-        return Int(double)
+        guard !(value is Bool), !(value is NSNull), let number = value as? NSNumber else { return nil }
+        let encoding = String(cString: number.objCType)
+        switch encoding {
+        case "C", "S", "I", "L", "Q":
+            guard let raw = UInt64(number.stringValue), raw <= UInt64(Int.max) else { return nil }
+            return Int(exactly: raw)
+        case "c", "s", "i", "l", "q":
+            guard let raw = Int64(number.stringValue), raw >= 0 else { return nil }
+            return Int(exactly: raw)
+        default:
+            let double = number.doubleValue
+            // Floating-point 2^63 is outside Int even though Double(Int.max)
+            // rounds to that same value, so the upper bound must stay strict.
+            guard double.isFinite, double >= 0, double.rounded(.towardZero) == double,
+                  double < Double(Int.max) else { return nil }
+            return Int(double)
+        }
     }
 }
 
