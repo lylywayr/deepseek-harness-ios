@@ -96,6 +96,14 @@ jobs:
           OUT="$GITHUB_WORKSPACE/artifacts/p4-conversation-v3"
           test -d "$APP_PATH"
           bash scripts/capture_conversation_v3.sh "$APP_PATH" "$OUT"
+      - name: Upload failed conversation v3 diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: p4-conversation-v3-diagnostic-${{ github.run_attempt }}
+          path: ${{ github.workspace }}/artifacts/p4-conversation-v3/**
+          if-no-files-found: error
+          retention-days: 1
       - name: Validate conversation v3 artifacts
         run: |
           set -euo pipefail
