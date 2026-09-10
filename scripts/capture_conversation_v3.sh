@@ -71,12 +71,10 @@ boot_simulator() {
   run_timeout shutdown-before-boot xcrun simctl shutdown "$target" || true
   run_timeout boot xcrun simctl boot "$target"
   for attempt in 1 2 3 4 5 6 7 8; do
-    set +e
-    run_timeout "bootstatus-${attempt}" xcrun simctl bootstatus "$target" -b
-    rc=$?
-    set -e
-    if [[ "$rc" -eq 0 ]]; then
+    if run_timeout "bootstatus-${attempt}" xcrun simctl bootstatus "$target" -b; then
       return 0
+    else
+      rc=$?
     fi
     echo "[diag] simulator=${target} bootstatus attempt=${attempt} rc=${rc}" >&2
     if [[ "$attempt" -lt 8 ]]; then
