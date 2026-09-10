@@ -283,6 +283,9 @@ final class HarnessRuntime: NSObject {
     private(set) var artifacts: [HarnessArtifact] = []
     private(set) var contextDirectory: String?
     private(set) var reasoningEffort: String?
+    #if DEBUG
+    private(set) var fixtureScene: String?
+    #endif
     private var changeObservers: [UUID: () -> Void] = [:]
     private var navigationObservers: [UUID: () -> Void] = [:]
     private var eventObservers: [UUID: (HarnessRuntimeEvent) -> Void] = [:]
@@ -345,9 +348,11 @@ final class HarnessRuntime: NSObject {
     #if DEBUG
     static func fixture(scene: String = "workspace") -> HarnessRuntime {
         let runtime = HarnessRuntime(baseURL: URL(string: "http://fixture.invalid")!)
+        runtime.fixtureScene = scene
+        let isConversationFixture = scene.hasPrefix("conversation-v3")
         let workspace = HarnessWorkspace(id: "workspace-project", title: "Pocket 项目", path: "/Users/demo/Pocket", sessionIDs: ["session-active"])
         let docsWorkspace = HarnessWorkspace(id: "workspace-docs", title: "验收文档", path: "/Users/demo/Pocket/docs", sessionIDs: ["session-research"])
-        let active = HarnessSessionSummary(id: "session-active", title: "原生工作台 V2", cwd: "/Users/demo/Pocket", updatedAt: 200, running: scene == "workspace" || scene == "conversation" || scene == "process" || scene == "trajectory", blank: false, preset: "standard", permission: "workspace-write", provider: "deepseek", model: "DeepSeek V4", turns: 4, steps: 12, contextUsed: 0.42, status: "running", stage: "工具调用")
+        let active = HarnessSessionSummary(id: "session-active", title: "原生工作台 V2", cwd: "/Users/demo/Pocket", updatedAt: 200, running: scene == "workspace" || scene == "conversation" || scene == "process" || scene == "trajectory" || isConversationFixture, blank: false, preset: "standard", permission: "workspace-write", provider: "deepseek", model: "DeepSeek V4", turns: 4, steps: 12, contextUsed: 0.42, status: "running", stage: "工具调用")
         let research = HarnessSessionSummary(id: "session-research", title: "验收与交付", cwd: "/Users/demo/Pocket/docs", updatedAt: 100, running: false, blank: false, preset: "standard", permission: "read-only", provider: "deepseek", model: "DeepSeek V4", turns: 2, steps: 6, contextUsed: 0.18)
         runtime.connected = true
         runtime.isLoading = false
@@ -358,7 +363,7 @@ final class HarnessRuntime: NSObject {
         runtime.selectedSessionID = active.id
         runtime.workspaces = [workspace, docsWorkspace]
         runtime.archivedSessionIDs = ["session-research"]
-        runtime.isGenerating = scene == "workspace" || scene == "conversation" || scene == "process" || scene == "trajectory" || scene == "keyboard"
+        runtime.isGenerating = scene == "workspace" || scene == "conversation" || scene == "process" || scene == "trajectory" || scene == "keyboard" || isConversationFixture
         runtime.reasoningEffort = "balanced"
         runtime.models = [HarnessModelOption(
             provider: "deepseek",
