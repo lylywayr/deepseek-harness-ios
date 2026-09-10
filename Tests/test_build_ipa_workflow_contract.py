@@ -96,26 +96,19 @@ class BuildIpaWorkflowContractTests(unittest.TestCase):
             "          if-no-files-found: error\n",
             v3,
         )
-        self.assertEqual(v3.count("if-no-files-found: error"), 2)
+        self.assertEqual(v3.count("if-no-files-found: error"), 1)
         self.assertEqual(v3.count("set -euo pipefail"), 2)
         self.assertNotRegex(v3, r"(?m)^\s*continue-on-error\s*:")
         self.assertNotRegex(v3, r"\|\|\s*true")
         self.assertNotRegex(v3, r"(?i)\b(?:exclude|excluded|post[- ]?process(?:ing)?|copy|noise|noisy)\b")
-        self.assertEqual(v3.count("        if: ${{ failure() }}\n"), 1)
-        self.assertIn(
-            "      - name: Upload failed conversation v3 diagnostics\n"
-            "        if: ${{ failure() }}\n"
-            "        uses: actions/upload-artifact@v4\n",
-            v3,
-        )
+        self.assertNotRegex(v3, r"(?m)^\s*if\s*:")
         self.assertNotRegex(v3, r"(?m)^\s*(?:cp|mv|rsync|sips|convert)\b")
 
     def test_v3_steps_have_no_failure_swallowing_or_exclusion(self) -> None:
         start = self.native_job.index("      - name: Capture conversation v3 screenshots\n")
         v3 = self.native_job[start:]
-        for forbidden in ("always()", "success()", "if-no-files-found: warn"):
+        for forbidden in ("always()", "success()", "failure()", "if-no-files-found: warn"):
             self.assertNotIn(forbidden, v3)
-        self.assertEqual(v3.count("failure()"), 1)
         self.assertEqual(v3.count('bash scripts/capture_conversation_v3.sh "$APP_PATH" "$OUT"'), 1)
         self.assertEqual(
             v3.count(
