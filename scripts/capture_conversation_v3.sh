@@ -66,10 +66,10 @@ boot_simulator() {
   local target="$1"
   local attempt rc
 
-  # Start from a known state without parsing human-formatted `simctl list`
-  # output. Shutdown may legitimately report that the device is already off.
-  run_timeout shutdown-before-boot xcrun simctl shutdown "$target" || true
-  run_timeout boot xcrun simctl boot "$target"
+  # Reuse a simulator that the legacy matrix already booted in this same job.
+  # `boot` is harmlessly allowed to report that it is already running; only a
+  # failed health check triggers the expensive shutdown/reboot migration path.
+  xcrun simctl boot "$target" >/dev/null 2>&1 || true
   for attempt in 1 2 3 4 5 6 7 8; do
     if run_timeout "bootstatus-${attempt}" xcrun simctl bootstatus "$target" -b; then
       return 0
@@ -91,6 +91,12 @@ prepare_device() {
   local logical_size="$2"
   local target device_type fixture_name
   target="$(find_udid "$device_name")"
+  if [[ -z "$target" && "$logical_size" == "390x844" ]]; then
+    target="$(find_udid "PocketV2Fixture")"
+  fi
+  if [[ -z "$target" && "$logical_size" == "430x932" ]]; then
+    target="$(find_udid "PocketV2Fixture430")"
+  fi
   if [[ -z "$target" ]]; then
     case "$logical_size" in
       390x844)
