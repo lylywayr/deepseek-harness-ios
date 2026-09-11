@@ -206,6 +206,13 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
         topBar.addSubview(center)
         topBar.addSubview(backButton)
         topBar.addSubview(newConversationButton)
+        // These two buttons used to be arranged subviews of a UIStackView, which
+        // managed the autoresizing mask for them.  Now that they are plain
+        // siblings of `center`, the mask must be disabled explicitly: otherwise
+        // their stale frame (0x0) constraints fight the layout below, which
+        // collapses the title stack and misplaces both buttons.
+        backButton.translatesAutoresizingMaskIntoConstraints = false
+        newConversationButton.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
             topBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             topBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
