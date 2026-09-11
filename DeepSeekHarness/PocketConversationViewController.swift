@@ -260,7 +260,7 @@ final class PocketConversationViewController: UIViewController, UITableViewDataS
         NSLayoutConstraint.activate([
             modeTabs.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             modeTabs.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-            modeTabs.topAnchor.constraint(equalTo: topBar.bottomAnchor, constant: 7),
+            modeTabs.topAnchor.constraint(equalTo: topBar.bottomAnchor, constant: 0),
             modeTabs.heightAnchor.constraint(equalToConstant: 48),
             configPanel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             configPanel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),

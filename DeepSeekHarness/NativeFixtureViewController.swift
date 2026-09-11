@@ -38,6 +38,16 @@ final class NativeFixtureViewController: UIViewController {
         home.didMove(toParent: self)
     }
 
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        // The production home hides the navigation bar (`MainViewController.render`
+        // calls `setNavigationBarHidden(true)`).  The screenshot host was mounted
+        // straight into a UINavigationController without that step, so every
+        // fixture capture inherited a phantom 44 pt bar that production never
+        // shows.  Mirror the production state before the first frame is drawn.
+        navigationController?.setNavigationBarHidden(true, animated: false)
+    }
+
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         guard !applied else { return }
